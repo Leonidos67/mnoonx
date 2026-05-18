@@ -67,6 +67,9 @@ yarn-error.log*
 tmp/
 temp/
 
+# Community file uploads (local dev)
+server/uploads/
+
 # Lock files
 .yarn-integrity
 .lock

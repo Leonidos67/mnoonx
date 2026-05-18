@@ -1,98 +1,206 @@
+# MNOONX Alpha Space — документация для AI-агентов
 
-## AGENTS.md
+## Краткое описание
 
-```markdown
-# MNOONX Alpha Space - Документация для AI агентов
+**MNOONX Alpha Space** — full-stack социальная платформа для Web3/крипто: посты, подписки, лайки, репосты, сообщества с installable apps, мессенджер (system + DM), уведомления, Discover.
 
-## 📌 Краткое описание
+Монорепозиторий: `client/` (React) + `server/` (Express + MongoDB).
 
-MNOONX — это социальная платформа (Twitter/X клон) для Web3 комьюнити. Пользователи создают посты, подписываются друг на друга, лайкают и репостят контент. Есть система сообщений и настройки профиля.
+## Архитектура
 
-## 🏗️ Архитектура
+| Слой | Стек |
+|------|------|
+| Фронтенд | React 18, TypeScript, Tailwind CSS, React Router v6, CRA |
+| Бэкенд | Node.js, Express, Mongoose |
+| Auth | JWT (`Authorization: Bearer`), bcryptjs |
+| Файлы | `server/uploads/` — `express.static('/uploads')` |
+| Стиль React | `React.FC`, хуки, `useCallback`, `useRef` |
 
-- **Фронтенд**: React 18 + TypeScript + Tailwind CSS
-- **Бэкенд**: Node.js + Express + MongoDB (Mongoose)
-- **Аутентификация**: JWT (jsonwebtoken + bcryptjs)
-- **Стиль кода**: Компоненты с `React.FC<>`, хуки, useCallback, useRef
-
-## 📂 Ключевые файлы
-
-### Фронтенд (client/src)
-
-| Файл | Назначение |
-|------|-----------|
-| `App.tsx` | Роутинг, модалки логина/регистрации |
-| `context/AuthContext.tsx` | Авторизация, хранение user/token |
-| `pages/UserProfile.tsx` | Профиль, посты, лайки, follow, меню поста |
-| `pages/Settings.tsx` | Настройки профиля с сайдбаром |
-| `pages/Messenger.tsx` | Чат с поддержкой |
-| `components/Layout/Sidebar.tsx` | Боковая панель навигации |
-
-### Бэкенд (server)
+### Контексты (клиент)
 
 | Файл | Назначение |
-|------|-----------|
-| `index.js` | Точка входа, CORS, маршруты |
-| `routes/auth.js` | Регистрация, логин, JWT |
-| `routes/users.js` | Профили, подписки, фолловеры |
-| `routes/posts.js` | CRUD постов, лайки, репосты |
-| `models/User.js` | Схема пользователя |
-| `models/Post.js` | Схема поста |
-| `models/Follow.js` | Схема подписок |
-| `middleware/auth.js` | JWT проверка |
+|------|------------|
+| `context/AuthContext.tsx` | `user`, `token`, login/register/logout, `localStorage` |
+| `context/UnreadsContext.tsx` | Счётчики непрочитанных messages/notifications для шапки, poll 15s |
 
-## 🔑 Важные детали реализации
+### Защита маршрутов
 
-### 1. Follow System
-- **ID хранятся как строки** в модели Follow (не ObjectId)
-- При подписке обновляются счетчики `followersCount` и `followingCount` в User
-- Поиск подписок: `Follow.findOne({ follower: userId.toString(), following: profileId.toString() })`
-- В GET /:username используется `auth` middleware для проверки `isFollowing`
+| Компонент | Где |
+|-----------|-----|
+| `components/Routing/RequireAuth.tsx` | `/settings`, профиль `/@username` (через `ProfileRoute`) |
+| Гостевой UI | Messenger, Notifications — сообщение «Sign in» без редиректа |
 
-### 2. Посты
-- `post.author` - строка (ID пользователя)
-- При получении постов автор заполняется вручную через `User.findById()`, а не `.populate()`
-- `isLiked` и `isReposted` вычисляются на сервере проверкой `req.userId` в массивах `likes`/`reposts`
-- Фронтенд использует `Set<string>` для отслеживания лайкнутых/репостнутых постов
+## Роутинг клиента (`client/src/App.tsx`)
 
-### 3. Лайки
-- `POST /api/posts/:id/like` - тоггл (добавить/удалить)
-- Метод `post.toggleLike(userId)` обновляет массив и счетчик
-- Фронтенд обновляет `likedPosts` (Set) и `posts` (состояние)
+| Путь | Компонент | Auth |
+|------|-----------|------|
+| `/` | `Home` | — |
+| `/discover` | `Discover` | — |
+| `/community/:handle` | `CommunityPage` | опционально |
+| `/community/:handle/settings` | `CommunitySettings` | owner |
+| `/community/:handle/store` | `CommunityStore` | owner install |
+| `/create-community` | `CreateCommunity` | — |
+| `/:username` | `ProfileRoute` → `/@name` или 404 | профиль: **RequireAuth** |
+| `/post/:postId` | `PostPage` | — |
+| `/messenger` | `Messenger` | API 401 без token |
+| `/notifications` | `Notifications` | API 401 без token |
+| `/users` | `Users` | API 401 без token |
+| `/settings` | `Settings` | **RequireAuth** |
+| `/plan` | `Plan` | — |
+| `/new`, `/new/personal`, `/new/business` | New* | — |
 
-### 4. Роутинг
-- `/` - Home
-- `/discover` - Discover
-- `/@:username` - Профиль пользователя
-- `/post/:id` - Отдельный пост
-- `/settings` - Настройки
-- `/messenger` - Сообщения
+Профиль в UI: `profilePath(username)` → `/@username` (`constants/paths.ts`).
 
-### 5. Меню поста (троеточие)
-- Появляется при наведении на пост (`group-hover/article:opacity-100`)
-- У своих постов: Copy link + Edit + Delete
-- У чужих: только Copy link
-- `isPostOwner()` сравнивает `user.username === post.author.username`
+Зарезервированные сегменты (не профиль): `discover`, `settings`, `messenger`, `notifications`, `users`, `community`, `post`, `plan`, `create-community`, `new` — см. `ProfileUsernameRedirect.tsx`.
 
-## 🐛 Типичные проблемы и решения
+## API (сервер)
 
-1. **`author` пустой после обновления** → использовать ручное заполнение вместо populate
-2. **Лайки сбрасываются** → загружать `isLiked`/`isReposted` с сервера в `fetchProfile`
-3. **Follow не определяется** → добавить `auth` middleware в GET /:username
-4. **Двойной `res.json()`** → удалить дублирующийся вызов
-5. **`Link` конфликт** → переименовать `Link as RouterLink` из react-router-dom и `Link as LinkIcon` из lucide
+Базовый URL: `http://localhost:5000/api` (клиент хардкодит localhost).
 
-## 🛠️ Команды для разработки
+| Префикс | Файл | Назначение |
+|---------|------|------------|
+| `/auth` | `routes/auth.js` | register, login |
+| `/users` | `routes/users.js` | `GET /list`, профиль, follow/unfollow |
+| `/posts` | `routes/posts.js` | CRUD, like, repost; посты в community |
+| `/communities` | `routes/communities.js` | CRUD, join/leave, posts, apps, chat, courses, files, announcements, events, branding |
+| `/messages` | `routes/messages.js` | conversations, DM, unread |
+| `/notifications` | `routes/notifications.js` | list, unread-count, mark read |
+
+### Middleware `auth.js`
+
+- Читает `Authorization: Bearer <token>`
+- При ошибке/отсутствии: `req.userId = null` (не 401) — маршруты сами решают доступ
+- Routes messages/notifications: явный 401 если нет `req.userId`
+
+## Модели MongoDB (`server/models/`)
+
+| Модель | Назначение |
+|--------|------------|
+| `User` | пользователь, счётчики, owned/joined communities |
+| `Post` | пост; `author` — **строка** userId; `community` optional |
+| `Follow` | `follower`, `following` — **строки** |
+| `Community` | сообщество, members, apps, isPublic, membersCanPost, joinCode |
+| `CommunityChatMessage`, `CommunityChatReadState` | чат в приложении |
+| `CommunityCourse`, `CommunityContentDocument`, `CommunityFile` | apps |
+| `CommunityAnnouncement`, `CommunityAnnouncementMeta` | announcements |
+| `CommunityEvent` | events |
+| `Conversation`, `DirectMessage`, `ConversationReadState` | мессенджер |
+| `Notification` | уведомления in-app |
+
+## Сообщества — важная логика
+
+### Доступ (`routes/communities.js`)
+
+- `canViewCommunity` — публичное или owner/member
+- `canPostInCommunity` — owner всегда; member если `membersCanPost !== false`
+- `GET /:handle` — 403 + `preview` для приватного без доступа
+- `GET /list` — **все** сообщества (в т.ч. private) для Discover
+- `serializeCommunityDoc` — `isMember`, `isOwner`, `canPost`, `requiresJoinCode`; `joinCode` только owner
+
+### Join
+
+- `POST /:handle/join` — body `{ joinCode }` если задан passphrase
+- `members` — ObjectId; сравнение через `.toString()`
+
+### Приложения
+
+- `installedAppInstances[]`: `{ id, appId, title, visibleToMembers, note }`
+- ID приложений: `chat`, `courses`, `content`, `files`, `announcements`, `events` (`client/src/constants/communityApps.ts`)
+- Store UI: `CommunityStore.tsx`; панели: `Community*Panel.tsx` на `CommunityPage`
+
+### Брендинг
+
+- `POST /:handle/branding` — multipart `avatar` / `banner` → `/uploads/community-branding/...`
+
+## Посты (`routes/posts.js`)
+
+- `post.author` — строка, без `.populate()`
+- Автор в ответе: `User.findById(author)`
+- `isLiked` / `isReposted` по `req.userId` в массивах likes/reposts
+- Создание в community: проверка member + `canPostInCommunity`
+- Клиент: `Set<string>` для id постов в лайках
+
+## Follow
+
+```js
+Follow.findOne({
+  follower: userId.toString(),
+  following: profileId.toString(),
+});
+```
+
+GET профиля по username — middleware `auth` для `isFollowing`.
+
+## Мессенджер (`services/messaging.js`)
+
+- При первом запросе: `ensureUserMessaging(userId)` — system чаты + seed notifications
+- `system_mnoonx`, `system_support` — по одному на пользователя (dedupe + unique index)
+- DM: две записи `Conversation` (у каждого owner свой inbox)
+- Unread: сообщения после `ConversationReadState.lastReadAt`
+- `POST /dm/:username` — создать/открыть DM
+
+## Уведомления
+
+- Типы: `mention`, `post`, `event`, `community`, `system`
+- `GET /?tab=mentions|all`
+- Seed при первом входе (2 шт.)
+
+## Ключевые файлы фронтенда
+
+| Файл | Назначение |
+|------|------------|
+| `App.tsx` | Routes, Login/Register modals, providers |
+| `components/Layout/AppLayout.tsx` | Sidebar + Header |
+| `components/Layout/Header.tsx` | Search, badges Messages/Notifications |
+| `components/Layout/Sidebar.tsx` | Nav, мои сообщества |
+| `pages/Home.tsx` | Глобальная лента |
+| `pages/UserProfile.tsx` | Профиль, посты, follow |
+| `pages/CommunityPage.tsx` | Сообщество, apps, лента, private gate |
+| `pages/CommunitySettings.tsx` | Visibility, joinCode, membersCanPost, delete |
+| `pages/Discover.tsx` | Список сообществ |
+| `pages/Messenger.tsx` | Чаты API, поиск users |
+| `pages/Notifications.tsx` | Лента уведомлений |
+
+## Типичные проблемы
+
+1. **Пустой author** — не использовать populate; подставлять `User.findById`.
+2. **Лайки сбрасываются** — отдавать `isLiked`/`isReposted` с сервера; ключи `Set` как `String(post._id)`.
+3. **Follow не виден** — `auth` на GET профиля; ID строками.
+4. **Дубликаты system-чатов** — гонка `ensureUserMessaging`; есть `dedupeSystemConversations` + unique index.
+5. **Двойной `res.json()`** — один ответ на запрос.
+6. **Link конфликт** — `Link` из `react-router-dom` vs `LinkIcon` из lucide.
+7. **`req.userId`** — нормализовать к строке в `auth.js`.
+8. **Приватное сообщество** — не вызывать `fetchPosts` без доступа; 403 → `privateGatePreview`.
+
+## Команды
 
 ```bash
-# Бэкенд
-cd server && npm run dev    # Запуск с nodemon
+cd server && npm run dev    # API :5000
+cd client && npm start      # UI :3000
+```
 
-# Фронтенд
-cd client && npm start      # Запуск React
+### MongoDB shell
 
-# MongoDB
-# Проверить подписки:
+```js
+db.users.find().pretty()
+db.communities.find({ handle: "my-handle" }).pretty()
+db.posts.find({ author: "USER_ID_STRING" }).pretty()
 db.follows.find().pretty()
-# Посты пользователя:
-db.posts.find({ author: "user_id" }).pretty()
+db.conversations.find({ ownerUserId: ObjectId("...") }).pretty()
+```
+
+## Переменные окружения (`server/.env`)
+
+```
+MONGO_URI=mongodb://127.0.0.1:27017/mnoonx
+JWT_SECRET=your_secret_here
+PORT=5000
+```
+
+## Правила для агентов
+
+- Менять только код, нужный для задачи; не рефакторить «заодно».
+- Не коммитить без явной просьбы пользователя.
+- После правок в `client/` — `npx tsc --noEmit` в `client/`.
+- Не путать `div` с несуществующими тегами при правках JSX.
+- Community routes файл очень большой — искать по `router.get/post` и имени фичи.

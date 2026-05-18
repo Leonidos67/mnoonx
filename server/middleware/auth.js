@@ -21,7 +21,8 @@ module.exports = (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
-    req.userId = decoded.userId || null;
+    const raw = decoded.userId;
+    req.userId = raw != null ? String(raw) : null;
     next();
   } catch (error) {
     // При любой ошибке токена - просто продолжаем без userId

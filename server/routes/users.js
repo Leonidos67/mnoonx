@@ -7,6 +7,70 @@ const Follow = require('../models/Follow');
 const Post = require('../models/Post');
 const auth = require('../middleware/auth');
 
+async function serializePostWithAuthor(post, viewerUserId) {
+  const author = await User.findById(post.author).select('username fullName avatar');
+  const uid = viewerUserId ? String(viewerUserId) : null;
+  return {
+    _id: post._id,
+    content: post.content,
+    author: author
+      ? {
+          _id: author._id.toString(),
+          username: author.username,
+          fullName: author.fullName || author.username,
+          avatar: author.avatar || '',
+        }
+      : {
+          _id: post.author,
+          username: 'unknown',
+          fullName: 'Unknown',
+          avatar: '',
+        },
+    media: post.media || [],
+    likesCount: post.likesCount || 0,
+    commentsCount: post.commentsCount || 0,
+    repostsCount: post.repostsCount || 0,
+    viewsCount: post.viewsCount || 0,
+    createdAt: post.createdAt,
+    updatedAt: post.updatedAt,
+    isLiked: uid ? post.likes.some((id) => String(id) === uid) : false,
+    isReposted: uid ? post.reposts.some((id) => String(id) === uid) : false,
+  };
+}
+
+// GET /api/users/list — directory (must be before /:username)
+router.get('/list', auth, async (req, res) => {
+  try {
+    const q = (req.query.q || '').toString().trim().toLowerCase();
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    const filter = {};
+    if (q) {
+      filter.$or = [
+        { username: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+        { fullName: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+      ];
+    }
+    const users = await User.find(filter)
+      .select('username fullName avatar followersCount createdAt')
+      .sort({ username: 1 })
+      .limit(limit)
+      .lean();
+    res.json(
+      users.map((u) => ({
+        id: u._id.toString(),
+        username: u.username,
+        fullName: u.fullName || u.username,
+        avatar: u.avatar || '',
+        followersCount: u.followersCount || 0,
+        isSelf: u._id.toString() === req.userId.toString(),
+      }))
+    );
+  } catch (error) {
+    console.error('List users error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // GET /api/users/:username
 router.get('/:username', auth, async (req, res) => {
   try {
@@ -49,51 +113,55 @@ router.get('/:username', auth, async (req, res) => {
 
     console.log('FINAL isFollowing:', isFollowing);
 
-    // Получаем посты
     const posts = await Post.find({ author: user._id.toString() })
       .sort({ createdAt: -1 })
-      .limit(10);
+      .limit(50);
 
-    // РУЧНОЕ ЗАПОЛНЕНИЕ АВТОРА (вместо populate)
-    const postsWithAuthor = await Promise.all(posts.map(async (post) => {
-      const author = await User.findById(post.author).select('username fullName avatar');
-      return {
-        _id: post._id,
-        content: post.content,
-        author: author ? {
-          _id: author._id.toString(),
-          username: author.username,
-          fullName: author.fullName || author.username,
-          avatar: author.avatar || ''
-        } : {
-          _id: post.author,
-          username: 'unknown',
-          fullName: 'Unknown',
-          avatar: ''
-        },
-        media: post.media || [],
-        likes: post.likes || [],
-        likesCount: post.likesCount || 0,
-        comments: post.comments || [],
-        commentsCount: post.commentsCount || 0,
-        reposts: post.reposts || [],
-        repostsCount: post.repostsCount || 0,
-        views: post.views || [],
-        viewsCount: post.viewsCount || 0,
-        createdAt: post.createdAt,
-        isLiked: req.userId ? post.likes.includes(req.userId.toString()) : false,
-        isReposted: req.userId ? post.reposts.includes(req.userId.toString()) : false
-      };
-    }));
+    const postsWithAuthor = await Promise.all(
+      posts.map((post) => serializePostWithAuthor(post, req.userId))
+    );
 
     res.json({
       ...user.toJSON(),
       isFollowing,
-      posts: postsWithAuthor
+      posts: postsWithAuthor,
     });
     
   } catch (error) {
     console.error('Get profile error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// GET /api/users/:username/reposts — posts this user has reposted
+router.get('/:username/reposts', auth, async (req, res) => {
+  try {
+    const { username } = req.params;
+    const user = await User.findOne({ username }).select('_id username');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const profileUserId = user._id.toString();
+    const idVariants = [profileUserId];
+    if (mongoose.Types.ObjectId.isValid(profileUserId)) {
+      idVariants.push(new mongoose.Types.ObjectId(profileUserId));
+    }
+
+    const posts = await Post.find({
+      reposts: { $in: idVariants },
+      isPrivate: { $ne: true },
+    })
+      .sort({ updatedAt: -1 })
+      .limit(50);
+
+    const postsWithAuthor = await Promise.all(
+      posts.map((post) => serializePostWithAuthor(post, req.userId))
+    );
+
+    res.json({ posts: postsWithAuthor, total: postsWithAuthor.length });
+  } catch (error) {
+    console.error('Get reposts error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

@@ -1,0 +1,90 @@
+const express = require('express');
+const router = express.Router();
+const Notification = require('../models/Notification');
+const User = require('../models/User');
+const auth = require('../middleware/auth');
+const { ensureUserMessaging } = require('../services/messaging');
+
+router.use(auth);
+router.use((req, res, next) => {
+  if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+  next();
+});
+
+router.get('/unread-count', async (req, res) => {
+  try {
+    await ensureUserMessaging(req.userId);
+    const mentions = await Notification.countDocuments({
+      userId: req.userId,
+      read: false,
+      type: 'mention',
+    });
+    const all = await Notification.countDocuments({
+      userId: req.userId,
+      read: false,
+    });
+    res.json({ mentions, all });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.get('/', async (req, res) => {
+  try {
+    await ensureUserMessaging(req.userId);
+    const tab = req.query.tab === 'mentions' ? 'mentions' : 'all';
+    const filter = { userId: req.userId };
+    if (tab === 'mentions') filter.type = 'mention';
+
+    const items = await Notification.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+
+    const actorIds = [...new Set(items.map((n) => n.actorUserId).filter(Boolean))];
+    const actors = await User.find({ _id: { $in: actorIds } })
+      .select('username fullName avatar')
+      .lean();
+    const actorMap = new Map(actors.map((a) => [a._id.toString(), a]));
+
+    const enriched = items.map((n) => ({
+      ...n,
+      actor: n.actorUserId ? actorMap.get(n.actorUserId.toString()) || null : null,
+    }));
+
+    res.json(enriched);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.patch('/read-all', async (req, res) => {
+  try {
+    const filter = { userId: req.userId, read: false };
+    if (req.query.tab === 'mentions') filter.type = 'mention';
+    await Notification.updateMany(filter, { $set: { read: true } });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.patch('/:id/read', async (req, res) => {
+  try {
+    const n = await Notification.findOneAndUpdate(
+      { _id: req.params.id, userId: req.userId },
+      { $set: { read: true } },
+      { new: true }
+    );
+    if (!n) return res.status(404).json({ message: 'Not found' });
+    res.json(n);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+module.exports = router;

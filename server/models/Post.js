@@ -43,6 +43,10 @@ const postSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
+  isPrivate: {
+    type: Boolean,
+    default: false
+  },
   commentsCount: {
     type: Number,
     default: 0
@@ -57,6 +61,11 @@ const postSchema = new mongoose.Schema({
   views: [{
     type: String // ID пользователей которые просмотрели
   }],
+  community: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Community',
+    default: null,
+  },
   viewsCount: {
     type: Number,
     default: 0
@@ -75,6 +84,7 @@ const postSchema = new mongoose.Schema({
 // Индексы для быстрого поиска
 postSchema.index({ author: 1, createdAt: -1 });
 postSchema.index({ createdAt: -1 });
+postSchema.index({ community: 1, isPrivate: 1, createdAt: -1 });
 
 // Middleware: обновляем счетчик постов пользователя
 postSchema.post('save', async function() {
@@ -100,9 +110,10 @@ postSchema.methods.addView = async function(userId) {
 
 // Метод для лайка
 postSchema.methods.toggleLike = async function(userId) {
-  const index = this.likes.indexOf(userId);
+  const uid = String(userId);
+  const index = this.likes.findIndex((id) => String(id) === uid);
   if (index === -1) {
-    this.likes.push(userId);
+    this.likes.push(uid);
   } else {
     this.likes.splice(index, 1);
   }

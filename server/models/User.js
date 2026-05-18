@@ -65,6 +65,14 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  ownedCommunities: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Community',
+  }],
+  joinedCommunities: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Community',
+  }],
   lastSeen: {
     type: Date,
     default: Date.now
