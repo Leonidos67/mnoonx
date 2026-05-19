@@ -25,6 +25,8 @@ Vercel хостит **только фронтенд** (CRA в `client/`). Expres
 
 5. Deploy.
 
+На Vercel `CI=true` по умолчанию — ESLint warnings ломают CRA build. В `vercel.json` уже стоит `CI=false` в buildCommand (или добавь переменную `CI` = `false` в Environment).
+
 `vercel.json` уже настроен:
 
 - `installCommand` / `buildCommand` — сборка из `client/`
