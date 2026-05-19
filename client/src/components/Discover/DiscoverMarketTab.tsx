@@ -18,7 +18,7 @@ import { formatPct, formatUsd, pctClass } from '../AI/marketFormat';
 import type { CoinDetail, CoinMarketRow, MarketsResponse, SearchCoinResult } from '../../types/ai';
 import { useAIChatPanel } from '../../context/AIChatPanelContext';
 
-const API_AI = 'http://localhost:5000/api/ai';
+import { AI_API as API_AI } from '../../config/api';
 const TABLE_PAGE_SIZE = 20;
 
 interface TokenRowProps {

@@ -55,7 +55,7 @@
 
 ## API (сервер)
 
-Базовый URL: `http://localhost:5000/api` (клиент хардкодит localhost).
+Базовый URL: `REACT_APP_API_URL` → `client/src/config/api.ts` (по умолчанию `http://localhost:5000`).
 
 | Префикс | Файл | Назначение |
 |---------|------|------------|

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import ResponsiveDialogShell from '../Common/ResponsiveDialogShell';
 
-const COMMUNITIES_API = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API } from '../../config/api';
 
 interface CommunityMemberRow {
   id: string;

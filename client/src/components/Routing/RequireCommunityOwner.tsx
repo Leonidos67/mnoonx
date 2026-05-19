@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { communityPath } from '../../constants/communityRoutes';
 import { canAccessCommunityDashboard } from '../../utils/communityRoles';
 
-const API_URL = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API_URL } from '../../config/api';
 
 interface RequireCommunityOwnerProps {
   children: React.ReactNode;

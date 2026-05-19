@@ -6,7 +6,7 @@ import { useCommunityDashboard } from '../../context/CommunityDashboardContext';
 import { communityPath } from '../../constants/communityRoutes';
 import { profilePath } from '../../constants/paths';
 
-const API_URL = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API_URL } from '../../config/api';
 
 interface FeedPost {
   _id: string;

@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { ArrowLeft, Upload } from 'lucide-react';
 
-const API_URL = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API_URL } from '../../config/api';
 
 export interface CreateCommunityFormProps {
   /** Fit inside AppLayout main (viewport minus header) with internal scroll */

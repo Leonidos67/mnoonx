@@ -23,7 +23,7 @@ import {
 } from '../../hooks/useDashboardAnalytics';
 import { communityDashboardSettingsPath } from '../../constants/communityRoutes';
 
-const API_URL = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API_URL } from '../../config/api';
 const PAGE_SIZE = 25;
 
 interface MemberRow {

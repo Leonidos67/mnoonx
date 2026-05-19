@@ -19,7 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 
-const API = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API } from '../../config/api';
 
 export interface CommunityFileRow {
   _id: string;

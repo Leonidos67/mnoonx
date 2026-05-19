@@ -69,6 +69,12 @@ npm start
 Фронтенд: [http://localhost:3000](http://localhost:3000)  
 API: [http://localhost:5000](http://localhost:5000)
 
+Переменная `REACT_APP_API_URL` в `client/.env.local` (см. `client/env.example`) — базовый URL API без суффикса `/api`.
+
+## Деплой на Vercel
+
+Фронтенд деплоится на Vercel; Express + MongoDB — на отдельном хостинге. Пошаговая инструкция: [docs/VERCEL.md](docs/VERCEL.md).
+
 Из **корня** (после установки зависимостей в `client` и `server`):
 
 ```bash

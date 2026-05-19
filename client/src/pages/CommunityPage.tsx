@@ -56,10 +56,8 @@ import { canAccessCommunityDashboard } from '../utils/communityRoles';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 
-const API_ORIGIN = 'http://localhost:5000';
+import { API_ORIGIN, COMMUNITIES_API as API_URL, POSTS_API as POSTS_API_URL } from '../config/api';
 const OWNER_ONLY_POST_NOTICE_KEY = 'communityOwnerOnlyPostNoticeDismissed';
-const API_URL = `${API_ORIGIN}/api/communities`;
-const POSTS_API_URL = `${API_ORIGIN}/api/posts`;
 
 interface InstalledAppInstance {
   id: string;

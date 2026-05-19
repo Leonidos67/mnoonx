@@ -1,0 +1,4 @@
+server/
+scripts/
+.github/
+**/node_modules/

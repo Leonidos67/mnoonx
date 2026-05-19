@@ -16,7 +16,7 @@ import { useAuth } from '../../context/AuthContext';
 import { communityPath, communitySettingsPath } from '../../constants/communityRoutes';
 import { profilePath } from '../../constants/paths';
 
-const API_COMMUNITIES = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API_COMMUNITIES } from '../../config/api';
 
 interface MyCommunity {
   _id: string;

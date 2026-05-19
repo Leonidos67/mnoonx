@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import type { CoinDetail, CoinMarketRow, MarketsResponse, SearchCoinResult } from '../../types/ai';
 
-const API_AI = 'http://localhost:5000/api/ai';
+import { AI_API as API_AI } from '../../config/api';
 
 function formatUsd(value: number | null | undefined, compact = false): string {
   if (value == null || Number.isNaN(value)) return '—';

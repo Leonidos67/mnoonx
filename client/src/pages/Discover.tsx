@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext';
 import DiscoverMarketTab from '../components/Discover/DiscoverMarketTab';
 import DiscoverExportBackground from '../components/Discover/DiscoverExportBackground';
 import MobileBottomSheet from '../components/Common/MobileBottomSheet';
+import { COMMUNITIES_API as API_URL } from '../config/api';
 
 const SECTION_PAGE_SIZE = 4;
 
@@ -30,8 +31,6 @@ interface Community {
   isPaid: boolean;
   price: number;
 }
-
-const API_URL = 'http://localhost:5000/api/communities';
 
 function matchesSearch(community: Community, query: string): boolean {
   const q = query.trim().toLowerCase();

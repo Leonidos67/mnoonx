@@ -18,8 +18,7 @@ import PostMediaUpload from '../components/Posts/PostMediaUpload';
 import PostMediaGallery from '../components/Posts/PostMediaGallery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 
-const API_URL = 'http://localhost:5000/api/users';
-const POSTS_API_URL = 'http://localhost:5000/api/posts';
+import { USERS_API as API_URL, POSTS_API as POSTS_API_URL } from '../config/api';
 
 interface Post {
   _id: string;

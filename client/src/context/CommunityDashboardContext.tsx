@@ -8,7 +8,7 @@ import {
 import { canAccessCommunityDashboard } from '../utils/communityRoles';
 import { communityPath } from '../constants/communityRoutes';
 
-const API_URL = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API_URL } from '../config/api';
 
 export interface DashboardInstalledApp {
   id: string;

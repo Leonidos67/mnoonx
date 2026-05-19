@@ -19,7 +19,7 @@ import { dashboardAppLabel } from '../../components/Community/Dashboard/dashboar
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 
-const API_URL = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API_URL } from '../../config/api';
 const PAGE_SIZE = 25;
 
 interface ProductRow {

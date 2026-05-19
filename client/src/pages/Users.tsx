@@ -4,7 +4,7 @@ import { MessageCircle, Search } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { profilePath } from '../constants/paths';
 
-const API_URL = 'http://localhost:5000/api/users';
+import { USERS_API as API_URL, MESSAGES_API } from '../config/api';
 
 interface DirectoryUser {
   id: string;
@@ -59,7 +59,7 @@ const Users: React.FC = () => {
     }
     setMessagingId(username);
     try {
-      const res = await fetch(`http://localhost:5000/api/messages/dm/${encodeURIComponent(username)}`, {
+      const res = await fetch(`${MESSAGES_API}/dm/${encodeURIComponent(username)}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });

@@ -9,7 +9,7 @@ import {
 } from './marketChatTemplates';
 import type { ChatResponse, MarketsResponse } from '../../types/ai';
 
-const API_AI = 'http://localhost:5000/api/ai';
+import { AI_API as API_AI } from '../../config/api';
 
 const QUICK_ICONS: Record<MarketChatTemplateId, React.ReactNode> = {
   gainers: <TrendingUp className="h-3.5 w-3.5 shrink-0 text-emerald-600" />,

@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 
-const API = 'http://localhost:5000/api';
+import { API_BASE as API } from '../config/api';
 
 interface UnreadsContextType {
   messageUnread: number;

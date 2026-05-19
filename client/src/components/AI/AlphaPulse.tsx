@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Activity, Loader2, Radio } from 'lucide-react';
 import type { PulseResponse, PulseSentiment } from '../../types/ai';
 
-const API_AI = 'http://localhost:5000/api/ai';
+import { AI_API as API_AI } from '../../config/api';
 
 const PULSE_INTERVAL_MS = 90_000;
 

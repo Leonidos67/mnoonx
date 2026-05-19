@@ -17,8 +17,8 @@ import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import MobileBottomSheet from '../components/Common/MobileBottomSheet';
 
-const API_URL = 'http://localhost:5000/api/posts';
-const USERS_API_URL = 'http://localhost:5000/api/users';
+import { POSTS_API as API_URL, USERS_API } from '../config/api';
+
 
 interface PostComment {
   _id: string;
@@ -195,7 +195,7 @@ const Home: React.FC = () => {
   const fetchSuggestedUsers = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await fetch(`${USERS_API_URL}/suggested`, {
+      const res = await fetch(`${USERS_API}/suggested`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {

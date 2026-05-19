@@ -14,8 +14,17 @@ console.log('JWT_SECRET value:', process.env.JWT_SECRET ? process.env.JWT_SECRET
 const path = require('path');
 const app = express();
 
-// Middleware
-app.use(cors());
+// Middleware — CLIENT_ORIGIN: comma-separated list (Vercel URL + localhost)
+const corsOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:3000')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+app.use(
+  cors({
+    origin: corsOrigins,
+    credentials: true,
+  }),
+);
 app.use(express.json({ limit: '2mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

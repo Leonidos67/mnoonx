@@ -1,7 +1,7 @@
 // context/AuthContext.tsx
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
-const API_URL = 'http://localhost:5000/api/auth';
+import { AUTH_API as API_URL } from '../config/api';
 
 interface User {
   id: string;

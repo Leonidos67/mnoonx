@@ -22,7 +22,7 @@ import ResponsiveDialogShell from '../Common/ResponsiveDialogShell';
 import { useConfirm } from '../../context/ConfirmContext';
 import { communityPath } from '../../constants/communityRoutes';
 
-const API = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API } from '../../config/api';
 
 interface Host {
   _id: string;

@@ -6,7 +6,7 @@ import { ArrowLeft } from 'lucide-react';
 import PostMediaGallery from '../components/Posts/PostMediaGallery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 
-const API_URL = 'http://localhost:5000/api/posts';
+import { POSTS_API as API_URL, USERS_API } from '../config/api';
 
 interface Post {
   _id: string;
@@ -67,7 +67,7 @@ const PostPage: React.FC = () => {
         // Если author - это строка (ID), подгружаем данные пользователя
         if (typeof data.author === 'string') {
         try {
-            const userRes = await fetch(`http://localhost:5000/api/users/${data.author}`, { headers });
+            const userRes = await fetch(`${USERS_API}/${data.author}`, { headers });
             if (userRes.ok) {
             const userData = await userRes.json();
             data.author = {

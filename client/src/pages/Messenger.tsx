@@ -29,8 +29,8 @@ import MessengerMessageBody from '../components/Messenger/MessengerMessageBody';
 import { MessengerEmojiItem } from '../constants/messengerEmojis';
 import { encodeAnimojiMessage, formatMessagePreview, isAnimojiOnlyMessage } from '../utils/messengerAnimoji';
 
-const MSG_API = 'http://localhost:5000/api/messages';
-const USERS_API = 'http://localhost:5000/api/users';
+import { MESSAGES_API as MSG_API, USERS_API as USERS_API } from '../config/api';
+
 /** Within this distance from the bottom, new messages auto-scroll. */
 const SCROLL_NEAR_BOTTOM_PX = 72;
 

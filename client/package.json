@@ -10,7 +10,7 @@
     "bcryptjs": "^3.0.3",
     "framer-motion": "^10.16.4",
     "lottie-web": "^5.13.0",
-    "lucide-react": "^1.14.0",
+    "lucide-react": "^1.16.0",
     "ogl": "^1.0.11",
     "postprocessing": "^6.36.0",
     "react": "^18.2.0",

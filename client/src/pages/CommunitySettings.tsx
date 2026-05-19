@@ -6,7 +6,7 @@ import { communityPath, COMMUNITY_SETTINGS_SEGMENT } from '../constants/communit
 import { isCommunityOwner } from '../utils/communityOwner';
 import { useConfirm } from '../context/ConfirmContext';
 
-const API_URL = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API_URL } from '../config/api';
 
 const CATEGORIES = [
   'Memecoins',

@@ -20,7 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import ResponsiveDialogShell from '../components/Common/ResponsiveDialogShell';
 
-const API = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API } from '../config/api';
 
 type AppCategory =
   | 'All'

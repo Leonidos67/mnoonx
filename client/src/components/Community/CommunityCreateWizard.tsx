@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import SimpleWizard, { WizardStep } from '../Common/SimpleWizard';
 
-const API_URL = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API_URL } from '../../config/api';
 
 export type CommunityWizardVariant = 'personal' | 'business';
 

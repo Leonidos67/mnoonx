@@ -29,7 +29,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 import ResponsiveDialogShell from '../Common/ResponsiveDialogShell';
 import { communityPath } from '../../constants/communityRoutes';
 
-const API = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API } from '../../config/api';
 
 const Z_OVERLAY = 10000;
 const Z_MENU = 10001;

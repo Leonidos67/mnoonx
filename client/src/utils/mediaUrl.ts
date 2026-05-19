@@ -1,4 +1,6 @@
-export const API_ORIGIN = 'http://localhost:5000';
+import { API_ORIGIN } from '../config/api';
+
+export { API_ORIGIN };
 
 export function resolveMediaUrl(url: string): string {
   if (!url) return '';

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useUnreads } from '../context/UnreadsContext';
 
-const API_URL = 'http://localhost:5000/api/notifications';
+import { NOTIFICATIONS_API as API_URL } from '../config/api';
 
 interface NotificationActor {
   username: string;

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, MessageCircle, Lock, Check, CheckCheck, SendHorizonal } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
-const API = 'http://localhost:5000/api/communities';
+import { COMMUNITIES_API as API } from '../../config/api';
 
 interface ChatAuthor {
   _id: string;
