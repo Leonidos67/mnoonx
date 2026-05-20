@@ -3,12 +3,12 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   MessageCircle, Repeat2, Heart, 
-  Smile, Send, X,
+  Send, X,
   MoreHorizontal, Pen, Trash, Unlink2,
   Globe, Lock, Search, Users, Calendar, ArrowLeft
 } from 'lucide-react';
-import PostMediaUpload from '../components/Posts/PostMediaUpload';
 import PostMediaGallery from '../components/Posts/PostMediaGallery';
+import PostComposer from '../components/Posts/PostComposer';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 import HomeSidebarPromoCarousel from '../components/Home/HomeSidebarPromoCarousel';
 import FloatingMenu from '../components/Common/FloatingMenu';
@@ -16,6 +16,7 @@ import EditTextModal from '../components/Common/EditTextModal';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import MobileBottomSheet from '../components/Common/MobileBottomSheet';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 import { POSTS_API as API_URL, USERS_API } from '../config/api';
 
@@ -102,8 +103,9 @@ const Home: React.FC = () => {
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
   const [isPosting, setIsPosting] = useState(false);
   const [suggestedUsers, setSuggestedUsers] = useState<SuggestedUser[]>([]);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isLgUp = useMediaQuery('(min-width: 1024px)');
+  const mobileComposerFull = isCreateOpen && !isLgUp;
 
   // Закрытие меню поста при клике вне
   useEffect(() => {
@@ -212,12 +214,11 @@ const Home: React.FC = () => {
     fetchSuggestedUsers();
   }, [fetchPosts, fetchSuggestedUsers]);
 
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-    }
-  }, [newPostContent]);
+  const closeComposer = useCallback(() => {
+    setIsCreateOpen(false);
+    setNewPostContent('');
+    setNewPostMedia([]);
+  }, []);
 
   const handleLike = async (postId: string) => {
     if (!token) {
@@ -830,74 +831,23 @@ const Home: React.FC = () => {
           </div>
         </div>
 
-        {/* Create Post */}
-        {!isCreateOpen ? (
-          <div
-            onClick={() => setIsCreateOpen(true)}
-            className="shrink-0 cursor-pointer border-b border-neutral-200 p-4 transition-colors hover:bg-neutral-50"
-          >
-            <div className="flex gap-3">
-              <img 
-                src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.fullName || 'User'}&background=000&color=fff&size=40&bold=true`}
-                alt=""
-                className="w-10 h-10 rounded-full"
-              />
-              <div className="flex-1">
-                <p className="text-neutral-500 text-base">What's on your mind?</p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="shrink-0 border-b border-neutral-200 bg-neutral-50 p-4">
-            <div className="flex gap-3">
-              <img 
-                src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.fullName || 'User'}&background=000&color=fff&size=40&bold=true`}
-                alt=""
-                className="w-10 h-10 rounded-full flex-shrink-0"
-              />
-              <div className="flex-1">
-                <textarea 
-                  ref={textareaRef}
-                  value={newPostContent} 
-                  onChange={(e) => setNewPostContent(e.target.value)}
-                  placeholder="What's on your mind?" 
-                  className="w-full resize-none outline-none text-neutral-900 bg-transparent placeholder:text-neutral-500 min-h-[100px] text-base"
-                  maxLength={2000} 
-                  autoFocus 
-                />
-                <PostMediaUpload
-                  urls={newPostMedia}
-                  onUrlsChange={setNewPostMedia}
-                  token={token}
-                />
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-200">
-                  <div className="flex items-center gap-2">
-                    <button type="button" className="p-2 hover:bg-neutral-100 rounded-full transition-colors text-neutral-500">
-                      <Smile size={18} />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => { setIsCreateOpen(false); setNewPostContent(''); setNewPostMedia([]); }} 
-                      className="px-4 py-2 rounded-full text-sm font-semibold hover:bg-neutral-100 transition-colors">
-                      Cancel
-                    </button>
-                    <button onClick={handleCreatePost} disabled={(!newPostContent.trim() && newPostMedia.length === 0) || isPosting}
-                      className="px-5 py-2 bg-black text-white rounded-full text-sm font-semibold hover:bg-neutral-800 transition-colors disabled:opacity-50 flex items-center gap-2">
-                      {isPosting ? (
-                        <><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>Posting...</>
-                      ) : (
-                        <>Post</>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <PostComposer
+          isOpen={isCreateOpen}
+          onOpen={() => setIsCreateOpen(true)}
+          content={newPostContent}
+          onContentChange={setNewPostContent}
+          media={newPostMedia}
+          onMediaChange={setNewPostMedia}
+          onCancel={closeComposer}
+          onSubmit={() => void handleCreatePost()}
+          isPosting={isPosting}
+          userAvatar={user?.avatar}
+          userFullName={user?.fullName}
+          token={token}
+        />
 
         {/* Posts Feed */}
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className={`min-h-0 flex-1 overflow-y-auto ${mobileComposerFull ? 'hidden' : ''}`}>
           {posts.length > 0 ? posts.map(post => {
             // Определяем, отображать ли от имени сообщества
             const displayAsCommunity = post.community && !post.isPrivate;
@@ -921,7 +871,7 @@ const Home: React.FC = () => {
                     <img 
                       src={displayAvatar}
                       alt={displayName} 
-                      className="w-10 h-10 rounded-full hover:opacity-90 transition-opacity object-cover"
+                      className="w-6 h-6 rounded-full hover:opacity-90 transition-opacity object-cover"
                     />
                   </Link>
                   <div className="flex-1 min-w-0">

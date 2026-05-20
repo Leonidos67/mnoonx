@@ -53,6 +53,14 @@ const USERS = [
   { username: 'stable_sage', email: 'stable@seed.mnoonx.dev', fullName: 'Stable Sage', bio: 'Stables, yields, depeg risk.' },
   { username: 'nft_flipper', email: 'nft@seed.mnoonx.dev', fullName: 'NFT Flipper', bio: 'Collections & floor trends.' },
   { username: 'base_builder', email: 'base@seed.mnoonx.dev', fullName: 'Base Builder', bio: 'Base ecosystem apps & TVL.' },
+  { username: 'riven_trades', email: 'riven@seed.mnoonx.dev', fullName: 'Riven Trades', bio: 'Swing trades · BTC & majors · journal only.' },
+  { username: 'orbit_eth', email: 'orbit@seed.mnoonx.dev', fullName: 'Orbit ETH', bio: 'Ethereum staking, restaking, LRT flows.' },
+  { username: 'nova_macro_ru', email: 'nova@seed.mnoonx.dev', fullName: 'Nova Macro RU', bio: 'Макро и риск. Комментарии на русском.' },
+  { username: 'airdrop_ace', email: 'ace@seed.mnoonx.dev', fullName: 'Airdrop Ace', bio: 'Farm checkpoints & eligibility threads.' },
+  { username: 'restaking_ray', email: 'ray@seed.mnoonx.dev', fullName: 'Restaking Ray', bio: 'EigenLayer · AVS · points meta.' },
+  { username: 'pepe_signals', email: 'pepe@seed.mnoonx.dev', fullName: 'Pepe Signals', bio: 'Meme coin scans — ETH & SOL.' },
+  { username: 'arb_alex', email: 'arb@seed.mnoonx.dev', fullName: 'Arb Alex', bio: 'Arbitrum ecosystem & gaming.' },
+  { username: 'yield_yuki', email: 'yuki@seed.mnoonx.dev', fullName: 'Yield Yuki', bio: 'Real yield · LP risk · points.' },
 ];
 
 /** @type {{ username: string; content: string; publishedAt: string; likes?: number; reposts?: number; comments?: { by: string; text: string; publishedAt: string }[] }[]} */
@@ -65,7 +73,7 @@ const POSTS = [
     reposts: 1,
     comments: [
       { by: 'memecoin_hunter', text: 'Watching the same level. Volume picked up last night.', publishedAt: '19.05.2026 19:32' },
-      { by: 'sol_degen_ru', text: 'Согласен, но размер маленький пока.', publishedAt: '19.05.2026 19:50' },
+      { by: 'pepe_signals', text: 'Same read — keeping size small until daily close confirms.', publishedAt: '19.05.2026 19:50' },
       { by: 'perp_master', text: 'Funding flat — no crowded longs yet. Interesting.', publishedAt: '19.05.2026 20:14' },
     ],
   },
@@ -109,7 +117,7 @@ const POSTS = [
     comments: [
       { by: 'perp_master', text: 'OI chart matches your point #3.', publishedAt: '19.05.2026 08:02' },
       { by: 'funding_watcher', text: 'Funding on HL still cleaner than most CEX.', publishedAt: '19.05.2026 08:32' },
-      { by: 'btc_oracle_ru', text: 'Сохранил тред, спасибо за структуру.', publishedAt: '19.05.2026 09:02' },
+      { by: 'restaking_ray', text: 'Saved the thread — clean structure, thanks.', publishedAt: '19.05.2026 09:02' },
       { by: 'chainscout', text: 'Would add bridge latency data next.', publishedAt: '19.05.2026 10:02' },
     ],
   },
@@ -130,9 +138,10 @@ const POSTS = [
     likes: 12,
     reposts: 2,
     comments: [
-      { by: 'macro_mike', text: 'DXY cooled — helps this thesis.', publishedAt: '19.05.2026 17:32' },
+      { by: 'nova_macro_ru', text: 'DXY ослаб — поддерживает сценарий.', publishedAt: '19.05.2026 17:32' },
       { by: 'onchain_anna', text: 'Exchange outflows ticked up too.', publishedAt: '19.05.2026 18:02' },
       { by: 'eth_maxi', text: 'ETH lagging as usual on BTC pumps 😅', publishedAt: '19.05.2026 18:32' },
+      { by: 'nova_macro_ru', text: 'Согласен по ликвидациям — объём шортов заметный.', publishedAt: '19.05.2026 19:10' },
     ],
   },
   {
@@ -140,7 +149,7 @@ const POSTS = [
     publishedAt: '18.05.2026 09:02',
     content: 'Fed speakers this week = volatility. Reduce leverage, widen stops. Spot > perps for most.',
     likes: 5,
-    comments: [{ by: 'stable_sage', text: 'Risk-off into events — wise.', publishedAt: '16.05.2026 22:02' }],
+    comments: [{ by: 'nova_macro_ru', text: 'Перед событиями — только спот, согласен.', publishedAt: '16.05.2026 22:02' }],
   },
   {
     username: 'memecoin_hunter',
@@ -149,7 +158,7 @@ const POSTS = [
     likes: 8,
     reposts: 1,
     comments: [
-      { by: 'sol_degen_ru', text: 'Жду откат, не гонюсь.', publishedAt: '19.05.2026 12:02' },
+      { by: 'pepe_signals', text: 'Waiting for the pullback — not chasing green.', publishedAt: '19.05.2026 12:02' },
       { by: 'cryptoalpha', text: 'Aligned. No FOMO entries.', publishedAt: '19.05.2026 12:32' },
     ],
   },
@@ -203,7 +212,7 @@ const POSTS = [
     reposts: 1,
     comments: [
       { by: 'stable_sage', text: 'Mint dominated by USDC — risk-on signal.', publishedAt: '19.05.2026 06:02' },
-      { by: 'btc_oracle_ru', text: 'Слежу за тем же.', publishedAt: '19.05.2026 06:32' },
+      { by: 'riven_trades', text: 'Tracking the same mint + reserve trend.', publishedAt: '19.05.2026 06:32' },
       { by: 'funding_watcher', text: 'Perps OI not extreme yet. Room to run?', publishedAt: '19.05.2026 07:02' },
     ],
   },
@@ -241,7 +250,7 @@ const POSTS = [
     comments: [
       { by: 'macro_mike', text: 'ETF flows driving the tape again.', publishedAt: '19.05.2026 21:08' },
       { by: 'chainscout', text: 'SOL TVL line — which protocols?', publishedAt: '19.05.2026 21:20' },
-      { by: 'btc_oracle_ru', text: 'Кратко и по делу, спасибо.', publishedAt: '19.05.2026 21:32' },
+      { by: 'macro_mike', text: 'Clean roundup — saved for the morning brief.', publishedAt: '19.05.2026 21:32' },
     ],
   },
   {
@@ -278,7 +287,7 @@ const POSTS = [
     content: 'DXY rolled over 2%. Historically risk assets get a bid 1–2 weeks later. Watch BTC correlation.',
     likes: 9,
     comments: [
-      { by: 'btc_oracle_ru', text: 'Макро совпадает с ончейн.', publishedAt: '19.05.2026 04:02' },
+      { by: 'onchain_anna', text: 'On-chain risk appetite ticking up in stables too.', publishedAt: '19.05.2026 04:02' },
       { by: 'stable_sage', text: 'Stables rotating into crypto slowly?', publishedAt: '19.05.2026 04:32' },
     ],
   },
@@ -328,7 +337,7 @@ const POSTS = [
     publishedAt: '17.05.2026 11:02',
     content: 'Weekend plan: less size, wider stops. Memes only on confirmed volume.',
     likes: 3,
-    comments: [{ by: 'sol_degen_ru', text: 'Умно. Выходные — ловушки.', publishedAt: '15.05.2026 01:02' }],
+    comments: [{ by: 'riven_trades', text: 'Smart. Weekends are liquidity traps.', publishedAt: '15.05.2026 01:02' }],
   },
   {
     username: 'defi_chad',
@@ -337,8 +346,9 @@ const POSTS = [
     likes: 8,
     reposts: 1,
     comments: [
-      { by: 'perp_master', text: 'Fee savings add up for active traders.', publishedAt: '17.05.2026 05:02' },
-      { by: 'funding_watcher', text: 'Plus better funding transparency.', publishedAt: '17.05.2026 06:02' },
+      { by: 'perp_master', text: 'На объёме >$50M/день экономия ощутимая.', publishedAt: '17.05.2026 05:02' },
+      { by: 'funding_watcher', text: 'Плюс funding прозрачнее, чем на CEX.', publishedAt: '17.05.2026 06:02' },
+      { by: 'nova_macro_ru', text: 'Хорошее сравнение, возьму в заметки.', publishedAt: '17.05.2026 06:30' },
     ],
   },
   {
@@ -346,7 +356,10 @@ const POSTS = [
     publishedAt: '16.05.2026 00:02',
     content: 'Доминация BTC стабильна. Альты без BTC — слабый сетап для агрессии.',
     likes: 5,
-    comments: [{ by: 'altseason_io', text: 'Waiting for dominance rollover.', publishedAt: '12.05.2026 06:02' }],
+    comments: [
+      { by: 'nova_macro_ru', text: 'Жду rollover доминации — пока только BTC.', publishedAt: '12.05.2026 06:02' },
+      { by: 'sol_degen_ru', text: 'Согласен, альты без битка — ловушка.', publishedAt: '12.05.2026 07:02' },
+    ],
   },
   {
     username: 'web3_daily',
@@ -360,7 +373,7 @@ const POSTS = [
     publishedAt: '16.05.2026 20:02',
     content: 'Miner outflows below 30d avg. Selling pressure easing on BTC supply side.',
     likes: 6,
-    comments: [{ by: 'btc_oracle_ru', text: 'Подтверждаю по Glassnode.', publishedAt: '13.05.2026 20:02' }],
+    comments: [{ by: 'macro_mike', text: 'Miner data matches the softer supply narrative.', publishedAt: '13.05.2026 20:02' }],
   },
   {
     username: 'memecoin_hunter',
@@ -368,9 +381,186 @@ const POSTS = [
     content: 'New ticker every day on SOL — 90% rugs. Stick to names with 7d+ holder growth.',
     likes: 5,
     comments: [
-      { by: 'sol_degen_ru', text: 'Уроками учимся дорого 😅', publishedAt: '17.05.2026 09:02' },
+      { by: 'pepe_signals', text: 'Learned that lesson the hard way last month 😅', publishedAt: '17.05.2026 09:02' },
       { by: 'cryptoalpha', text: 'Holder chart > hype tweets.', publishedAt: '17.05.2026 10:02' },
     ],
+  },
+  // —— New accounts & extra posts ——
+  {
+    username: 'riven_trades',
+    publishedAt: '19.05.2026 20:32',
+    content: 'BTC 4H: higher low held. Invalidation below $92.8k. Targeting prior range high if volume confirms.',
+    likes: 6,
+    comments: [
+      { by: 'perp_master', text: 'Same invalidation zone on my chart.', publishedAt: '19.05.2026 18:02' },
+      { by: 'macro_mike', text: 'Risk-on tape helps this setup.', publishedAt: '19.05.2026 18:40' },
+    ],
+  },
+  {
+    username: 'riven_trades',
+    publishedAt: '17.05.2026 14:02',
+    content: 'Cut one alt loser early — preserved capital for the next BTC swing. Journal > ego.',
+    likes: 4,
+    comments: [{ by: 'altseason_io', text: 'Sizing discipline is underrated.', publishedAt: '16.05.2026 09:02' }],
+  },
+  {
+    username: 'orbit_eth',
+    publishedAt: '19.05.2026 11:32',
+    content: 'Restaking points: concentration in top AVSs rising. Diversification still matters before TGE clusters.',
+    likes: 7,
+    reposts: 1,
+    comments: [
+      { by: 'restaking_ray', text: 'EigenLayer caps worth re-reading this week.', publishedAt: '19.05.2026 08:02' },
+      { by: 'eth_maxi', text: 'ETH beta to restaking narrative still strong.', publishedAt: '19.05.2026 08:45' },
+    ],
+  },
+  {
+    username: 'orbit_eth',
+    publishedAt: '18.05.2026 06:02',
+    content: '$ETH staking yield vs T-bills — spread compressed but on-chain demand sticky.',
+    likes: 5,
+    comments: [{ by: 'yield_yuki', text: 'Real yield hunters still allocating.', publishedAt: '17.05.2026 20:02' }],
+  },
+  {
+    username: 'nova_macro_ru',
+    publishedAt: '19.05.2026 16:32',
+    content: 'Индекс доллара: откат от локального хая. Риск-активы обычно откликаются с лагом 5–10 дней.',
+    likes: 8,
+    comments: [
+      { by: 'btc_oracle_ru', text: 'Совпадает с картиной по BTC.', publishedAt: '19.05.2026 12:02' },
+      { by: 'sol_degen_ru', text: 'Жду подтверждения на графике, не рано ли.', publishedAt: '19.05.2026 12:40' },
+    ],
+  },
+  {
+    username: 'nova_macro_ru',
+    publishedAt: '15.05.2026 18:02',
+    content: 'Неделя отчётов по инфляции — уменьшаю плечо на всех позициях.',
+    likes: 4,
+    comments: [{ by: 'btc_oracle_ru', text: 'Тоже спот и малый размер.', publishedAt: '14.05.2026 10:02' }],
+  },
+  {
+    username: 'airdrop_ace',
+    publishedAt: '19.05.2026 13:32',
+    content: 'Checkpoint reminder: L2 bridge activity still counts for several Q2 campaigns. Batch txs > one-off bridges.',
+    likes: 9,
+    reposts: 1,
+    comments: [
+      { by: 'chainscout', text: 'Which L2s still weight volume vs unique days?', publishedAt: '19.05.2026 10:02' },
+      { by: 'arb_alex', text: 'Arbitrum quests still live — double-check deadlines.', publishedAt: '19.05.2026 10:30' },
+    ],
+  },
+  {
+    username: 'airdrop_ace',
+    publishedAt: '16.05.2026 11:02',
+    content: 'Sybil filters getting stricter — quality wallets > farm quantity.',
+    likes: 6,
+    comments: [{ by: 'base_builder', text: 'On-chain history length matters now.', publishedAt: '15.05.2026 08:02' }],
+  },
+  {
+    username: 'restaking_ray',
+    publishedAt: '19.05.2026 10:32',
+    content: 'AVS launch calendar crowded in June. Points dilution risk if you chase every meta.',
+    likes: 7,
+    comments: [
+      { by: 'orbit_eth', text: 'Picking two AVSs max for my stack.', publishedAt: '19.05.2026 07:02' },
+      { by: 'defi_chad', text: 'Tokenomics threads on each before deposit.', publishedAt: '19.05.2026 07:40' },
+    ],
+  },
+  {
+    username: 'pepe_signals',
+    publishedAt: '19.05.2026 14:32',
+    content: '$PEPE holding daily VWAP on ETH — SOL memes louder but ETH beta names basing.',
+    likes: 5,
+    comments: [
+      { by: 'memecoin_hunter', text: 'Watching holder growth on PEPE vs new SOL tickers.', publishedAt: '19.05.2026 11:02' },
+      { by: 'cryptoalpha', text: 'ETH meme liquidity still deeper on exits.', publishedAt: '19.05.2026 11:35' },
+    ],
+  },
+  {
+    username: 'pepe_signals',
+    publishedAt: '18.05.2026 11:02',
+    content: 'Scan: top 10 SOL memes by 24h unique buyers — only 3 pass my holder filter.',
+    likes: 4,
+    comments: [{ by: 'memecoin_hunter', text: 'DMing you — want to compare against my scan.', publishedAt: '17.05.2026 16:02' }],
+  },
+  {
+    username: 'arb_alex',
+    publishedAt: '19.05.2026 07:32',
+    content: 'Arbitrum gaming cohort: DAU +18% WoW. Tokens lagging — watch for catch-up trade.',
+    likes: 6,
+    comments: [
+      { by: 'chainscout', text: 'Cross-checking with bridge inflows.', publishedAt: '19.05.2026 04:02' },
+      { by: 'nft_flipper', text: 'NFT volumes on Arb still quiet though.', publishedAt: '19.05.2026 04:40' },
+    ],
+  },
+  {
+    username: 'yield_yuki',
+    publishedAt: '19.05.2026 06:32',
+    content: 'Stable LP on Base: advertised APY vs realized after IL — spread widening on volatile pairs.',
+    likes: 5,
+    comments: [
+      { by: 'stable_sage', text: 'Stick to stables-only pools for now.', publishedAt: '19.05.2026 02:02' },
+      { by: 'base_builder', text: 'New pool incentives distort the headline APY.', publishedAt: '19.05.2026 02:35' },
+    ],
+  },
+  {
+    username: 'cryptoalpha',
+    publishedAt: '19.05.2026 12:02',
+    content: 'Intraday: booked partial on $BONK, runner left. Trail stop under VWAP.',
+    likes: 5,
+    comments: [{ by: 'solwhale_io', text: 'Same — locked profit on the spike.', publishedAt: '19.05.2026 10:02' }],
+  },
+  {
+    username: 'solwhale_io',
+    publishedAt: '19.05.2026 05:02',
+    content: 'Jupiter volume share back above 80% on SOL swaps — aggregator moat intact.',
+    likes: 6,
+    comments: [{ by: 'defi_chad', text: 'Fee switch narrative still the elephant in the room.', publishedAt: '18.05.2026 22:02' }],
+  },
+  {
+    username: 'eth_maxi',
+    publishedAt: '18.05.2026 14:02',
+    content: 'L2 fees sub-cent on Base & Arb — good for adoption, thin for token burns short-term.',
+    likes: 5,
+    comments: [
+      { by: 'layer2_lisa', text: 'Blob capacity is the real bottleneck later.', publishedAt: '17.05.2026 20:02' },
+      { by: 'arb_alex', text: 'Arb still wins on app diversity.', publishedAt: '17.05.2026 21:02' },
+    ],
+  },
+  {
+    username: 'web3_daily',
+    publishedAt: '17.05.2026 15:02',
+    content: 'Weekend wrap: BTC +3.2%, SOL ecosystem memes led alt beta, ETH flat. ETF flows positive Mon–Thu.',
+    likes: 8,
+    reposts: 1,
+    comments: [
+      { by: 'altseason_io', text: 'Breadth improved but ETH/BTC still the gate.', publishedAt: '16.05.2026 10:02' },
+      { by: 'macro_mike', text: 'Perfect Monday brief — saved.', publishedAt: '16.05.2026 10:40' },
+    ],
+  },
+  {
+    username: 'sol_degen_ru',
+    publishedAt: '18.05.2026 12:02',
+    content: 'Памп на тонком стакане — половина объёма wash. Не путать с органическим спросом.',
+    likes: 5,
+    comments: [
+      { by: 'nova_macro_ru', text: 'Фильтр по уникальным покупателям — must have.', publishedAt: '17.05.2026 08:02' },
+      { by: 'btc_oracle_ru', text: 'На локальном рынке сейчас много wash.', publishedAt: '17.05.2026 08:40' },
+    ],
+  },
+  {
+    username: 'funding_watcher',
+    publishedAt: '18.05.2026 08:02',
+    content: 'Cross-exchange funding arb window on ETH perps — 0.02% spread, watch fees.',
+    likes: 4,
+    comments: [{ by: 'perp_master', text: 'Gone in minutes last time I tried.', publishedAt: '17.05.2026 18:02' }],
+  },
+  {
+    username: 'nft_flipper',
+    publishedAt: '18.05.2026 20:02',
+    content: 'Blur daily active bidders up but average sale size down — traders farming points?',
+    likes: 3,
+    comments: [{ by: 'arb_alex', text: 'Could be Arb gaming overlap wallets.', publishedAt: '17.05.2026 12:02' }],
   },
 ];
 

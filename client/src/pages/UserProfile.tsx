@@ -14,8 +14,6 @@ import {
   Heart,
   MoreHorizontal,
   Search,
-  Smile,
-  Send,
   Pen,
   Trash,
   Unlink2,
@@ -26,8 +24,9 @@ import PostDetailPanel from '../components/Posts/PostDetailPanel';
 import { PostCommentsSection } from '../components/Posts/PostCommentsSection';
 import { usePostDetail } from '../hooks/usePostDetail';
 import type { FeedPost } from '../types/postFeed';
-import PostMediaUpload from '../components/Posts/PostMediaUpload';
 import PostMediaGallery from '../components/Posts/PostMediaGallery';
+import PostComposer from '../components/Posts/PostComposer';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 
 import { USERS_API as API_URL, POSTS_API as POSTS_API_URL } from '../config/api';
@@ -65,8 +64,8 @@ const UserProfileComponent: React.FC = () => {
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const navigate = useNavigate();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isLgUp = useMediaQuery('(min-width: 1024px)');
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [posts, setPosts] = useState<FeedPost[]>([]);
@@ -85,6 +84,7 @@ const UserProfileComponent: React.FC = () => {
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
   const [isPosting, setIsPosting] = useState(false);
   const [showPostCreator, setShowPostCreator] = useState(false);
+  const mobileComposerFull = showPostCreator && !isLgUp && activeTab === 'posts';
 
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [repostedPosts, setRepostedPosts] = useState<Set<string>>(new Set());
@@ -430,12 +430,11 @@ const UserProfileComponent: React.FC = () => {
     }
   }, [activeTab, profileSlug, fetchReposts]);
 
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-    }
-  }, [newPostContent]);
+  const closeComposer = useCallback(() => {
+    setShowPostCreator(false);
+    setNewPostContent('');
+    setNewPostMedia([]);
+  }, []);
 
   const handleCreatePost = async () => {
     if ((!newPostContent.trim() && newPostMedia.length === 0) || !token || isPosting) return;
@@ -461,7 +460,7 @@ const UserProfileComponent: React.FC = () => {
       setProfile(prev => prev ? { ...prev, postsCount: (prev.postsCount || 0) + 1 } : null);
       setNewPostContent('');
       setNewPostMedia([]);
-      setShowPostCreator(false);
+      closeComposer();
       showToast('Post published');
     } catch (err: unknown) {
       console.error('Create post error:', err);
@@ -569,7 +568,7 @@ const UserProfileComponent: React.FC = () => {
             <img
               src={post.author.avatar || `https://ui-avatars.com/api/?name=${post.author.fullName}&background=000&color=fff&size=40&bold=true`}
               alt={post.author.fullName}
-              className="w-10 h-10 rounded-full hover:opacity-90 transition-opacity object-cover"
+              className="h-6 w-6 rounded-full object-cover transition-opacity hover:opacity-90"
             />
           </Link>
           <div className="flex-1 min-w-0">
@@ -714,7 +713,8 @@ const UserProfileComponent: React.FC = () => {
 
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-[1200px] gap-6">
-      <div className="flex h-full min-h-0 max-w-[600px] flex-1 flex-col border-x border-neutral-200 bg-white overflow-y-auto">
+      <div className="flex h-full min-h-0 max-w-[600px] flex-1 flex-col overflow-hidden border-x border-neutral-200 bg-white">
+        <div className="shrink-0">
         {/* Profile Info */}
         <div className="px-4 pb-4 mt-4">
           <div className="flex justify-between items-start">
@@ -773,45 +773,30 @@ const UserProfileComponent: React.FC = () => {
           ))}
         </div>
 
-        {/* Post Creator */}
+        </div>
+
         {isOwnProfile && activeTab === 'posts' && (
-          <div className="p-4 border-b bg-neutral-50 border-neutral-200">
-            {!showPostCreator ? (
-              <button onClick={() => setShowPostCreator(true)} className="w-full text-left px-4 py-3 text-neutral-500 hover:bg-neutral-100 rounded-xl transition-colors">What's on your mind?</button>
-            ) : (
-              <div>
-                <div className="flex gap-3">
-                  <img src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.fullName}&background=000&color=fff&size=40&bold=true`} alt="" className="w-10 h-10 rounded-full flex-shrink-0" />
-                  <div className="flex-1">
-                    <textarea ref={textareaRef} value={newPostContent} onChange={(e) => setNewPostContent(e.target.value)}
-                      placeholder="What's on your mind?" className="w-full resize-none outline-none text-neutral-900 bg-neutral-50 placeholder:text-neutral-500 min-h-[100px]" maxLength={2000} autoFocus />
-                    <PostMediaUpload
-                      urls={newPostMedia}
-                      onUrlsChange={setNewPostMedia}
-                      token={token}
-                    />
-                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-neutral-200">
-                      <div className="flex items-center gap-2">
-                        <button type="button" className="p-2 hover:bg-neutral-100 rounded-full transition-colors text-neutral-500"><Smile size={18} /></button>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => { setShowPostCreator(false); setNewPostContent(''); setNewPostMedia([]); }} className="px-4 py-2 rounded-full text-sm font-semibold hover:bg-neutral-100 transition-colors">Cancel</button>
-                        <button onClick={handleCreatePost} disabled={(!newPostContent.trim() && newPostMedia.length === 0) || isPosting}
-                          className="px-5 py-2 bg-black text-white rounded-full text-sm font-semibold hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
-                          {isPosting ? (<><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>Posting...</>) : (<><Send size={16} />Post</>)}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <PostComposer
+            variant="profile"
+            isOpen={showPostCreator}
+            onOpen={() => setShowPostCreator(true)}
+            content={newPostContent}
+            onContentChange={setNewPostContent}
+            media={newPostMedia}
+            onMediaChange={setNewPostMedia}
+            onCancel={closeComposer}
+            onSubmit={() => void handleCreatePost()}
+            isPosting={isPosting}
+            userAvatar={user?.avatar}
+            userFullName={user?.fullName}
+            token={token}
+          />
         )}
 
+        <div className={`min-h-0 flex-1 ${mobileComposerFull ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {/* Posts */}
         {activeTab === 'posts' && (
-          <div>
+          <div className={mobileComposerFull ? 'hidden' : ''}>
             {posts.length > 0 ? (
               posts.map((post) => renderPostCard(post))
             ) : (
@@ -848,6 +833,7 @@ const UserProfileComponent: React.FC = () => {
             <p className="text-neutral-500">When @{profile.username} has {activeTab}, they&apos;ll show up here.</p>
           </div>
         )}
+        </div>
 
       </div>
 

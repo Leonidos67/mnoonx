@@ -1,7 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Image, Loader2, X } from 'lucide-react';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { MAX_POST_MEDIA, uploadPostMediaFiles } from '../../utils/postMedia';
+
+export interface PostMediaUploadHandle {
+  openPicker: () => void;
+}
 
 interface PostMediaUploadProps {
   urls: string[];
@@ -9,18 +13,30 @@ interface PostMediaUploadProps {
   token: string | null;
   maxCount?: number;
   compact?: boolean;
+  hideAddButton?: boolean;
+  onUploadingChange?: (uploading: boolean) => void;
 }
 
-const PostMediaUpload: React.FC<PostMediaUploadProps> = ({
+const PostMediaUpload = forwardRef<PostMediaUploadHandle, PostMediaUploadProps>(({
   urls,
   onUrlsChange,
   token,
   maxCount = MAX_POST_MEDIA,
   compact = false,
-}) => {
+  hideAddButton = false,
+  onUploadingChange,
+}, ref) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    openPicker: () => inputRef.current?.click(),
+  }));
+
+  useEffect(() => {
+    onUploadingChange?.(uploading);
+  }, [uploading, onUploadingChange]);
 
   const handlePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files || []);
@@ -92,7 +108,7 @@ const PostMediaUpload: React.FC<PostMediaUploadProps> = ({
         onChange={(e) => void handlePick(e)}
       />
 
-      {urls.length < maxCount && (
+      {urls.length < maxCount && !hideAddButton && (
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
@@ -107,6 +123,8 @@ const PostMediaUpload: React.FC<PostMediaUploadProps> = ({
       )}
     </div>
   );
-};
+});
+
+PostMediaUpload.displayName = 'PostMediaUpload';
 
 export default PostMediaUpload;

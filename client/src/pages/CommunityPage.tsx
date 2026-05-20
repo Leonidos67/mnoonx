@@ -48,8 +48,9 @@ import {
   X,
   LayoutDashboard,
 } from 'lucide-react';
-import PostMediaUpload from '../components/Posts/PostMediaUpload';
 import PostMediaGallery from '../components/Posts/PostMediaGallery';
+import PostComposer from '../components/Posts/PostComposer';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 import AddCommunityAdminModal from '../components/Community/AddCommunityAdminModal';
 import { canAccessCommunityDashboard } from '../utils/communityRoles';
@@ -175,7 +176,9 @@ const CommunityPage: React.FC = () => {
   const [unreadByInstance, setUnreadByInstance] = useState<Record<string, number>>({});
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
+  const isLgUp = useMediaQuery('(min-width: 1024px)');
   const [postVisibility, setPostVisibility] = useState<'public' | 'private'>('public');
   const [ownerOnlyPostNoticeDismissed, setOwnerOnlyPostNoticeDismissed] = useState(false);
   const [addAdminModalOpen, setAddAdminModalOpen] = useState(false);
@@ -583,8 +586,7 @@ const CommunityPage: React.FC = () => {
       if (res.ok) {
         const newPost = await res.json();
         setPosts(prev => [newPost, ...prev]);
-        setNewPostContent('');
-        setNewPostMedia([]);
+        closeComposer();
       }
     } catch (err) {
       console.error('Create post error:', err);
@@ -707,7 +709,14 @@ const CommunityPage: React.FC = () => {
     community?.canPost === true ||
     isOwner ||
     (isMember && community?.membersCanPost !== false);
+  const mobileComposerFull = isCreateOpen && !isLgUp && mainTab === 'home' && canPost;
   const memberButCannotPost = isMember && !canPost && !isOwner;
+
+  const closeComposer = useCallback(() => {
+    setIsCreateOpen(false);
+    setNewPostContent('');
+    setNewPostMedia([]);
+  }, []);
   const chatInstances =
     community?.installedAppInstances?.filter((i) => i.appId === COMMUNITY_APP_IDS.CHAT) ?? [];
   const courseInstances =
@@ -1319,7 +1328,7 @@ const CommunityPage: React.FC = () => {
               }}
             />
           ) : (
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+            <div className={mobileComposerFull ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'min-h-0 flex-1 space-y-4 overflow-y-auto'}>
           {/* HEADER */}
           <div className="overflow-hidden rounded-xl border border-[#e7e7e7] bg-white max-lg:rounded-none max-lg:border-x-0">
             {/* BANNER */}
@@ -1446,45 +1455,25 @@ const CommunityPage: React.FC = () => {
             </div>
 
             {/* TAB PANELS — same card */}
-            <div className="border-t border-[#ececec] py-0">
+            <div className={`border-t border-[#ececec] py-0 ${mobileComposerFull ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
               {mainTab === 'home' && (
-                <div className="mx-auto max-w-2xl px-4 mt-4">
+                <div className={mobileComposerFull ? 'mx-auto mt-4 flex min-h-0 max-w-2xl flex-1 flex-col px-4' : 'mx-auto mt-4 max-w-2xl px-4'}>
                   {canPost && (
-                    <div className="my-6 border-b border-[#ececec] pb-6">
-                      <div className="flex gap-4">
-                        <img
-                          src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.fullName || 'User'}&background=000&color=fff&size=48&bold=true`}
-                          alt=""
-                          className="h-12 w-12 rounded-full object-cover"
-                        />
-                        <div className="flex-1">
-                          <textarea
-                            value={newPostContent}
-                            onChange={(e) => setNewPostContent(e.target.value)}
-                            placeholder="What's on your mind?"
-                            className="min-h-[60px] w-full resize-none bg-transparent text-[18px] outline-none placeholder:text-[#999]"
-                          />
-                          <PostMediaUpload
-                            urls={newPostMedia}
-                            onUrlsChange={setNewPostMedia}
-                            token={token}
-                          />
-                          <div className="mt-4 flex items-center justify-between">
-                            <div className="flex gap-5 text-xl text-[#315efb]" />
-                            <div className="flex items-center gap-3">
-                              <button
-                                type="button"
-                                onClick={handleCreatePost}
-                                disabled={(!newPostContent.trim() && newPostMedia.length === 0) || isPosting}
-                                className="h-11 rounded-2xl bg-[#315efb] px-6 font-medium text-white disabled:opacity-50"
-                              >
-                                {isPosting ? 'Posting...' : 'Post'}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    <PostComposer
+                      variant="community"
+                      isOpen={isCreateOpen}
+                      onOpen={() => setIsCreateOpen(true)}
+                      content={newPostContent}
+                      onContentChange={setNewPostContent}
+                      media={newPostMedia}
+                      onMediaChange={setNewPostMedia}
+                      onCancel={closeComposer}
+                      onSubmit={() => void handleCreatePost()}
+                      isPosting={isPosting}
+                      userAvatar={user?.avatar}
+                      userFullName={user?.fullName}
+                      token={token}
+                    />
                   )}
                   {memberButCannotPost && !ownerOnlyPostNoticeDismissed && (
                     <div className="my-6 flex items-start gap-3 rounded-xl border border-[#ececec] bg-[#fafafa] px-4 py-3 text-sm text-[#666]">
@@ -1502,7 +1491,7 @@ const CommunityPage: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="space-y-0">
+                  <div className={`space-y-0 ${mobileComposerFull ? 'hidden' : ''}`}>
                   {posts.length > 0 ? (
                     posts.map((post, idx) => (
                       <div
@@ -1517,7 +1506,7 @@ const CommunityPage: React.FC = () => {
                                 `https://ui-avatars.com/api/?name=${post.author.fullName}&background=000&color=fff&size=48&bold=true`
                               }
                               alt=""
-                              className="h-12 w-12 rounded-full object-cover"
+                              className="h-6 w-6 rounded-full object-cover"
                             />
                           </Link>
                           <div className="flex-1">
