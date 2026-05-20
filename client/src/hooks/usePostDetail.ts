@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useConfirm } from '../context/ConfirmContext';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../i18n/useTranslation';
 import { POSTS_API } from '../config/api';
 import type { FeedPost, PostComment } from '../types/postFeed';
 
@@ -14,6 +15,7 @@ export function usePostDetail(
   const { token, user } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const { t } = useTranslation();
 
   const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
   const [commentText, setCommentText] = useState('');
@@ -117,7 +119,7 @@ export function usePostDetail(
         body: JSON.stringify({ content: text.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to post comment');
+      if (!res.ok) throw new Error(data.message || t('common.failedToPostComment'));
 
       if (source === 'inline') setInlineCommentText('');
       else setCommentText('');
@@ -126,7 +128,7 @@ export function usePostDetail(
       updateCommentsOnPost(id, nextComments, data.commentsCount);
     } catch (err: unknown) {
       console.error('Comment error:', err);
-      showToast(err instanceof Error ? err.message : 'Failed to post comment', 'error');
+      showToast(err instanceof Error ? err.message : t('common.failedToPostComment'), 'error');
     } finally {
       setCommentSubmitting(false);
     }
@@ -174,17 +176,17 @@ export function usePostDetail(
         body: JSON.stringify({ content: newContent }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to update comment');
+      if (!res.ok) throw new Error(data.message || t('common.failedToEditComment'));
 
       const nextComments = (current.comments || []).map((c) =>
         String(c._id) === commentId ? data.comment : c,
       );
       updateCommentsOnPost(id, nextComments, data.commentsCount ?? current.commentsCount);
       setEditCommentTarget(null);
-      showToast('Comment updated');
+      showToast(t('common.commentUpdated'));
     } catch (err: unknown) {
       console.error('Edit comment error:', err);
-      showToast(err instanceof Error ? err.message : 'Failed to edit comment', 'error');
+      showToast(err instanceof Error ? err.message : t('common.failedToEditComment'), 'error');
     } finally {
       setEditCommentSaving(false);
     }
@@ -194,9 +196,9 @@ export function usePostDetail(
     setOpenCommentMenu(null);
     if (!token) return;
     const confirmed = await confirm({
-      title: 'Delete comment?',
-      message: 'This cannot be undone. The comment will be removed from the post.',
-      confirmLabel: 'Delete',
+      title: t('common.deleteCommentTitle'),
+      message: t('common.deleteCommentMessage'),
+      confirmLabel: t('common.delete'),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -211,14 +213,14 @@ export function usePostDetail(
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to delete comment');
+      if (!res.ok) throw new Error(data.message || t('common.failedToDeleteComment'));
 
       const nextComments = (current.comments || []).filter((c) => String(c._id) !== commentId);
       updateCommentsOnPost(id, nextComments, data.commentsCount);
-      showToast('Comment deleted');
+      showToast(t('common.commentDeleted'));
     } catch (err: unknown) {
       console.error('Delete comment error:', err);
-      showToast(err instanceof Error ? err.message : 'Failed to delete comment', 'error');
+      showToast(err instanceof Error ? err.message : t('common.failedToDeleteComment'), 'error');
     }
   };
 

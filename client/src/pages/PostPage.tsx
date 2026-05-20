@@ -7,6 +7,7 @@ import PostMediaGallery from '../components/Posts/PostMediaGallery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 
 import { POSTS_API as API_URL, USERS_API } from '../config/api';
+import { useTranslation } from '../i18n/useTranslation';
 
 interface Post {
   _id: string;
@@ -31,6 +32,7 @@ const PostPage: React.FC = () => {
   const { postId } = useParams<{ postId: string }>();
   const { user, token } = useAuth();
   const navigate = useNavigate();
+  const { t, locale } = useTranslation();
 
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,7 +42,7 @@ const PostPage: React.FC = () => {
     if (postId) {
       fetchPost(postId);
     }
-  }, [postId]);
+  }, [postId, token, t]);
 
   // В PostPage.tsx, после получения данных:
     const fetchPost = async (id: string) => {
@@ -55,9 +57,9 @@ const PostPage: React.FC = () => {
         
         if (!res.ok) {
         if (res.status === 404) {
-            setError('Post not found');
+            setError(t('postPage.notFound'));
         } else {
-            setError('Failed to load post');
+            setError(t('postPage.loadFailed'));
         }
         return;
         }
@@ -82,7 +84,7 @@ const PostPage: React.FC = () => {
             data.author = {
             _id: data.author,
             username: 'unknown',
-            fullName: 'Unknown User',
+            fullName: t('postPage.unknownUser'),
             avatar: ''
             };
         }
@@ -91,7 +93,7 @@ const PostPage: React.FC = () => {
         setPost(data);
     } catch (err) {
         console.error('Fetch post error:', err);
-        setError('Failed to load post');
+        setError(t('postPage.loadFailed'));
     } finally {
         setLoading(false);
     }
@@ -106,11 +108,12 @@ const PostPage: React.FC = () => {
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
     
-    if (minutes < 1) return 'now';
-    if (minutes < 60) return `${minutes}m`;
-    if (hours < 24) return `${hours}h`;
-    if (days < 7) return `${days}d`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const loc = locale === 'ru' ? 'ru-RU' : 'en-US';
+    if (minutes < 1) return t('home.timeNow');
+    if (minutes < 60) return t('home.timeMinutes', { count: minutes });
+    if (hours < 24) return t('home.timeHours', { count: hours });
+    if (days < 7) return t('home.timeDays', { count: days });
+    return date.toLocaleDateString(loc, { month: 'short', day: 'numeric' });
   };
 
   const formatCount = (count: number) => {
@@ -130,9 +133,9 @@ const PostPage: React.FC = () => {
   if (error || !post) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
-        <p className="text-xl text-neutral-500 mb-4">{error || 'Post not found'}</p>
+        <p className="text-xl text-neutral-500 mb-4">{error || t('postPage.notFound')}</p>
         <button onClick={() => navigate('/')} className="px-4 py-2 bg-black text-white rounded-full">
-          Back to Home
+          {t('postPage.backToHome')}
         </button>
       </div>
     );
@@ -210,15 +213,15 @@ const PostPage: React.FC = () => {
             <div className="flex items-center gap-6 mt-4 pt-3 border-t border-neutral-100 text-sm">
               <div>
                 <span className="font-bold text-neutral-900">{formatCount(post.repostsCount || 0)}</span>
-                <span className="text-neutral-500 ml-1">Reposts</span>
+                <span className="text-neutral-500 ml-1">{t('home.reposts')}</span>
               </div>
               <div>
                 <span className="font-bold text-neutral-900">{formatCount(post.likesCount || 0)}</span>
-                <span className="text-neutral-500 ml-1">Likes</span>
+                <span className="text-neutral-500 ml-1">{t('home.likesLabel')}</span>
               </div>
               <div>
                 <span className="font-bold text-neutral-900">{formatCount(post.commentsCount || 0)}</span>
-                <span className="text-neutral-500 ml-1">Comments</span>
+                <span className="text-neutral-500 ml-1">{t('home.commentsLabel')}</span>
               </div>
             </div>
           </div>

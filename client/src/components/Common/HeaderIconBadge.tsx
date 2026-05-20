@@ -5,16 +5,26 @@ interface HeaderIconBadgeProps {
   to: string;
   label: string;
   count: number;
+  /** Full accessible name when there are unread items (e.g. translated “Notifications, 3 unread”). */
+  ariaLabelWhenUnread?: string;
   children: React.ReactNode;
 }
 
-const HeaderIconBadge: React.FC<HeaderIconBadgeProps> = ({ to, label, count, children }) => {
+const HeaderIconBadge: React.FC<HeaderIconBadgeProps> = ({
+  to,
+  label,
+  count,
+  ariaLabelWhenUnread,
+  children,
+}) => {
   const display = count > 99 ? '99+' : count > 0 ? String(count) : null;
+  const aria =
+    display && (ariaLabelWhenUnread ?? `${label}, ${count} unread`);
 
   return (
     <Link
       to={to}
-      aria-label={display ? `${label}, ${count} unread` : label}
+      aria-label={aria ?? label}
       className="relative p-2 text-neutral-600 border hover:text-neutral-700 hover:bg-black/10 rounded-full active:scale-[0.95] transition-all"
     >
       {children}

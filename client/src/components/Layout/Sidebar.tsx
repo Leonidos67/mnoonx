@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   House,
@@ -11,8 +11,12 @@ import {
   CreditCard,
   LogOut,
   Menu,
+  Languages,
+  ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { useTranslation } from '../../i18n/useTranslation';
 import { communityPath, communitySettingsPath } from '../../constants/communityRoutes';
 import { profilePath } from '../../constants/paths';
 
@@ -35,6 +39,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, token, logout } = useAuth();
+  const { locale, setLocale } = useLanguage();
+  const { t } = useTranslation();
   const [myCommunities, setMyCommunities] = useState<MyCommunity[]>([]);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -77,11 +83,20 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
     return () => document.removeEventListener('mousedown', onDocMouseDown);
   }, []);
 
-  const navItems = [
-    { name: 'Home', icon: House, path: '/', end: true },
-    { name: 'Profile', icon: User, path: profileHref, isActive: isProfileActive, skipPathMatch: true },
-    { name: 'Discover', icon: Compass, path: '/discover', end: false },
-  ];
+  const navItems = useMemo(
+    () => [
+      { nameKey: 'nav.home' as const, icon: House, path: '/', end: true },
+      {
+        nameKey: 'nav.profile' as const,
+        icon: User,
+        path: profileHref,
+        isActive: isProfileActive,
+        skipPathMatch: true,
+      },
+      { nameKey: 'nav.discover' as const, icon: Compass, path: '/discover', end: false },
+    ],
+    [profileHref, isProfileActive, t]
+  );
 
   const isCommunityRouteActive = (handle: string) => {
     const base = communityPath(handle);
@@ -95,6 +110,13 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
     navigate('/');
   };
 
+  const userMenuPanelClass =
+    'absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-neutral-200 bg-white p-1 z-50 shadow-lg';
+  const userMenuItemClass =
+    'w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-50 transition-colors flex items-center gap-2 text-neutral-800';
+  const langSubmenuClass =
+    'rounded-lg border border-neutral-200 bg-white p-1 shadow-lg min-w-[5.5rem]';
+
   return (
     <div className="flex h-full w-64 flex-col bg-neutral-50">
       <div className="flex items-center gap-1 border-b border-neutral-200 p-2">
@@ -102,7 +124,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
           type="button"
           onClick={onToggleCollapse}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-neutral-700 transition-colors hover:bg-black/5 active:scale-95"
-          aria-label="Hide sidebar"
+          aria-label={t('nav.hideSidebar')}
         >
           <Menu className="h-5 w-5" strokeWidth={2} aria-hidden />
         </button>
@@ -118,7 +140,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                 ? location.pathname === item.path
                 : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
             return (
-              <li key={item.name}>
+              <li key={item.nameKey}>
                 <Link
                   to={item.path}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all active:scale-[0.95] ${
@@ -126,7 +148,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                   }`}
                 >
                   <item.icon className="h-5 w-5 shrink-0" />
-                  <span className="font-medium">{item.name}</span>
+                  <span className="font-medium">{t(item.nameKey)}</span>
                 </Link>
               </li>
             );
@@ -135,15 +157,15 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
 
         <div className="mt-4">
           <div className="flex items-center justify-between mb-2 px-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">My Communities</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('nav.myCommunities')}</h2>
           </div>
 
           <div className="space-y-1">
             {!token && (
-              <p className="px-4 py-2 text-xs text-neutral-500">Sign in to see your communities.</p>
+              <p className="px-4 py-2 text-xs text-neutral-500">{t('nav.signInToSeeCommunities')}</p>
             )}
             {token && myCommunities.length === 0 && (
-              <p className="px-4 py-2 text-xs text-neutral-500">You haven&apos;t created a community yet.</p>
+              <p className="px-4 py-2 text-xs text-neutral-500">{t('nav.noCommunitiesYet')}</p>
             )}
             {myCommunities.map((c) => {
               const active = isCommunityRouteActive(c.handle);
@@ -183,7 +205,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
             className="mt-2 w-full flex items-center justify-center gap-2 bg-black text-white py-3 rounded-xl hover:rounded-2xl transition-colors"
           >
             <Plus className="w-5 h-5" />
-            Start a Community
+            {t('nav.startCommunity')}
           </button>
         </div>
       </nav>
@@ -213,46 +235,95 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
             </button>
 
             {userMenuOpen && (
-              <div
-                className="absolute bottom-full left-2 right-2 mb-1 rounded-xl border border-neutral-200 bg-white shadow-lg py-1 z-50"
-                role="menu"
-              >
+              <div className={userMenuPanelClass} role="menu">
                 <Link
                   to={profileHref}
                   role="menuitem"
                   onClick={() => setUserMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2.5 text-sm text-neutral-800 hover:bg-neutral-50"
+                  className={userMenuItemClass}
                 >
-                  <User className="w-4 h-4 text-neutral-500" />
-                  Profile
+                  <User size={14} className="shrink-0 text-neutral-500" />
+                  {t('nav.profile')}
                 </Link>
                 <Link
                   to="/settings"
                   role="menuitem"
                   onClick={() => setUserMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2.5 text-sm text-neutral-800 hover:bg-neutral-50"
+                  className={userMenuItemClass}
                 >
-                  <Settings className="w-4 h-4 text-neutral-500" />
-                  Settings
+                  <Settings size={14} className="shrink-0 text-neutral-500" />
+                  {t('nav.settings')}
                 </Link>
                 <Link
                   to="/plan"
                   role="menuitem"
                   onClick={() => setUserMenuOpen(false)}
-                  className="flex items-center gap-2 px-3 py-2.5 text-sm text-neutral-800 hover:bg-neutral-50"
+                  className={userMenuItemClass}
                 >
-                  <CreditCard className="w-4 h-4 text-neutral-500" />
-                  Plan
+                  <CreditCard size={14} className="shrink-0 text-neutral-500" />
+                  {t('nav.plan')}
                 </Link>
-                <div className="border-t border-neutral-100 my-1" />
+                <div className="group relative">
+                  <div
+                    className={`${userMenuItemClass} cursor-default justify-between gap-2`}
+                    role="presentation"
+                  >
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <Languages size={14} className="shrink-0 text-neutral-500" />
+                      <span className="truncate">{t('nav.changeLanguage')}</span>
+                    </span>
+                    <ChevronRight
+                      size={14}
+                      className="shrink-0 text-neutral-400 transition-transform group-hover:translate-x-0.5"
+                      aria-hidden
+                    />
+                  </div>
+                  <div
+                    className="pointer-events-none invisible absolute left-full top-0 z-[60] ml-0.5 pl-1 opacity-0 transition-[opacity,visibility] duration-150 group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100"
+                    role="menu"
+                    aria-label={t('nav.changeLanguage')}
+                  >
+                    <div className={langSubmenuClass}>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={`${userMenuItemClass} justify-center font-medium tracking-wide ${
+                          locale === 'en' ? 'bg-neutral-100 text-neutral-900' : ''
+                        }`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setLocale('en');
+                        }}
+                      >
+                        en
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={`${userMenuItemClass} justify-center font-medium tracking-wide ${
+                          locale === 'ru' ? 'bg-neutral-100 text-neutral-900' : ''
+                        }`}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setLocale('ru');
+                        }}
+                      >
+                        ru
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="h-px bg-neutral-100 my-1" />
                 <button
                   type="button"
                   role="menuitem"
                   onClick={handleLogoutClick}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50 text-left"
+                  className={`${userMenuItemClass} text-red-600 hover:bg-red-50`}
                 >
-                  <LogOut className="w-4 h-4" />
-                  Log out
+                  <LogOut size={14} className="shrink-0" />
+                  {t('common.logOut')}
                 </button>
               </div>
             )}
@@ -264,7 +335,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
             className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-neutral-300 rounded-xl hover:bg-neutral-100 transition-colors"
           >
             <LogIn className="w-5 h-5" />
-            <span className="font-medium">Sign in</span>
+            <span className="font-medium">{t('common.signIn')}</span>
           </button>
         )}
       </div>

@@ -15,9 +15,10 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useCommunityDashboard } from '../../context/CommunityDashboardContext';
 import { communityPath, communityStorePath } from '../../constants/communityRoutes';
-import { dashboardAppLabel } from '../../components/Community/Dashboard/dashboardAppMeta';
+import { getDashboardAppLabel } from '../../components/Community/Dashboard/dashboardAppMeta';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useTranslation } from '../../i18n/useTranslation';
 
 import { COMMUNITIES_API as API_URL } from '../../config/api';
 const PAGE_SIZE = 25;
@@ -52,6 +53,7 @@ const CommunityDashboardProducts: React.FC = () => {
   const { token } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const { t } = useTranslation();
 
   // const [visibilityFilter, setVisibilityFilter] = useState<VisibilityFilter>('chip');
   const [page, setPage] = useState(0);
@@ -70,10 +72,10 @@ const CommunityDashboardProducts: React.FC = () => {
         id: inst.id,
         instanceId: inst.id,
         name: inst.title,
-        price: 'Free',
+        price: t('communityDashboard.free'),
         visibility: visible ? 'Visible' : 'Hidden',
         visibleToMembers: visible,
-        includedApps: dashboardAppLabel(inst.appId),
+        includedApps: getDashboardAppLabel(inst.appId, t),
         allTimeRevenue: '$0.00',
         activeUsers: 0,
       });
@@ -82,18 +84,18 @@ const CommunityDashboardProducts: React.FC = () => {
     if (community.isPaid) {
       rows.push({
         id: 'membership',
-        name: `${community.name} membership`,
-        price: community.price > 0 ? `$${community.price.toFixed(2)}` : 'Free',
+        name: t('communityDashboard.products.membershipName', { name: community.name }),
+        price: community.price > 0 ? `$${community.price.toFixed(2)}` : t('communityDashboard.free'),
         visibility: 'Visible',
         visibleToMembers: true,
-        includedApps: 'Community access',
+        includedApps: t('communityDashboard.products.communityAccess'),
         allTimeRevenue: '$0.00',
         activeUsers: community.memberCount ?? 0,
       });
     }
 
     return rows;
-  }, [community]);
+  }, [community, t]);
 
   const filteredProducts = allProducts;
 
@@ -127,6 +129,9 @@ const CommunityDashboardProducts: React.FC = () => {
     return () => document.removeEventListener('mousedown', onDocMouseDown);
   }, []);
 
+  const visibilityLabel = (visibility: ProductRow['visibility']) =>
+    visibility === 'Visible' ? t('communityDashboard.visible') : t('communityDashboard.hidden');
+
   const patchVisibility = useCallback(
     async (instanceId: string, visibleToMembers: boolean) => {
       if (!token || !handle) return;
@@ -144,28 +149,32 @@ const CommunityDashboardProducts: React.FC = () => {
         );
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          showToast(typeof data?.message === 'string' ? data.message : 'Failed to update product', 'error');
+          showToast(typeof data?.message === 'string' ? data.message : t('communityDashboard.products.failedUpdate'), 'error');
           return;
         }
         const data = await res.json();
         setCommunity(data);
         await reload();
-        showToast(visibleToMembers ? 'Product is now visible' : 'Product hidden');
+        showToast(
+          visibleToMembers
+            ? t('communityDashboard.products.nowVisible')
+            : t('communityDashboard.products.nowHidden')
+        );
       } catch {
-        showToast('Failed to update product', 'error');
+        showToast(t('communityDashboard.products.failedUpdate'), 'error');
       }
       setMenuProductId(null);
     },
-    [token, handle, setCommunity, reload, showToast]
+    [token, handle, setCommunity, reload, showToast, t]
   );
 
   const deleteInstance = useCallback(
     async (instanceId: string) => {
       if (!token || !handle) return;
       const confirmed = await confirm({
-        title: 'Remove product?',
-        message: 'This app instance will be removed from your community.',
-        confirmLabel: 'Remove',
+        title: t('communityDashboard.products.removeTitle'),
+        message: t('communityDashboard.products.removeMessage'),
+        confirmLabel: t('communityDashboard.products.removeConfirm'),
         variant: 'danger',
       });
       if (!confirmed) return;
@@ -179,19 +188,19 @@ const CommunityDashboardProducts: React.FC = () => {
         );
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          showToast(typeof data?.message === 'string' ? data.message : 'Failed to delete', 'error');
+          showToast(typeof data?.message === 'string' ? data.message : t('communityDashboard.products.failedDelete'), 'error');
           return;
         }
         const data = await res.json();
         setCommunity(data);
         await reload();
-        showToast('Product removed');
+        showToast(t('communityDashboard.products.removed'));
       } catch {
-        showToast('Failed to delete', 'error');
+        showToast(t('communityDashboard.products.failedDelete'), 'error');
       }
       setMenuProductId(null);
     },
-    [token, handle, setCommunity, reload, confirm, showToast]
+    [token, handle, setCommunity, reload, confirm, showToast, t]
   );
 
   const copyProductLink = (row: ProductRow) => {
@@ -226,7 +235,7 @@ const CommunityDashboardProducts: React.FC = () => {
             className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#315efb] px-4 text-sm font-medium text-white transition-colors hover:bg-[#2748c9]"
           >
             <Plus className="h-4 w-4" aria-hidden />
-            Create product
+            {t('communityDashboard.products.createProduct')}
           </button>
         </div>
       </div>
@@ -234,9 +243,9 @@ const CommunityDashboardProducts: React.FC = () => {
       <div className="flex-1 bg-white pb-6 pt-2">
         {total === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <p className="text-lg font-medium text-neutral-800">No products yet</p>
+            <p className="text-lg font-medium text-neutral-800">{t('communityDashboard.products.noProductsTitle')}</p>
             <p className="mt-2 max-w-sm text-sm text-neutral-500">
-              Install apps from the store or enable paid access in Settings.
+              {t('communityDashboard.products.noProductsHint')}
             </p>
             <button
               type="button"
@@ -244,7 +253,7 @@ const CommunityDashboardProducts: React.FC = () => {
               className="mt-6 inline-flex h-10 items-center gap-2 rounded-lg bg-[#315efb] px-4 text-sm font-medium text-white"
             >
               <Plus className="h-4 w-4" aria-hidden />
-              Create product
+              {t('communityDashboard.products.createProduct')}
             </button>
           </div>
         ) : (
@@ -252,18 +261,18 @@ const CommunityDashboardProducts: React.FC = () => {
           <table className="w-full min-w-[800px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200">
-                <HeaderCell label="Name" />
-                <HeaderCell label="Price" />
-                <HeaderCell label="Visibility" />
-                <HeaderCell label="Included apps" />
-                <HeaderCell label="All time revenue" />
+                <HeaderCell label={t('communityDashboard.products.colName')} />
+                <HeaderCell label={t('communityDashboard.products.colPrice')} />
+                <HeaderCell label={t('communityDashboard.products.colVisibility')} />
+                <HeaderCell label={t('communityDashboard.products.colIncludedApps')} />
+                <HeaderCell label={t('communityDashboard.products.colAllTimeRevenue')} />
                 <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-neutral-500">
                   <button
                     type="button"
                     onClick={toggleActiveUsersSort}
                     className="inline-flex items-center gap-1.5 whitespace-nowrap hover:text-neutral-700"
                   >
-                    Active users
+                    {t('communityDashboard.products.colActiveUsers')}
                     <ChevronDown
                       className={`h-3.5 w-3.5 text-neutral-500 transition-transform ${
                         sortKey === 'activeUsers' && sortDir === 'asc' ? 'rotate-180' : ''
@@ -273,7 +282,7 @@ const CommunityDashboardProducts: React.FC = () => {
                     <GripVertical className="h-3.5 w-3.5 text-neutral-300" aria-hidden />
                   </button>
                 </th>
-                <th className="w-[88px] px-2 py-3" aria-label="Actions" />
+                <th className="w-[88px] px-2 py-3" aria-label={t('communityDashboard.products.actions')} />
               </tr>
             </thead>
             <tbody>
@@ -291,7 +300,7 @@ const CommunityDashboardProducts: React.FC = () => {
                             : 'bg-neutral-100 text-neutral-600'
                         }`}
                       >
-                        {row.visibility}
+                        {visibilityLabel(row.visibility)}
                       </span>
                     </td>
                     <td className="px-4 py-4 text-neutral-600">{row.includedApps || '—'}</td>
@@ -303,7 +312,7 @@ const CommunityDashboardProducts: React.FC = () => {
                           type="button"
                           onClick={() => copyProductLink(row)}
                           className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-50"
-                          title="Copy link"
+                          title={t('communityDashboard.products.copyLink')}
                         >
                           <Link2 className="h-4 w-4" aria-hidden />
                         </button>
@@ -312,7 +321,7 @@ const CommunityDashboardProducts: React.FC = () => {
                             type="button"
                             onClick={() => setMenuProductId((id) => (id === row.id ? null : row.id))}
                             className="flex h-8 w-8 items-center justify-center rounded-lg border border-neutral-200 text-neutral-500 transition-colors hover:bg-neutral-50"
-                            aria-label="Product options"
+                            aria-label={t('communityDashboard.products.productOptions')}
                           >
                             <MoreVertical className="h-4 w-4" aria-hidden />
                           </button>
@@ -329,21 +338,21 @@ const CommunityDashboardProducts: React.FC = () => {
                                   setMenuProductId(null);
                                 }}
                               >
-                                Edit
+                                {t('communityDashboard.products.edit')}
                               </button>
                               <button
                                 type="button"
                                 className="flex w-full px-4 py-2 text-left text-sm text-neutral-400"
                                 disabled
                               >
-                                Control Center
+                                {t('communityDashboard.products.controlCenter')}
                               </button>
                               <button
                                 type="button"
                                 className="flex w-full px-4 py-2 text-left text-sm text-neutral-400"
                                 disabled
                               >
-                                Archive
+                                {t('communityDashboard.products.archive')}
                               </button>
                               {row.instanceId && (
                                 <button
@@ -351,7 +360,7 @@ const CommunityDashboardProducts: React.FC = () => {
                                   className="flex w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
                                   onClick={() => void deleteInstance(row.instanceId!)}
                                 >
-                                  Delete
+                                  {t('communityDashboard.products.delete')}
                                 </button>
                               )}
                               {row.instanceId && (
@@ -362,7 +371,9 @@ const CommunityDashboardProducts: React.FC = () => {
                                     void patchVisibility(row.instanceId!, !row.visibleToMembers)
                                   }
                                 >
-                                  {row.visibleToMembers ? 'Hide' : 'Show'}
+                                  {row.visibleToMembers
+                                    ? t('communityDashboard.products.hide')
+                                    : t('communityDashboard.products.show')}
                                 </button>
                               )}
                               <button
@@ -370,14 +381,14 @@ const CommunityDashboardProducts: React.FC = () => {
                                 className="flex w-full px-4 py-2 text-left text-sm text-neutral-400"
                                 disabled
                               >
-                                Duplicate
+                                {t('communityDashboard.products.duplicate')}
                               </button>
                               <button
                                 type="button"
                                 className="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-neutral-400"
                                 disabled
                               >
-                                Details
+                                {t('communityDashboard.products.details')}
                                 <ChevronRight className="h-4 w-4" aria-hidden />
                               </button>
                             </div>
@@ -397,7 +408,11 @@ const CommunityDashboardProducts: React.FC = () => {
       {total > 0 && (
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 bg-white px-4 py-1">
         <p className="text-sm text-neutral-500">
-          Showing {rangeStart} to {rangeEnd} of {total}
+          {t('communityDashboard.products.showingRange', {
+            start: rangeStart,
+            end: rangeEnd,
+            total,
+          })}
         </p>
         <div className="flex items-center gap-1">
           <button
@@ -405,7 +420,7 @@ const CommunityDashboardProducts: React.FC = () => {
             disabled={safePage === 0}
             onClick={() => setPage(0)}
             className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
-            aria-label="First page"
+            aria-label={t('communityDashboard.products.pageFirst')}
           >
             <ChevronsLeft className="h-4 w-4" aria-hidden />
           </button>
@@ -414,7 +429,7 @@ const CommunityDashboardProducts: React.FC = () => {
             disabled={safePage === 0}
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
-            aria-label="Previous page"
+            aria-label={t('communityDashboard.products.pagePrev')}
           >
             <ChevronLeft className="h-4 w-4" aria-hidden />
           </button>
@@ -423,7 +438,7 @@ const CommunityDashboardProducts: React.FC = () => {
             disabled={safePage >= totalPages - 1}
             onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
             className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
-            aria-label="Next page"
+            aria-label={t('communityDashboard.products.pageNext')}
           >
             <ChevronRightIcon className="h-4 w-4" aria-hidden />
           </button>
@@ -432,7 +447,7 @@ const CommunityDashboardProducts: React.FC = () => {
             disabled={safePage >= totalPages - 1}
             onClick={() => setPage(totalPages - 1)}
             className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
-            aria-label="Last page"
+            aria-label={t('communityDashboard.products.pageLast')}
           >
             <ChevronsRight className="h-4 w-4" aria-hidden />
           </button>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useTranslation } from '../../i18n/useTranslation';
 import { ArrowLeft, Upload } from 'lucide-react';
 
 import { COMMUNITIES_API as API_URL } from '../../config/api';
@@ -13,9 +14,21 @@ export interface CreateCommunityFormProps {
   backTo?: string;
 }
 
+const CREATE_CATEGORIES = [
+  { value: 'Memecoins', labelKey: 'createCommunity.catMemecoins' },
+  { value: 'Futures', labelKey: 'createCommunity.catFutures' },
+  { value: 'On-Chain', labelKey: 'createCommunity.catOnChain' },
+  { value: 'Airdrops', labelKey: 'createCommunity.catAirdrops' },
+  { value: 'Education', labelKey: 'createCommunity.catEducation' },
+  { value: 'DeFi', labelKey: 'createCommunity.catDeFi' },
+  { value: 'NFT', labelKey: 'createCommunity.catNFT' },
+  { value: 'Other', labelKey: 'createCommunity.catOther' },
+] as const;
+
 const CreateCommunityForm: React.FC<CreateCommunityFormProps> = ({ embedded = false, backTo }) => {
   const { token } = useAuth();
   const { showToast } = useToast();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -47,12 +60,12 @@ const CreateCommunityForm: React.FC<CreateCommunityFormProps> = ({ embedded = fa
     }
 
     if (!formData.name.trim() || !formData.handle.trim() || !formData.description.trim()) {
-      showToast('Please fill in all required fields', 'info');
+      showToast(t('createCommunity.toastRequired'), 'info');
       return;
     }
 
     if (!/^[a-zA-Z0-9-]+$/.test(formData.handle)) {
-      showToast('Handle can only contain letters, numbers, and hyphens', 'info');
+      showToast(t('createCommunity.toastHandleInvalid'), 'info');
       return;
     }
 
@@ -70,12 +83,12 @@ const CreateCommunityForm: React.FC<CreateCommunityFormProps> = ({ embedded = fa
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.message || 'Failed to create community');
+        throw new Error(data.message || t('createCommunity.toastCreateFailed'));
       }
 
       navigate(`/community/${formData.handle}`);
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'Error', 'error');
+      showToast(err instanceof Error ? err.message : t('createCommunity.toastGenericError'), 'error');
     } finally {
       setLoading(false);
     }
@@ -93,7 +106,7 @@ const CreateCommunityForm: React.FC<CreateCommunityFormProps> = ({ embedded = fa
         <button type="button" onClick={goBack} className="rounded-full p-2 transition-colors hover:bg-neutral-100">
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-xl font-bold">Create Community</h1>
+        <h1 className="text-xl font-bold">{t('createCommunity.headerTitle')}</h1>
       </div>
     </div>
   );
@@ -115,20 +128,20 @@ const CreateCommunityForm: React.FC<CreateCommunityFormProps> = ({ embedded = fa
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">Community Name *</label>
+        <label className="mb-1 block text-sm font-medium text-neutral-700">{t('createCommunity.nameLabel')}</label>
         <input
           type="text"
           name="name"
           value={formData.name}
           onChange={handleChange}
-          placeholder="e.g., Crypto Trading Signals"
+          placeholder={t('createCommunity.namePlaceholder')}
           className="w-full rounded-xl border border-neutral-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black/10"
           required
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">Community Handle *</label>
+        <label className="mb-1 block text-sm font-medium text-neutral-700">{t('createCommunity.handleLabel')}</label>
         <div className="flex items-center gap-2">
           <span className="text-neutral-500">@</span>
           <input
@@ -136,48 +149,45 @@ const CreateCommunityForm: React.FC<CreateCommunityFormProps> = ({ embedded = fa
             name="handle"
             value={formData.handle}
             onChange={handleChange}
-            placeholder="e.g., cryptosignals"
+            placeholder={t('createCommunity.handlePlaceholder')}
             className="flex-1 rounded-xl border border-neutral-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black/10"
             required
           />
         </div>
-        <p className="mt-1 text-xs text-neutral-500">Letters, numbers, and hyphens only. No spaces.</p>
+        <p className="mt-1 text-xs text-neutral-500">{t('createCommunity.handleHint')}</p>
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">Description *</label>
+        <label className="mb-1 block text-sm font-medium text-neutral-700">{t('createCommunity.descriptionLabel')}</label>
         <textarea
           name="description"
           value={formData.description}
           onChange={handleChange}
           rows={4}
-          placeholder="Tell people what your community is about..."
+          placeholder={t('createCommunity.descriptionPlaceholder')}
           className="w-full resize-none rounded-xl border border-neutral-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black/10"
           required
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-neutral-700">Category</label>
+        <label className="mb-1 block text-sm font-medium text-neutral-700">{t('createCommunity.categoryLabel')}</label>
         <select
           name="category"
           value={formData.category}
           onChange={handleChange}
           className="w-full rounded-xl border border-neutral-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black/10"
         >
-          <option value="Memecoins">🐸 Memecoins</option>
-          <option value="Futures">📈 Futures</option>
-          <option value="On-Chain">🔗 On-Chain</option>
-          <option value="Airdrops">🎁 Airdrops</option>
-          <option value="Education">📚 Education</option>
-          <option value="DeFi">💎 DeFi</option>
-          <option value="NFT">🎨 NFT</option>
-          <option value="Other">🤝 Other</option>
+          {CREATE_CATEGORIES.map((cat) => (
+            <option key={cat.value} value={cat.value}>
+              {t(cat.labelKey)}
+            </option>
+          ))}
         </select>
       </div>
 
       <div>
-        <label className="mb-2 block text-sm font-medium text-neutral-700">Visibility</label>
+        <label className="mb-2 block text-sm font-medium text-neutral-700">{t('createCommunity.visibilityLabel')}</label>
         <div className="flex gap-4">
           <label className="flex cursor-pointer items-center gap-2">
             <input
@@ -188,7 +198,7 @@ const CreateCommunityForm: React.FC<CreateCommunityFormProps> = ({ embedded = fa
               onChange={() => setFormData((prev) => ({ ...prev, isPublic: true }))}
               className="h-4 w-4"
             />
-            <span>🌍 Public</span>
+            <span>{t('createCommunity.visibilityPublic')}</span>
           </label>
           <label className="flex cursor-pointer items-center gap-2">
             <input
@@ -199,7 +209,7 @@ const CreateCommunityForm: React.FC<CreateCommunityFormProps> = ({ embedded = fa
               onChange={() => setFormData((prev) => ({ ...prev, isPublic: false }))}
               className="h-4 w-4"
             />
-            <span>🔒 Private</span>
+            <span>{t('createCommunity.visibilityPrivate')}</span>
           </label>
         </div>
       </div>
@@ -209,7 +219,7 @@ const CreateCommunityForm: React.FC<CreateCommunityFormProps> = ({ embedded = fa
         disabled={loading}
         className="w-full rounded-xl bg-black py-3 font-semibold text-white transition-colors hover:bg-neutral-800 disabled:opacity-50"
       >
-        {loading ? 'Creating...' : 'Create Community'}
+        {loading ? t('createCommunity.submitCreating') : t('createCommunity.submit')}
       </button>
     </form>
   );

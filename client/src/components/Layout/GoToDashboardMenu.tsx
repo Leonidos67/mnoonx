@@ -4,10 +4,12 @@ import DashboardCommunityPickerList from './DashboardCommunityPickerList';
 import DashboardPickerModal from './DashboardPickerModal';
 import { useMyCommunities } from '../../hooks/useMyCommunities';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const LG_MEDIA = '(min-width: 1024px)';
 
 const GoToDashboardMenu: React.FC = () => {
+  const { t } = useTranslation();
   const isDesktop = useMediaQuery(LG_MEDIA);
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ rect: DOMRect } | null>(null);
@@ -46,13 +48,13 @@ const GoToDashboardMenu: React.FC = () => {
         aria-haspopup="menu"
         className="inline-flex items-center rounded-full border px-3 py-2 text-sm font-medium text-neutral-600 transition-all hover:bg-black/10 hover:text-neutral-700 active:scale-[0.95] sm:px-4"
       >
-        Go to Dashboard
+        {t('goToDashboard.label')}
       </button>
 
       {isDesktop && (
         <FloatingMenu open={open} anchor={anchor} onClose={close} width={280}>
           <p className="border-b border-neutral-100 px-3 py-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
-            Your communities
+            {t('goToDashboard.menuHeading')}
           </p>
           <DashboardCommunityPickerList
             communities={communities}

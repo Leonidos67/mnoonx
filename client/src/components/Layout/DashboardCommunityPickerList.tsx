@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react';
 import type { MyCommunity } from '../../hooks/useMyCommunities';
 import { communityDashboardPath } from '../../constants/communityRoutes';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
+import { useTranslation } from '../../i18n/useTranslation';
 
 interface DashboardCommunityPickerListProps {
   communities: MyCommunity[];
@@ -18,23 +19,24 @@ const DashboardCommunityPickerList: React.FC<DashboardCommunityPickerListProps> 
   onSelect,
   className = '',
 }) => {
+  const { t } = useTranslation();
   if (loading) {
     return (
-      <p className={`px-3 py-6 text-center text-sm text-neutral-500 ${className}`}>Loading…</p>
+      <p className={`px-3 py-6 text-center text-sm text-neutral-500 ${className}`}>{t('goToDashboard.loading')}</p>
     );
   }
 
   if (communities.length === 0) {
     return (
       <div className={`px-3 py-4 text-center ${className}`}>
-        <p className="text-sm text-neutral-600">You haven&apos;t created a community yet.</p>
+        <p className="text-sm text-neutral-600">{t('nav.noCommunitiesYet')}</p>
         <Link
           to="/new"
           onClick={onSelect}
           className="mt-3 inline-flex items-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-neutral-800"
         >
           <Plus className="h-4 w-4" aria-hidden />
-          Start a Community
+          {t('nav.startCommunity')}
         </Link>
       </div>
     );

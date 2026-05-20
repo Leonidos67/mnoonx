@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useUnreads } from '../context/UnreadsContext';
 
 import { NOTIFICATIONS_API as API_URL } from '../config/api';
+import { useTranslation } from '../i18n/useTranslation';
 
 interface NotificationActor {
   username: string;
@@ -59,15 +60,10 @@ function groupKey(iso: string): 'today' | 'week' | 'earlier' {
   return 'earlier';
 }
 
-const SECTION_LABELS: Record<string, string> = {
-  today: 'Today',
-  week: 'THIS WEEK',
-  earlier: 'EARLIER',
-};
-
 const Notifications: React.FC = () => {
   const { token } = useAuth();
   const { mentionUnread, refreshUnreads } = useUnreads();
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('all');
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -108,6 +104,11 @@ const Notifications: React.FC = () => {
   };
 
   const grouped = useMemo(() => {
+    const sectionLabels: Record<'today' | 'week' | 'earlier', string> = {
+      today: t('notifications.sectionToday'),
+      week: t('notifications.sectionWeek'),
+      earlier: t('notifications.sectionEarlier'),
+    };
     const order: Array<'today' | 'week' | 'earlier'> = ['today', 'week', 'earlier'];
     const map: Record<string, NotificationItem[]> = { today: [], week: [], earlier: [] };
     for (const n of items) {
@@ -115,8 +116,8 @@ const Notifications: React.FC = () => {
     }
     return order
       .filter((k) => map[k].length > 0)
-      .map((k) => ({ key: k, label: SECTION_LABELS[k], items: map[k] }));
-  }, [items]);
+      .map((k) => ({ key: k, label: sectionLabels[k], items: map[k] }));
+  }, [items, t]);
 
   const avatarFor = (n: NotificationItem) => {
     if (n.actor?.avatar) return n.actor.avatar;
@@ -127,14 +128,14 @@ const Notifications: React.FC = () => {
   if (!token) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 text-center text-neutral-600">
-        <p>Sign in to view notifications.</p>
+        <p>{t('notifications.signIn')}</p>
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-full p-4">
-      <h1 className="text-xl font-semibold text-neutral-800">Notifications</h1>
+      <h1 className="text-xl font-semibold text-neutral-800">{t('notifications.title')}</h1>
 
       <div className="mt-6 flex gap-8 border-b border-neutral-200">
         <button
@@ -144,7 +145,7 @@ const Notifications: React.FC = () => {
             tab === 'mentions' ? 'text-neutral-900' : 'text-neutral-500 hover:text-neutral-800'
           }`}
         >
-          Mentions
+          {t('notifications.mentions')}
           {mentionUnread > 0 && (
             <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#e5484d] px-1.5 text-[11px] font-bold text-white">
               {mentionUnread > 99 ? '99+' : mentionUnread}
@@ -161,7 +162,7 @@ const Notifications: React.FC = () => {
             tab === 'all' ? 'text-neutral-900' : 'text-neutral-500 hover:text-neutral-800'
           }`}
         >
-          All activity
+          {t('notifications.allActivity')}
           {tab === 'all' && (
             <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900" />
           )}
@@ -173,7 +174,7 @@ const Notifications: React.FC = () => {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-black" />
         </div>
       ) : grouped.length === 0 ? (
-        <p className="py-16 text-center text-neutral-500">No notifications yet.</p>
+        <p className="py-16 text-center text-neutral-500">{t('notifications.empty')}</p>
       ) : (
         <div className="mt-2">
           {grouped.map((section) => (

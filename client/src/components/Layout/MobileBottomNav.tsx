@@ -3,10 +3,12 @@ import { Link, useLocation } from 'react-router-dom';
 import { House, Compass, Plus, MessageCircle, User } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useUnreads } from '../../context/UnreadsContext';
+import { useTranslation } from '../../i18n/useTranslation';
 import { profilePath } from '../../constants/paths';
 
 const MobileBottomNav: React.FC = () => {
   const location = useLocation();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { messageUnread } = useUnreads();
 
@@ -32,7 +34,7 @@ const MobileBottomNav: React.FC = () => {
   return (
     <nav
       className="shrink-0 border-t border-neutral-200 bg-white/95 backdrop-blur-md pb-[env(safe-area-inset-bottom,0px)] lg:hidden"
-      aria-label="Main navigation"
+      aria-label={t('common.mainNav')}
     >
       <div className="mx-auto flex h-[60px] max-w-lg items-stretch justify-between px-2">
         <Link to="/" className={iconLinkClass(isHomeActive)} aria-current={isHomeActive ? 'page' : undefined}>
@@ -66,7 +68,11 @@ const MobileBottomNav: React.FC = () => {
           to="/messenger"
           className={`${iconLinkClass(isMessengerActive)} relative`}
           aria-current={isMessengerActive ? 'page' : undefined}
-          aria-label={unreadLabel ? `Messages, ${messageUnread} unread` : 'Messages'}
+          aria-label={
+            unreadLabel
+              ? t('common.messagesUnread', { count: messageUnread })
+              : t('common.messages')
+          }
         >
           <span className="relative">
             <MessageCircle

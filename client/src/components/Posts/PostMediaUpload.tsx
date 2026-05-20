@@ -1,5 +1,6 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Image, Loader2, X } from 'lucide-react';
+import { useTranslation } from '../../i18n/useTranslation';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { MAX_POST_MEDIA, uploadPostMediaFiles } from '../../utils/postMedia';
 
@@ -26,6 +27,7 @@ const PostMediaUpload = forwardRef<PostMediaUploadHandle, PostMediaUploadProps>(
   hideAddButton = false,
   onUploadingChange,
 }, ref) => {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,7 @@ const PostMediaUpload = forwardRef<PostMediaUploadHandle, PostMediaUploadProps>(
 
     const slotsLeft = maxCount - urls.length;
     if (slotsLeft <= 0) {
-      setError(`Maximum ${maxCount} images`);
+      setError(t('postMedia.maxImages', { count: maxCount }));
       return;
     }
 
@@ -61,7 +63,7 @@ const PostMediaUpload = forwardRef<PostMediaUploadHandle, PostMediaUploadProps>(
       const uploaded = await uploadPostMediaFiles(token, batch);
       onUrlsChange([...urls, ...uploaded]);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      setError(err instanceof Error ? err.message : t('postMedia.uploadFailed'));
     } finally {
       setUploading(false);
     }
@@ -88,7 +90,7 @@ const PostMediaUpload = forwardRef<PostMediaUploadHandle, PostMediaUploadProps>(
                 type="button"
                 onClick={() => removeAt(index)}
                 className="absolute top-1 right-1 p-0.5 rounded-full bg-black/70 text-white hover:bg-black transition-colors"
-                aria-label="Remove image"
+                aria-label={t('postMedia.removeImage')}
               >
                 <X size={12} />
               </button>
@@ -118,7 +120,7 @@ const PostMediaUpload = forwardRef<PostMediaUploadHandle, PostMediaUploadProps>(
           }`}
         >
           {uploading ? <Loader2 size={18} className="animate-spin" /> : <Image size={18} />}
-          {!compact && <span>{uploading ? 'Uploading…' : 'Add photos'}</span>}
+          {!compact && <span>{uploading ? t('postMedia.uploading') : t('postMedia.addPhotos')}</span>}
         </button>
       )}
     </div>

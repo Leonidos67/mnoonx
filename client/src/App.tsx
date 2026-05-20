@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { LanguageProvider } from './context/LanguageContext';
 import { UnreadsProvider } from './context/UnreadsContext';
 import { ToastProvider } from './context/ToastContext';
 import { ConfirmProvider } from './context/ConfirmContext';
@@ -53,6 +54,7 @@ function App() {
 
   return (
     <AuthProvider>
+      <LanguageProvider>
       <ToastProvider>
       <ConfirmProvider>
       <UnreadsProvider>
@@ -161,6 +163,7 @@ function App() {
       </UnreadsProvider>
       </ConfirmProvider>
       </ToastProvider>
+      </LanguageProvider>
     </AuthProvider>
   );
 }

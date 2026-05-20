@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -26,8 +26,21 @@ import MessengerAttachmentMenu, {
 import MessengerEmojiPicker from '../components/Messenger/MessengerEmojiPicker';
 import MessengerAnimojiAttachPanel from '../components/Messenger/MessengerAnimojiAttachPanel';
 import MessengerMessageBody from '../components/Messenger/MessengerMessageBody';
+import MessengerChatContextMenu, {
+  type ChatContextMenuAnchor,
+  type MessengerChatActionId,
+} from '../components/Messenger/MessengerChatContextMenu';
+import MessengerChatListItem from '../components/Messenger/MessengerChatListItem';
 import { MessengerEmojiItem } from '../constants/messengerEmojis';
+import { useConfirm } from '../context/ConfirmContext';
+import { useToast } from '../context/ToastContext';
+import { useTranslation } from '../i18n/useTranslation';
 import { encodeAnimojiMessage, formatMessagePreview, isAnimojiOnlyMessage } from '../utils/messengerAnimoji';
+import {
+  loadMessengerChatPrefs,
+  saveMessengerChatPrefs,
+  type MessengerChatPrefs,
+} from '../utils/messengerChatPrefs';
 
 import { MESSAGES_API as MSG_API, USERS_API as USERS_API } from '../config/api';
 
@@ -80,8 +93,13 @@ function dedupeSystemChats(list: ApiConversation[]): ApiConversation[] {
 const Messenger: React.FC = () => {
   const { token, user } = useAuth();
   const { refreshUnreads } = useUnreads();
+  const { t } = useTranslation();
+  const { showToast } = useToast();
+  const { confirm } = useConfirm();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [chatPrefs, setChatPrefs] = useState<MessengerChatPrefs>(() => loadMessengerChatPrefs());
+  const [chatActionAnchor, setChatActionAnchor] = useState<ChatContextMenuAnchor | null>(null);
 
   const [chats, setChats] = useState<ApiConversation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -209,8 +227,26 @@ const Messenger: React.FC = () => {
     [token, loadChats, refreshUnreads]
   );
 
+  const persistChatPrefs = useCallback((next: MessengerChatPrefs) => {
+    setChatPrefs(next);
+    saveMessengerChatPrefs(next);
+  }, []);
+
+  const clearMarkedNew = useCallback(
+    (id: string) => {
+      setChatPrefs((prev) => {
+        if (!prev.markedNewIds.includes(id)) return prev;
+        const next = { ...prev, markedNewIds: prev.markedNewIds.filter((x) => x !== id) };
+        saveMessengerChatPrefs(next);
+        return next;
+      });
+    },
+    []
+  );
+
   const openChat = useCallback(
     (id: string) => {
+      clearMarkedNew(id);
       setAttachMenuOpen(false);
       setAttachMenuView('main');
       setEmojiPickerOpen(false);
@@ -222,7 +258,7 @@ const Messenger: React.FC = () => {
       setSearchParams({ chat: id }, { replace: true });
       void loadMessages(id);
     },
-    [loadMessages, setSearchParams]
+    [clearMarkedNew, loadMessages, setSearchParams]
   );
 
   const closeChat = useCallback(() => {
@@ -466,6 +502,7 @@ const Messenger: React.FC = () => {
   };
 
   const filteredChats = chats.filter((chat) => {
+    if (chatPrefs.hiddenIds.includes(chat.id)) return false;
     const q = searchQuery.toLowerCase();
     if (!q) return true;
     return (
@@ -474,6 +511,106 @@ const Messenger: React.FC = () => {
       chat.lastMessage.toLowerCase().includes(q)
     );
   });
+
+  const displayChats = useMemo(() => {
+    const pinned = new Set(chatPrefs.pinnedIds);
+    const markedNew = new Set(chatPrefs.markedNewIds);
+    return [...filteredChats]
+      .map((chat) => ({
+        ...chat,
+        unreadCount: markedNew.has(chat.id) ? Math.max(1, chat.unreadCount) : chat.unreadCount,
+      }))
+      .sort((a, b) => {
+        const ap = pinned.has(a.id) ? 1 : 0;
+        const bp = pinned.has(b.id) ? 1 : 0;
+        if (ap !== bp) return bp - ap;
+        return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
+      });
+  }, [filteredChats, chatPrefs.pinnedIds, chatPrefs.markedNewIds]);
+
+  const chatActionLabels = useMemo(
+    () => ({
+      sheetTitle: t('messenger.chatActions.sheetTitle'),
+      pin: t('messenger.chatActions.pin'),
+      unpin: t('messenger.chatActions.unpin'),
+      markNew: t('messenger.chatActions.markNew'),
+      report: t('messenger.chatActions.report'),
+      blockUser: t('messenger.chatActions.blockUser'),
+      deleteChat: t('messenger.chatActions.deleteChat'),
+    }),
+    [t]
+  );
+
+  const handleChatAction = useCallback(
+    async (action: MessengerChatActionId) => {
+      const chat = chatActionAnchor?.target;
+      if (!chat) return;
+      setChatActionAnchor(null);
+
+      if (action === 'pin') {
+        const pinned = new Set(chatPrefs.pinnedIds);
+        if (pinned.has(chat.id)) pinned.delete(chat.id);
+        else pinned.add(chat.id);
+        persistChatPrefs({ ...chatPrefs, pinnedIds: Array.from(pinned) });
+        showToast(pinned.has(chat.id) ? t('messenger.chatActions.pinned') : t('messenger.chatActions.unpinned'));
+        return;
+      }
+
+      if (action === 'markNew') {
+        if (!chatPrefs.markedNewIds.includes(chat.id)) {
+          persistChatPrefs({
+            ...chatPrefs,
+            markedNewIds: [...chatPrefs.markedNewIds, chat.id],
+          });
+          setChats((prev) =>
+            prev.map((c) => (c.id === chat.id ? { ...c, unreadCount: Math.max(1, c.unreadCount) } : c))
+          );
+        }
+        showToast(t('messenger.chatActions.markedNew'));
+        return;
+      }
+
+      if (action === 'report') {
+        showToast(t('messenger.chatActions.reportSent'), 'info');
+        return;
+      }
+
+      if (action === 'block') {
+        showToast(t('messenger.chatActions.blocked'), 'info');
+        return;
+      }
+
+      if (action === 'delete') {
+        const ok = await confirm({
+          title: t('messenger.chatActions.deleteTitle'),
+          message: t('messenger.chatActions.deleteMessage', { name: chat.name }),
+          confirmLabel: t('messenger.chatActions.deleteConfirm'),
+          variant: 'danger',
+        });
+        if (!ok) return;
+        const hidden = new Set(chatPrefs.hiddenIds);
+        hidden.add(chat.id);
+        persistChatPrefs({
+          ...chatPrefs,
+          hiddenIds: Array.from(hidden),
+          pinnedIds: chatPrefs.pinnedIds.filter((id) => id !== chat.id),
+          markedNewIds: chatPrefs.markedNewIds.filter((id) => id !== chat.id),
+        });
+        if (selectedId === chat.id) closeChat();
+        showToast(t('messenger.chatActions.deleted'));
+      }
+    },
+    [
+      chatActionAnchor,
+      chatPrefs,
+      closeChat,
+      confirm,
+      persistChatPrefs,
+      selectedId,
+      showToast,
+      t,
+    ]
+  );
 
   const formatMessageTime = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -618,42 +755,30 @@ const Messenger: React.FC = () => {
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-black" />
             </div>
           ) : (
-            filteredChats.map((chat) => (
-              <button
+            displayChats.map((chat) => (
+              <MessengerChatListItem
                 key={chat.id}
-                type="button"
-                onClick={() => openChat(chat.id)}
-                className={`flex w-full items-start gap-3 border-b border-neutral-100 p-4 text-left transition-colors hover:bg-neutral-50 ${
-                  selectedId === chat.id ? 'bg-neutral-50' : ''
-                }`}
-              >
-                <div className="relative flex-shrink-0">
-                  <img src={chat.avatar} alt="" className="h-12 w-12 rounded-full" />
-                  {chat.isOnline && (
-                    <div className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline justify-between">
-                    <h3 className="truncate font-semibold text-neutral-800">{chat.name}</h3>
-                    <span className="ml-2 flex-shrink-0 text-xs text-neutral-400">
-                      {formatListTime(chat.lastMessageTime)}
-                    </span>
-                  </div>
-                  <p
-                    className={`mt-1 truncate text-sm ${
-                      chat.unreadCount > 0 ? 'font-semibold text-neutral-800' : 'text-neutral-500'
-                    }`}
-                  >
-                    {chat.lastMessage ? formatMessagePreview(chat.lastMessage) : 'No messages yet'}
-                  </p>
-                </div>
-                {chat.unreadCount > 0 && (
-                  <span className="flex h-5 min-w-[20px] flex-shrink-0 items-center justify-center rounded-full bg-[#e5484d] px-1.5 text-xs font-bold text-white">
-                    {chat.unreadCount > 99 ? '99+' : chat.unreadCount}
-                  </span>
-                )}
-              </button>
+                chat={chat}
+                selected={selectedId === chat.id}
+                isPinned={chatPrefs.pinnedIds.includes(chat.id)}
+                formatListTime={formatListTime}
+                noMessagesLabel={t('messenger.noMessagesYet')}
+                menuOpenForThisChat={chatActionAnchor?.target.id === chat.id}
+                onOpen={() => openChat(chat.id)}
+                onLongPress={(rect) =>
+                  setChatActionAnchor({
+                    rect,
+                    chat,
+                    target: {
+                      id: chat.id,
+                      name: chat.name,
+                      avatar: chat.avatar,
+                      kind: chat.kind,
+                      username: chat.username,
+                    },
+                  })
+                }
+              />
             ))
           )}
         </div>
@@ -885,6 +1010,18 @@ const Messenger: React.FC = () => {
           </div>
         </div>
       )}
+
+      <MessengerChatContextMenu
+        anchor={chatActionAnchor}
+        isPinned={
+          chatActionAnchor ? chatPrefs.pinnedIds.includes(chatActionAnchor.target.id) : false
+        }
+        formatListTime={formatListTime}
+        noMessagesLabel={t('messenger.noMessagesYet')}
+        onClose={() => setChatActionAnchor(null)}
+        onAction={(action) => void handleChatAction(action)}
+        labels={chatActionLabels}
+      />
     </div>
   );
 };

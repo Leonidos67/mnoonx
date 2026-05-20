@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { useTranslation } from '../../i18n/useTranslation';
 
 export interface WizardStep {
   id: string;
@@ -32,6 +33,7 @@ const SimpleWizard: React.FC<SimpleWizardProps> = ({
   headerLabel,
   children,
 }) => {
+  const { t } = useTranslation();
   const step = steps[stepIndex];
   const isLast = stepIndex === steps.length - 1;
   const progress = ((stepIndex + 1) / steps.length) * 100;
@@ -45,7 +47,7 @@ const SimpleWizard: React.FC<SimpleWizardProps> = ({
             type="button"
             onClick={onBack}
             className="rounded-full p-2 text-neutral-700 transition-colors hover:bg-black/5"
-            aria-label="Back"
+            aria-label={t('common.back')}
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -54,7 +56,7 @@ const SimpleWizard: React.FC<SimpleWizardProps> = ({
               <p className="text-xs font-semibold uppercase tracking-wide text-[#888]">{headerLabel}</p>
             )}
             <p className="text-sm font-medium text-neutral-800">
-              Step {stepIndex + 1} of {steps.length}
+              {t('newPage.wizard.stepOf', { current: stepIndex + 1, total: steps.length })}
             </p>
           </Box>
         </Box>
@@ -87,7 +89,7 @@ const SimpleWizard: React.FC<SimpleWizardProps> = ({
               disabled={loading}
               className="h-12 flex-1 rounded-2xl border border-[#e5e5e5] text-[15px] font-semibold text-neutral-800 hover:bg-neutral-50 disabled:opacity-50"
             >
-              Back
+              {t('common.back')}
             </button>
           )}
           <button
@@ -96,7 +98,11 @@ const SimpleWizard: React.FC<SimpleWizardProps> = ({
             disabled={!canNext || loading}
             className="h-12 flex-[2] rounded-2xl bg-black text-[15px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            {loading ? 'Please wait...' : isLast ? finishLabel : nextLabel}
+            {loading
+              ? t('newPage.wizard.pleaseWait')
+              : isLast
+                ? finishLabel
+                : nextLabel ?? t('newPage.wizard.continue')}
           </button>
         </Box>
       </Box>

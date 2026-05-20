@@ -1,15 +1,18 @@
 import React from 'react';
 import { User, Briefcase, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const NewPage: React.FC = () => {
+  const { t } = useTranslation();
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
       <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="flex min-h-full flex-col items-center justify-center px-6 py-10">
           <div className="w-full max-w-[760px]">
             <h1 className="mb-12 text-center text-[52px] font-semibold tracking-[-0.04em] text-black">
-              Create a community
+              {t('newPage.createHeading')}
             </h1>
 
             <div className="flex flex-col gap-6">
@@ -23,10 +26,10 @@ const NewPage: React.FC = () => {
                       <User size={28} strokeWidth={2.2} />
                     </div>
                     <div>
-                      <h2 className="text-[30px] font-semibold tracking-[-0.03em] text-black">Personal Community</h2>
-                      <p className="mt-1 text-[15px] text-[#666]">
-                        Create a personal space for your audience, posts and chats.
-                      </p>
+                      <h2 className="text-[30px] font-semibold tracking-[-0.03em] text-black">
+                        {t('newPage.personalTitle')}
+                      </h2>
+                      <p className="mt-1 text-[15px] text-[#666]">{t('newPage.personalDesc')}</p>
                     </div>
                   </div>
                   <div className="text-[#999] transition group-hover:text-black">
@@ -45,10 +48,10 @@ const NewPage: React.FC = () => {
                       <Briefcase size={28} strokeWidth={2.2} />
                     </div>
                     <div>
-                      <h2 className="text-[30px] font-semibold tracking-[-0.03em] text-black">Business Community</h2>
-                      <p className="mt-1 text-[15px] text-[#666]">
-                        Launch a branded community with subscriptions and products.
-                      </p>
+                      <h2 className="text-[30px] font-semibold tracking-[-0.03em] text-black">
+                        {t('newPage.businessTitle')}
+                      </h2>
+                      <p className="mt-1 text-[15px] text-[#666]">{t('newPage.businessDesc')}</p>
                     </div>
                   </div>
                   <div className="text-[#999] transition group-hover:text-black">

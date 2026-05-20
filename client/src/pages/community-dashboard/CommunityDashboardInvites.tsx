@@ -3,9 +3,11 @@ import { Link } from 'react-router-dom';
 import { Copy, Check, Lock, Link2 } from 'lucide-react';
 import { useCommunityDashboard } from '../../context/CommunityDashboardContext';
 import { communityPath, communityDashboardSettingsPath } from '../../constants/communityRoutes';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const CommunityDashboardInvites: React.FC = () => {
   const { handle, community } = useCommunityDashboard();
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   if (!community) return null;
@@ -30,18 +32,17 @@ const CommunityDashboardInvites: React.FC = () => {
 
   return (
     <div className="min-h-full bg-white p-4 lg:p-8">
-      <h1 className="text-2xl font-bold text-neutral-900">Invites</h1>
-      <p className="mt-1 text-sm text-neutral-500">Share your community with new members</p>
+      <h1 className="text-2xl font-bold text-neutral-900">{t('communityDashboard.invites.title')}</h1>
+      <p className="mt-1 text-sm text-neutral-500">{t('communityDashboard.invites.subtitle')}</p>
 
       <div className="mt-8 max-w-xl space-y-6">
         <section className="rounded-xl border border-neutral-200 p-6">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
             <Link2 className="h-4 w-4" aria-hidden />
-            Invite link
+            {t('communityDashboard.invites.inviteLink')}
           </h2>
           <p className="mt-2 text-sm text-neutral-500">
-            Anyone with this link can open your community page
-            {isPublic ? ' and join if the community is public.' : '.'}
+            {isPublic ? t('communityDashboard.invites.inviteLinkPublic') : t('communityDashboard.invites.inviteLinkPrivate')}
           </p>
           <div className="mt-4 flex gap-2">
             <input
@@ -56,7 +57,7 @@ const CommunityDashboardInvites: React.FC = () => {
               className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg bg-[#315efb] px-4 text-sm font-medium text-white hover:bg-[#2748c9]"
             >
               {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {copied ? 'Copied' : 'Copy'}
+              {copied ? t('communityDashboard.invites.copied') : t('communityDashboard.invites.copy')}
             </button>
           </div>
         </section>
@@ -65,12 +66,12 @@ const CommunityDashboardInvites: React.FC = () => {
           <section className="rounded-xl border border-neutral-200 p-6">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-neutral-900">
               <Lock className="h-4 w-4" aria-hidden />
-              Join passphrase
+              {t('communityDashboard.invites.joinPassphrase')}
             </h2>
             <p className="mt-2 text-sm text-neutral-500">
               {hasJoinCode
-                ? 'A passphrase is required for new members to join this private community.'
-                : 'No passphrase is set. Members can join without a code.'}
+                ? t('communityDashboard.invites.passphraseRequired')
+                : t('communityDashboard.invites.passphraseNotSet')}
             </p>
             {hasJoinCode ? (
               <p className="mt-3 rounded-lg bg-neutral-100 px-3 py-2 font-mono text-sm text-neutral-700">
@@ -81,16 +82,13 @@ const CommunityDashboardInvites: React.FC = () => {
               to={communityDashboardSettingsPath(handle)}
               className="mt-4 inline-block text-sm font-medium text-[#315efb] hover:underline"
             >
-              Edit in Settings
+              {t('communityDashboard.invites.editInSettings')}
             </Link>
           </section>
         )}
 
         <section className="rounded-xl border border-neutral-100 bg-neutral-50 p-4 text-sm text-neutral-600">
-          <p>
-            <span className="font-medium text-neutral-800">{community.memberCount}</span> members
-            currently have access.
-          </p>
+          <p>{t('communityDashboard.invites.membersHaveAccess', { count: community.memberCount })}</p>
         </section>
       </div>
     </div>

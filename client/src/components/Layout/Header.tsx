@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { Bell, MessageCircle, LogIn, Menu, Search } from 'lucide-react';
-import MnoonxAISiriOrb from '../AI/MnoonxAISiriOrb';
 import SearchBar from '../Common/SearchBar';
 import SearchModal from '../Common/SearchModal';
 import HeaderIconBadge from '../Common/HeaderIconBadge';
 import MnoonxLogo from './MnoonxLogo';
 import GoToDashboardMenu from './GoToDashboardMenu';
 import { useAuth } from '../../context/AuthContext';
-import { useAIChatPanel } from '../../context/AIChatPanelContext';
 import { useUnreads } from '../../context/UnreadsContext';
+import { useTranslation } from '../../i18n/useTranslation';
 
 interface HeaderProps {
   onSearch?: (query: string, category?: string) => void;
@@ -20,9 +19,9 @@ const headerIconButtonClass =
   'relative flex shrink-0 items-center justify-center rounded-full border p-2 text-neutral-600 transition-all hover:bg-black/10 hover:text-neutral-700 active:scale-[0.95]';
 
 const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOpen }) => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { messageUnread, notificationUnread } = useUnreads();
-  const { isOpen: isAiOpen, togglePanel } = useAIChatPanel();
   const [searchOpen, setSearchOpen] = useState(false);
 
   return (
@@ -35,7 +34,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
               type="button"
               onClick={onSidebarOpen}
               className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl text-neutral-700 transition-colors hover:bg-black/5 active:scale-95 lg:flex"
-              aria-label="Show sidebar"
+              aria-label={t('nav.showSidebar')}
             >
               <Menu className="h-5 w-5" strokeWidth={2} aria-hidden />
             </button>
@@ -44,7 +43,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
           <div className="hidden min-w-0 max-w-2xl flex-1 lg:block">
             <SearchBar
               onSearch={onSearch}
-              placeholder="Search communities or people..."
+              placeholder={t('search.placeholder')}
             />
           </div>
         </div>
@@ -54,30 +53,28 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
             type="button"
             onClick={() => setSearchOpen(true)}
             className={`${headerIconButtonClass} lg:hidden`}
-            aria-label="Search"
+            aria-label={t('header.searchAria')}
           >
             <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
 
-          {/* <button
-            type="button"
-            onClick={togglePanel}
-            className={`flex shrink-0 items-center justify-center rounded-full transition-all ${
-              isAiOpen ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-neutral-50' : ''
-            }`}
-            aria-label={isAiOpen ? 'Close MNOONX AI' : 'Open MNOONX AI'}
-            aria-expanded={isAiOpen}
-          >
-            <MnoonxAISiriOrb size="42px" animationDuration={18} compact />
-          </button> */}
-
           {user ? (
             <div className="flex items-center gap-1 sm:gap-2">
-              <HeaderIconBadge to="/notifications" label="Notifications" count={notificationUnread}>
+              <HeaderIconBadge
+                to="/notifications"
+                label={t('header.notifications')}
+                count={notificationUnread}
+                ariaLabelWhenUnread={t('header.notificationsUnread', { count: notificationUnread })}
+              >
                 <Bell className="h-5 w-5" />
               </HeaderIconBadge>
               <span className="hidden lg:contents">
-                <HeaderIconBadge to="/messenger" label="Messages" count={messageUnread}>
+                <HeaderIconBadge
+                  to="/messenger"
+                  label={t('header.messages')}
+                  count={messageUnread}
+                  ariaLabelWhenUnread={t('header.messagesUnread', { count: messageUnread })}
+                >
                   <MessageCircle className="h-5 w-5" />
                 </HeaderIconBadge>
               </span>
@@ -89,7 +86,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
               className="hidden items-center gap-2 rounded-full border border-neutral-300 px-3 py-2 transition-all hover:bg-black hover:text-white active:scale-[0.95] lg:flex"
             >
               <LogIn className="h-5 w-5" />
-              <span className="font-medium">Sign in</span>
+              <span className="font-medium">{t('common.signIn')}</span>
             </button>
           )}
         </div>

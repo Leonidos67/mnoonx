@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from '../../i18n/useTranslation';
 import AuthModalShell from './AuthModalShell';
 import { authInputClass, authSubmitClass } from './authFormStyles';
 
@@ -11,6 +12,7 @@ interface RegisterModalProps {
 
 const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSwitchToLogin }) => {
   const { register } = useAuth();
+  const { t } = useTranslation();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,7 +38,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSwitch
       await register(username, email, password, username);
       onClose();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Registration failed';
+      const message = err instanceof Error ? err.message : t('auth.registrationFailed');
       setError(message);
     } finally {
       setLoading(false);
@@ -44,12 +46,12 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSwitch
   };
 
   return (
-    <AuthModalShell isOpen={isOpen} onClose={onClose} title="Create account">
+    <AuthModalShell isOpen={isOpen} onClose={onClose} title={t('auth.registerTitle')}>
       <h2
         id="auth-modal-title"
         className="mb-6 text-center text-2xl font-bold text-neutral-900 sm:mb-8 sm:text-3xl"
       >
-        Create account
+        {t('auth.registerHeading')}
       </h2>
 
       {error && (
@@ -61,7 +63,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSwitch
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4 sm:space-y-5">
         <input
           type="text"
-          placeholder="Username"
+          placeholder={t('auth.username')}
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           className={authInputClass}
@@ -70,7 +72,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSwitch
         />
         <input
           type="email"
-          placeholder="Email address"
+          placeholder={t('auth.email')}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className={authInputClass}
@@ -79,7 +81,7 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSwitch
         />
         <input
           type="password"
-          placeholder="Password"
+          placeholder={t('auth.password')}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           className={authInputClass}
@@ -88,18 +90,18 @@ const RegisterModal: React.FC<RegisterModalProps> = ({ isOpen, onClose, onSwitch
         />
 
         <button type="submit" disabled={loading} className={authSubmitClass}>
-          {loading ? 'Creating account...' : 'Create account'}
+          {loading ? t('auth.creatingAccount') : t('auth.createAccount')}
         </button>
       </form>
 
       <p className="mt-6 text-center text-sm text-gray-500">
-        Already have an account?{' '}
+        {t('auth.haveAccount')}{' '}
         <button
           type="button"
           onClick={onSwitchToLogin}
           className="font-medium text-[#315efb] hover:underline"
         >
-          Log in
+          {t('auth.logIn')}
         </button>
       </p>
     </AuthModalShell>

@@ -12,6 +12,7 @@ import {
 } from '../../constants/searchSuggestions';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { authInputClass } from '../Auth/authFormStyles';
+import { useTranslation } from '../../i18n/useTranslation';
 
 interface SearchBarProps {
   onSearch?: (query: string, category?: string) => void;
@@ -57,11 +58,13 @@ const PERSON_AVATAR_CLASS = 'h-9 w-9 shrink-0 rounded-full object-cover';
 
 const SearchBar: React.FC<SearchBarProps> = ({
   onSearch,
-  placeholder = 'Search communities or people...',
+  placeholder,
   variant = 'inline',
   isActive = false,
   onDismiss,
 }) => {
+  const { t } = useTranslation();
+  const resolvedPlaceholder = placeholder ?? t('search.placeholder');
   const isModal = variant === 'modal';
   const navigate = useNavigate();
   const { token } = useAuth();
@@ -77,11 +80,14 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
   const panelOpen = isModal ? isActive : dropdownOpen;
 
-  const categories = [
-    { id: 'all' as const, label: 'All', icon: LayoutGrid },
-    { id: 'communities' as const, label: 'Communities', icon: Landmark },
-    { id: 'people' as const, label: 'People', icon: Users },
-  ];
+  const categories = useMemo(
+    () => [
+      { id: 'all' as const, label: t('search.all'), icon: LayoutGrid },
+      { id: 'communities' as const, label: t('search.communities'), icon: Landmark },
+      { id: 'people' as const, label: t('search.people'), icon: Users },
+    ],
+    [t]
+  );
 
   const loadPopular = useCallback(async () => {
     setPopularLoading(true);
@@ -176,8 +182,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
 
   useEffect(() => {
     if (!isModal || !isActive) return;
-    const t = window.setTimeout(() => inputRef.current?.focus(), 100);
-    return () => window.clearTimeout(t);
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 100);
+    return () => window.clearTimeout(focusTimer);
   }, [isModal, isActive]);
 
   useEffect(() => {
@@ -307,8 +313,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-100">
         <Search className="h-6 w-6 text-neutral-400" strokeWidth={1.75} aria-hidden />
       </div>
-      <p className="text-base font-medium text-neutral-900">Find anything</p>
-      <p className="mt-1 text-sm text-neutral-500">Start typing</p>
+      <p className="text-base font-medium text-neutral-900">{t('search.findAnything')}</p>
+      <p className="mt-1 text-sm text-neutral-500">{t('search.startTyping')}</p>
     </div>
   );
 
@@ -355,10 +361,10 @@ const SearchBar: React.FC<SearchBarProps> = ({
           <div className="py-2">
             <div className="flex items-center gap-2 px-4 py-2 text-xs font-medium uppercase text-neutral-500">
               <Search className="h-3 w-3" />
-              Results for &ldquo;{query}&rdquo;
+              {t('search.resultsFor', { query })}
             </div>
             {popularLoading ? (
-              <p className="px-4 py-8 text-center text-sm text-neutral-400">Searching…</p>
+              <p className="px-4 py-8 text-center text-sm text-neutral-400">{t('search.searching')}</p>
             ) : searchResults.length > 0 ? (
               searchResults.map((hit) => (
                 <button
@@ -381,7 +387,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                     <span className="block truncate text-xs text-neutral-500">{hit.subtitle}</span>
                   </span>
                   <span className="text-xs capitalize text-neutral-400">
-                    {hit.kind === 'community' ? 'Community' : 'Person'}
+                    {hit.kind === 'community' ? t('search.kindCommunity') : t('search.kindPerson')}
                   </span>
                   <ArrowRight className="h-3 w-3 text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100" />
                 </button>
@@ -389,8 +395,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
             ) : (
               <div className="px-4 py-8 text-center text-neutral-400">
                 <Search className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                <p className="text-sm">No results for &ldquo;{query}&rdquo;</p>
-                <p className="mt-1 text-xs text-neutral-400">Try another name or handle</p>
+                <p className="text-sm">{t('search.noResultsFor', { query })}</p>
+                <p className="mt-1 text-xs text-neutral-400">{t('search.tryAnother')}</p>
               </div>
             )}
           </div>
@@ -423,7 +429,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             onSearch?.(query, activeCategory);
           }
         }}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         className={
           isModal
             ? `${authInputClass} pl-12 pr-5`

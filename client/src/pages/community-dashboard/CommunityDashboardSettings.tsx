@@ -9,6 +9,7 @@ import {
   mergeAdminPermissions,
 } from '../../constants/communityAdminPermissions';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useTranslation } from '../../i18n/useTranslation';
 
 import { COMMUNITIES_API as API_URL } from '../../config/api';
 
@@ -23,10 +24,22 @@ const CATEGORIES = [
   'Other',
 ] as const;
 
+const SETTINGS_CATEGORY_TKEY: Record<(typeof CATEGORIES)[number], string> = {
+  Memecoins: 'communitySettings.categoryMemecoins',
+  Futures: 'communitySettings.categoryFutures',
+  'On-Chain': 'communitySettings.categoryOnChain',
+  Airdrops: 'communitySettings.categoryAirdrops',
+  Education: 'communitySettings.categoryEducation',
+  DeFi: 'communitySettings.categoryDeFi',
+  NFT: 'communitySettings.categoryNFT',
+  Other: 'communitySettings.categoryOther',
+};
+
 const CommunityDashboardSettings: React.FC = () => {
   const navigate = useNavigate();
   const { token } = useAuth();
   const { confirm } = useConfirm();
+  const { t } = useTranslation();
   const { handle, community, setCommunity, reload } = useCommunityDashboard();
 
   const [saving, setSaving] = useState(false);
@@ -79,13 +92,13 @@ const CommunityDashboardSettings: React.FC = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { message?: string }).message || 'Failed to save admin permissions');
+        setError((data as { message?: string }).message || t('communityDashboard.settings.failedSaveAdminPerm'));
         return;
       }
       setCommunity(data);
       await reload();
     } catch {
-      setError('Network error.');
+      setError(t('communitySettings.networkError'));
     } finally {
       setSavingAdminPermissions(false);
     }
@@ -117,13 +130,13 @@ const CommunityDashboardSettings: React.FC = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { message?: string }).message || 'Failed to save');
+        setError((data as { message?: string }).message || t('communitySettings.saveFailed'));
         return;
       }
       setCommunity(data);
       await reload();
     } catch {
-      setError('Network error.');
+      setError(t('communitySettings.networkError'));
     } finally {
       setSaving(false);
     }
@@ -134,9 +147,9 @@ const CommunityDashboardSettings: React.FC = () => {
     const normalized = deleteConfirm.trim().replace(/^@/, '').toLowerCase();
     if (normalized !== community.handle.toLowerCase()) return;
     const confirmed = await confirm({
-      title: 'Delete community?',
-      message: 'This is permanent. All posts, chats, apps, and uploaded files will be removed.',
-      confirmLabel: 'Delete forever',
+      title: t('communitySettings.deleteCommunityTitle'),
+      message: t('communitySettings.deleteCommunityMessage'),
+      confirmLabel: t('communitySettings.deleteConfirmButton'),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -149,16 +162,16 @@ const CommunityDashboardSettings: React.FC = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { message?: string }).message || 'Failed to delete');
+        setError((data as { message?: string }).message || t('communitySettings.deleteFailed'));
         return;
       }
       navigate('/discover', { replace: true });
     } catch {
-      setError('Network error.');
+      setError(t('communitySettings.networkError'));
     } finally {
       setDeleting(false);
     }
-  }, [token, community, deleteConfirm, handle, navigate, confirm]);
+  }, [token, community, deleteConfirm, handle, navigate, confirm, t]);
 
   if (!community) return null;
 
@@ -169,8 +182,8 @@ const CommunityDashboardSettings: React.FC = () => {
 
   return (
     <div className="min-h-full bg-white p-4 lg:p-8">
-      <h1 className="text-2xl font-bold text-neutral-900">Settings</h1>
-      <p className="mt-1 text-sm text-neutral-500">Detailed community configuration</p>
+      <h1 className="text-2xl font-bold text-neutral-900">{t('communityDashboard.nav.settings')}</h1>
+      <p className="mt-1 text-sm text-neutral-500">{t('communityDashboard.settings.subtitle')}</p>
 
       {error && (
         <p className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>
@@ -182,10 +195,8 @@ const CommunityDashboardSettings: React.FC = () => {
             <div className="flex items-start gap-3">
               <Shield className="mt-0.5 h-5 w-5 shrink-0 text-[#315efb]" aria-hidden />
               <div>
-                <h2 className="text-lg font-semibold text-neutral-900">Admin permissions</h2>
-                <p className="mt-1 text-sm text-neutral-500">
-                  Choose what community admins are allowed to do in the dashboard and on the community page.
-                </p>
+                <h2 className="text-lg font-semibold text-neutral-900">{t('communityDashboard.settings.adminPermissions')}</h2>
+                <p className="mt-1 text-sm text-neutral-500">{t('communityDashboard.settings.adminPermissionsHint')}</p>
               </div>
             </div>
             <ul className="space-y-3">
@@ -204,8 +215,12 @@ const CommunityDashboardSettings: React.FC = () => {
                     className="mt-1 rounded border-neutral-300"
                   />
                   <label htmlFor={`admin-perm-${item.key}`} className="min-w-0 cursor-pointer">
-                    <span className="block text-sm font-medium text-neutral-900">{item.label}</span>
-                    <span className="mt-0.5 block text-xs text-neutral-500">{item.description}</span>
+                    <span className="block text-sm font-medium text-neutral-900">
+                      {t(`communityDashboard.adminPerm.${item.key}.label`)}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-neutral-500">
+                      {t(`communityDashboard.adminPerm.${item.key}.description`)}
+                    </span>
                   </label>
                 </li>
               ))}
@@ -217,7 +232,7 @@ const CommunityDashboardSettings: React.FC = () => {
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-black py-3 text-sm font-medium text-white transition-colors hover:bg-neutral-800 disabled:opacity-50"
             >
               <Save className="h-4 w-4" aria-hidden />
-              {savingAdminPermissions ? 'Saving…' : 'Save admin permissions'}
+              {savingAdminPermissions ? t('communityDashboard.settings.savingAdminPermissions') : t('communityDashboard.settings.saveAdminPermissions')}
             </button>
           </section>
         )}
@@ -225,9 +240,9 @@ const CommunityDashboardSettings: React.FC = () => {
         {canEditSettings ? (
         <>
         <section className="space-y-4 rounded-2xl border border-neutral-200 p-6">
-          <h2 className="text-lg font-semibold text-neutral-900">General</h2>
+          <h2 className="text-lg font-semibold text-neutral-900">{t('communityDashboard.settings.general')}</h2>
           <div>
-            <label className="mb-2 block text-sm font-medium text-neutral-700">Name</label>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">{t('communitySettings.name')}</label>
             <input
               type="text"
               value={name}
@@ -236,17 +251,17 @@ const CommunityDashboardSettings: React.FC = () => {
             />
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium text-neutral-700">Handle</label>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">{t('communityDashboard.settings.handle')}</label>
             <input
               type="text"
               value={community.handle}
               disabled
               className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 font-mono text-sm text-neutral-600"
             />
-            <p className="mt-1 text-xs text-neutral-500">Handle cannot be changed after creation.</p>
+            <p className="mt-1 text-xs text-neutral-500">{t('communityDashboard.settings.handleLocked')}</p>
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium text-neutral-700">Description</label>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">{t('communitySettings.description')}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -255,7 +270,7 @@ const CommunityDashboardSettings: React.FC = () => {
             />
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium text-neutral-700">Category</label>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">{t('communitySettings.category')}</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -263,7 +278,7 @@ const CommunityDashboardSettings: React.FC = () => {
             >
               {CATEGORIES.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {t(SETTINGS_CATEGORY_TKEY[c])}
                 </option>
               ))}
             </select>
@@ -271,31 +286,31 @@ const CommunityDashboardSettings: React.FC = () => {
         </section>
 
         <section className="space-y-4 rounded-2xl border border-neutral-200 p-6">
-          <h2 className="text-lg font-semibold text-neutral-900">Branding</h2>
+          <h2 className="text-lg font-semibold text-neutral-900">{t('communityDashboard.settings.branding')}</h2>
           <div>
-            <label className="mb-2 block text-sm font-medium text-neutral-700">Avatar URL</label>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">{t('communitySettings.avatarUrl')}</label>
             <input
               type="url"
               value={avatar}
               onChange={(e) => setAvatar(e.target.value)}
-              placeholder="https://..."
+              placeholder={t('communitySettings.urlPlaceholder')}
               className="w-full rounded-xl border border-neutral-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black/10"
             />
           </div>
           <div>
-            <label className="mb-2 block text-sm font-medium text-neutral-700">Banner URL</label>
+            <label className="mb-2 block text-sm font-medium text-neutral-700">{t('communitySettings.bannerUrl')}</label>
             <input
               type="url"
               value={banner}
               onChange={(e) => setBanner(e.target.value)}
-              placeholder="https://..."
+              placeholder={t('communitySettings.urlPlaceholder')}
               className="w-full rounded-xl border border-neutral-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black/10"
             />
           </div>
         </section>
 
         <section className="space-y-4 rounded-2xl border border-neutral-200 p-6">
-          <h2 className="text-lg font-semibold text-neutral-900">Access</h2>
+          <h2 className="text-lg font-semibold text-neutral-900">{t('communityDashboard.settings.access')}</h2>
           <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
             <label className="flex flex-1 cursor-pointer items-center gap-2 rounded-xl border border-neutral-200 px-4 py-3 has-[:checked]:border-[#315efb] has-[:checked]:bg-[#eef2ff]">
               <input
@@ -306,7 +321,7 @@ const CommunityDashboardSettings: React.FC = () => {
                 className="h-4 w-4"
               />
               <Globe className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
-              <span className="text-sm font-medium">Public</span>
+              <span className="text-sm font-medium">{t('communitySettings.visibilityPublicTitle')}</span>
             </label>
             <label className="flex flex-1 cursor-pointer items-center gap-2 rounded-xl border border-neutral-200 px-4 py-3 has-[:checked]:border-[#315efb] has-[:checked]:bg-[#eef2ff]">
               <input
@@ -317,7 +332,7 @@ const CommunityDashboardSettings: React.FC = () => {
                 className="h-4 w-4"
               />
               <Lock className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden />
-              <span className="text-sm font-medium">Private</span>
+              <span className="text-sm font-medium">{t('communitySettings.visibilityPrivateTitle')}</span>
             </label>
           </div>
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-neutral-200 px-4 py-3">
@@ -330,21 +345,21 @@ const CommunityDashboardSettings: React.FC = () => {
             <span>
               <span className="flex items-center gap-2 text-sm font-medium text-neutral-900">
                 <MessageSquare className="h-4 w-4 text-neutral-500" aria-hidden />
-                Members can publish posts
+                {t('communitySettings.membersCanPostTitle')}
               </span>
               <span className="mt-1 block text-xs text-neutral-500">
-                When disabled, only the community owner can post to the feed.
+                {t('communitySettings.membersCanPostHint')}
               </span>
             </span>
           </label>
           {!isPublic && (
             <div>
-              <label className="mb-2 block text-sm font-medium text-neutral-700">Join passphrase</label>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">{t('communitySettings.joinPassphrase')}</label>
               <input
                 type="text"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value)}
-                placeholder="Leave empty to allow join without a passphrase"
+                placeholder={t('communitySettings.joinPassphrasePlaceholder')}
                 maxLength={64}
                 className="w-full rounded-xl border border-neutral-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black/10"
               />
@@ -353,7 +368,7 @@ const CommunityDashboardSettings: React.FC = () => {
         </section>
 
         <section className="space-y-4 rounded-2xl border border-neutral-200 p-6">
-          <h2 className="text-lg font-semibold text-neutral-900">Monetization</h2>
+          <h2 className="text-lg font-semibold text-neutral-900">{t('communityDashboard.settings.monetization')}</h2>
           <label className="flex cursor-pointer items-center gap-3">
             <input
               type="checkbox"
@@ -362,11 +377,11 @@ const CommunityDashboardSettings: React.FC = () => {
               className="rounded border-neutral-300"
             />
             <CreditCard className="h-4 w-4 text-neutral-500" aria-hidden />
-            <span className="text-sm font-medium">Paid access</span>
+            <span className="text-sm font-medium">{t('communitySettings.paidAccess')}</span>
           </label>
           {isPaid && (
             <div>
-              <label className="mb-2 block text-sm font-medium text-neutral-700">Price (USD)</label>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">{t('communityDashboard.settings.priceUsd')}</label>
               <input
                 type="number"
                 min={0}
@@ -379,7 +394,7 @@ const CommunityDashboardSettings: React.FC = () => {
           )}
           <div className="flex items-center gap-2 border-t border-neutral-100 pt-2 text-sm text-neutral-500">
             <Users className="h-4 w-4" aria-hidden />
-            <span>{community.memberCount} members</span>
+            <span>{t('communitySettings.membersCount', { count: community.memberCount })}</span>
           </div>
         </section>
 
@@ -390,24 +405,22 @@ const CommunityDashboardSettings: React.FC = () => {
           className="flex w-full max-w-2xl items-center justify-center gap-2 rounded-xl bg-black py-3 font-medium text-white transition-colors hover:bg-neutral-800 disabled:opacity-50"
         >
           <Save className="h-5 w-5" aria-hidden />
-          {saving ? 'Saving…' : 'Save changes'}
+          {saving ? t('communitySettings.saving') : t('communitySettings.saveChanges')}
         </button>
         </>
         ) : (
           <p className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-6 text-sm text-neutral-600">
-            You can view settings, but only the owner can change community details. Admin permission toggles are
-            configured by the owner above.
+            {t('communityDashboard.settings.readOnlyNotice')}
           </p>
         )}
 
         {isOwner && (
         <section className="max-w-2xl rounded-2xl border border-red-200 bg-red-50/60 p-6">
-          <h2 className="text-lg font-semibold text-red-900">Danger zone</h2>
-          <p className="mt-1 text-sm text-red-800/90">
-            Deleting a community is permanent. Posts, members, apps, and uploaded files will be removed.
-          </p>
+          <h2 className="text-lg font-semibold text-red-900">{t('communitySettings.dangerZone')}</h2>
+          <p className="mt-1 text-sm text-red-800/90">{t('communitySettings.dangerZoneBody')}</p>
           <label className="mt-4 block text-sm font-medium text-red-900">
-            Type the handle to confirm: <span className="font-mono">@{community.handle}</span>
+            {t('communitySettings.deleteConfirmLabel')}{' '}
+            <span className="font-mono">@{community.handle}</span>
           </label>
           <input
             type="text"
@@ -424,7 +437,7 @@ const CommunityDashboardSettings: React.FC = () => {
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-red-300 bg-white py-3 font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Trash2 className="h-5 w-5" aria-hidden />
-            {deleting ? 'Deleting…' : 'Delete community permanently'}
+            {deleting ? t('communitySettings.deleting') : t('communitySettings.deleteForever')}
           </button>
         </section>
         )}

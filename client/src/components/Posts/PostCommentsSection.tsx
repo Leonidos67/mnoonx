@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { MoreHorizontal, Send } from 'lucide-react';
 import type { FeedPost, PostComment } from '../../types/postFeed';
+import { useTranslation } from '../../i18n/useTranslation';
 import { formatPostDate } from './postFeedUtils';
 
 export const PostCommentComposer: React.FC<{
@@ -11,7 +12,9 @@ export const PostCommentComposer: React.FC<{
   onSubmit: () => void;
   token: string | null;
   commentSubmitting: boolean;
-}> = ({ variant, text, onTextChange, onSubmit, token, commentSubmitting }) => (
+}> = ({ variant, text, onTextChange, onSubmit, token, commentSubmitting }) => {
+  const { t } = useTranslation();
+  return (
   <div
     className={variant === 'feed' ? 'flex gap-2 border-t border-neutral-100 pt-3' : 'flex gap-2'}
     onClick={(e) => e.stopPropagation()}
@@ -27,7 +30,7 @@ export const PostCommentComposer: React.FC<{
         }
       }}
       onClick={(e) => e.stopPropagation()}
-      placeholder={token ? 'Write a comment…' : 'Sign in to comment'}
+      placeholder={token ? t('home.writeComment') : t('home.signInToComment')}
       disabled={!token || commentSubmitting}
       className="min-w-0 flex-1 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm outline-none focus:border-black/30 focus:ring-2 focus:ring-black/5 disabled:opacity-60"
     />
@@ -47,7 +50,8 @@ export const PostCommentComposer: React.FC<{
       )}
     </button>
   </div>
-);
+  );
+};
 
 export const PostCommentsSection: React.FC<{
   post: FeedPost;
@@ -81,6 +85,7 @@ export const PostCommentsSection: React.FC<{
   openCommentMenu,
   onCommentMenuToggle,
 }) => {
+  const { t } = useTranslation();
   const postId = String(post._id);
 
   if (part === 'composer') {
@@ -104,7 +109,7 @@ export const PostCommentsSection: React.FC<{
       onClick={(e) => e.stopPropagation()}
     >
       {variant === 'sidebar' && (
-        <p className="text-sm font-semibold text-neutral-900 mb-3">Comments</p>
+        <p className="text-sm font-semibold text-neutral-900 mb-3">{t('home.commentsHeading')}</p>
       )}
       <div className={`overflow-y-auto ${listMaxHeight} pr-1 -mr-1`}>
         {commentsLoading ? (
@@ -115,7 +120,7 @@ export const PostCommentsSection: React.FC<{
           <>
             {(!post.comments || post.comments.length === 0) && (
               <p className="py-4 text-center cursor-default text-sm text-neutral-500">
-                No comments yet. Be the first to comment!
+                {t('home.noCommentsHint')}
               </p>
             )}
             <ul className={`space-y-3 ${variant === 'feed' ? 'mb-2' : 'mb-4'}`}>

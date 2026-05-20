@@ -76,7 +76,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     <AIChatPanelProvider>
       <div className="flex h-[100dvh] overflow-hidden bg-neutral-50">
         <aside
-          className={`hidden h-full shrink-0 overflow-hidden border-neutral-200 bg-neutral-50 transition-[width,border-width] duration-300 ease-out lg:flex ${
+          className={`hidden h-full shrink-0 overflow-visible border-neutral-200 bg-neutral-50 transition-[width,border-width] duration-300 ease-out lg:flex ${
             sidebarCollapsed ? 'w-0 border-r-0' : 'w-64 border-r'
           }`}
           aria-hidden={sidebarCollapsed}

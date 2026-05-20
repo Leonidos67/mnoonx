@@ -24,6 +24,7 @@ import {
 import { CommunityDashboardProvider, useCommunityDashboard } from '../../../context/CommunityDashboardContext';
 import { hasCommunityPermission } from '../../../utils/communityRoles';
 import type { CommunityAdminPermissionKey } from '../../../constants/communityAdminPermissions';
+import { useTranslation } from '../../../i18n/useTranslation';
 
 type DashboardNavItem = {
   to: string;
@@ -67,6 +68,7 @@ const DashboardNavLinks: React.FC<{
 
 const DashboardShell: React.FC = () => {
   const { handle, community, loading, error } = useCommunityDashboard();
+  const { t } = useTranslation();
 
   const can = (permission: CommunityAdminPermissionKey) =>
     community ? hasCommunityPermission(community, null, permission) : false;
@@ -74,28 +76,40 @@ const DashboardShell: React.FC = () => {
   const navItems = useMemo((): DashboardNavItem[] => {
     if (!community) return [];
     const items: DashboardNavItem[] = [
-      { to: communityDashboardPath(handle), end: true, label: 'Home', icon: House },
+      { to: communityDashboardPath(handle), end: true, label: t('communityDashboard.nav.home'), icon: House },
     ];
     if (can('canManageMembers')) {
-      items.push({ to: communityDashboardUsersPath(handle), label: 'Users', icon: Users });
+      items.push({ to: communityDashboardUsersPath(handle), label: t('communityDashboard.nav.users'), icon: Users });
     }
     if (can('canManageProducts')) {
-      items.push({ to: communityDashboardProductsPath(handle), label: 'Products', icon: ShoppingBag });
+      items.push({
+        to: communityDashboardProductsPath(handle),
+        label: t('communityDashboard.nav.products'),
+        icon: ShoppingBag,
+      });
     }
     if (can('canManageContent')) {
-      items.push({ to: communityDashboardContentPath(handle), label: 'Content', icon: FileText });
+      items.push({ to: communityDashboardContentPath(handle), label: t('communityDashboard.nav.content'), icon: FileText });
     }
     if (can('canViewAnalytics')) {
-      items.push({ to: communityDashboardAnalyticsPath(handle), label: 'Analytics', icon: BarChart3 });
+      items.push({
+        to: communityDashboardAnalyticsPath(handle),
+        label: t('communityDashboard.nav.analytics'),
+        icon: BarChart3,
+      });
     }
     if (can('canManageInvites')) {
-      items.push({ to: communityDashboardInvitesPath(handle), label: 'Invites', icon: Link2 });
+      items.push({ to: communityDashboardInvitesPath(handle), label: t('communityDashboard.nav.invites'), icon: Link2 });
     }
     if (community.isOwner || can('canManageSettings')) {
-      items.push({ to: communityDashboardSettingsPath(handle), label: 'Settings', icon: Settings });
+      items.push({
+        to: communityDashboardSettingsPath(handle),
+        label: t('communityDashboard.nav.settings'),
+        icon: Settings,
+      });
     }
     return items;
-  }, [community, handle]);
+  }, [community, handle, t]);
 
   if (loading) {
     return (
@@ -108,7 +122,7 @@ const DashboardShell: React.FC = () => {
   if (error || !community) {
     return (
       <div className="flex min-h-full items-center justify-center bg-white px-4">
-        <p className="text-sm text-red-600">{error || 'Community not found.'}</p>
+        <p className="text-sm text-red-600">{error || t('communityDashboard.notFound')}</p>
       </div>
     );
   }
@@ -168,7 +182,7 @@ const DashboardShell: React.FC = () => {
 
         <nav
           className="flex gap-0.5 overflow-x-auto px-2 scrollbar-thin scrollbar-thumb-neutral-200"
-          aria-label="Dashboard sections"
+          aria-label={t('communityDashboard.navAria')}
         >
           {navItems.map((item) => {
             const Icon = item.icon;

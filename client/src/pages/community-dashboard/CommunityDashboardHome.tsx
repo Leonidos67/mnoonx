@@ -21,7 +21,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useCommunityDashboard } from '../../context/CommunityDashboardContext';
 import { useDashboardOverview } from '../../hooks/useDashboardOverview';
 import { formatUsd, useDashboardAnalytics } from '../../hooks/useDashboardAnalytics';
-import { dashboardAppIcon, dashboardAppLabel } from '../../components/Community/Dashboard/dashboardAppMeta';
+import { dashboardAppIcon, getDashboardAppLabel } from '../../components/Community/Dashboard/dashboardAppMeta';
+import { useTranslation } from '../../i18n/useTranslation';
 import {
   communityPath,
   communityDashboardAnalyticsPath,
@@ -35,6 +36,7 @@ import {
 const CommunityDashboardHome: React.FC = () => {
   const { handle, community } = useCommunityDashboard();
   const { token } = useAuth();
+  const { t } = useTranslation();
   const { postCount, totalChatUnread, loading: overviewLoading } = useDashboardOverview(
     handle,
     token
@@ -54,53 +56,63 @@ const CommunityDashboardHome: React.FC = () => {
     if (totalChatUnread > 0) {
       items.push({
         id: 'chat',
-        message: `${totalChatUnread} unread chat message${totalChatUnread === 1 ? '' : 's'}`,
+        message: t(
+          totalChatUnread === 1
+            ? 'communityDashboard.home.attentionUnreadChat'
+            : 'communityDashboard.home.attentionUnreadChatMany',
+          { count: totalChatUnread }
+        ),
         href: communityPath(community.handle),
-        label: 'Open community',
+        label: t('communityDashboard.home.actionOpenCommunity'),
       });
     }
     if (hiddenApps.length > 0) {
       items.push({
         id: 'hidden-apps',
-        message: `${hiddenApps.length} app${hiddenApps.length === 1 ? '' : 's'} hidden from members`,
+        message: t(
+          hiddenApps.length === 1
+            ? 'communityDashboard.home.attentionHiddenApps'
+            : 'communityDashboard.home.attentionHiddenAppsMany',
+          { count: hiddenApps.length }
+        ),
         href: communityDashboardProductsPath(handle),
-        label: 'Manage products',
+        label: t('communityDashboard.home.actionManageProducts'),
       });
     }
     if (!isPublic && !hasJoinCode) {
       items.push({
         id: 'join-code',
-        message: 'Private community has no join passphrase',
+        message: t('communityDashboard.home.attentionNoPassphrase'),
         href: communityDashboardSettingsPath(handle),
-        label: 'Add passphrase',
+        label: t('communityDashboard.home.actionAddPassphrase'),
       });
     }
     if (!membersCanPost) {
       items.push({
         id: 'posts-locked',
-        message: 'Only you can publish to the community feed',
+        message: t('communityDashboard.home.attentionPostsLocked'),
         href: communityDashboardSettingsPath(handle),
-        label: 'Review settings',
+        label: t('communityDashboard.home.actionReviewSettings'),
       });
     }
     if (appCount === 0) {
       items.push({
         id: 'no-apps',
-        message: 'No apps installed yet',
+        message: t('communityDashboard.home.attentionNoApps'),
         href: communityStorePath(handle),
-        label: 'Open store',
+        label: t('communityDashboard.home.openStore'),
       });
     }
     if (postCount === 0 && !overviewLoading) {
       items.push({
         id: 'no-posts',
-        message: 'Community feed is empty',
+        message: t('communityDashboard.home.attentionFeedEmpty'),
         href: communityPath(community.handle),
-        label: 'View feed',
+        label: t('communityDashboard.home.actionViewFeed'),
       });
     }
     return items;
-  }, [community, totalChatUnread, postCount, overviewLoading, handle]);
+  }, [community, totalChatUnread, postCount, overviewLoading, handle, t]);
 
   if (!community) return null;
 
@@ -123,85 +135,87 @@ const CommunityDashboardHome: React.FC = () => {
 
   return (
     <div className="min-h-full bg-white p-4 lg:p-8">
-      <h1 className="text-2xl font-bold text-neutral-900">Dashboard</h1>
-      <p className="mt-1 text-sm text-neutral-500">Overview for {community.name}</p>
+      <h1 className="text-2xl font-bold text-neutral-900">{t('dashboard.title')}</h1>
+      <p className="mt-1 text-sm text-neutral-500">
+        {t('communityDashboard.home.overviewFor', { name: community.name })}
+      </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           icon={<Users className="h-4 w-4" aria-hidden />}
-          label="Members"
+          label={t('communityDashboard.home.members')}
           value={String(community.memberCount)}
           href={communityDashboardUsersPath(handle)}
-          linkLabel="View users"
+          linkLabel={t('communityDashboard.home.viewUsers')}
         />
         <StatCard
           icon={<FileText className="h-4 w-4" aria-hidden />}
-          label="Feed posts"
+          label={t('communityDashboard.home.feedPosts')}
           value={overviewLoading ? '…' : String(postCount)}
           href={communityDashboardContentPath(handle)}
-          linkLabel="Manage content"
+          linkLabel={t('communityDashboard.home.manageContent')}
         />
         <StatCard
           icon={<LayoutGrid className="h-4 w-4" aria-hidden />}
-          label="Installed apps"
+          label={t('communityDashboard.home.installedApps')}
           value={String(appCount)}
           href={communityStorePath(handle)}
-          linkLabel="Open store"
+          linkLabel={t('communityDashboard.home.openStore')}
         />
         <StatCard
           icon={<MessageCircle className="h-4 w-4" aria-hidden />}
-          label="Unread chat"
+          label={t('communityDashboard.home.unreadChat')}
           value={overviewLoading ? '…' : String(totalChatUnread)}
           href={communityPath(community.handle)}
-          linkLabel="Open chat"
+          linkLabel={t('communityDashboard.home.openChat')}
         />
         <StatCard
           icon={<UserPlus className="h-4 w-4" aria-hidden />}
-          label="New members (7d)"
+          label={t('communityDashboard.home.newMembers7d')}
           value={analyticsLoading ? '…' : String(analytics?.summary.newMembers7d ?? 0)}
           href={communityDashboardAnalyticsPath(handle)}
-          linkLabel="View analytics"
+          linkLabel={t('communityDashboard.home.viewAnalytics')}
         />
         {community.isPaid ? (
           <StatCard
             icon={<DollarSign className="h-4 w-4" aria-hidden />}
-            label="Est. revenue"
+            label={t('communityDashboard.home.estRevenue')}
             value={
               analyticsLoading ? '…' : formatUsd(analytics?.summary.estimatedRevenue ?? 0)
             }
             href={communityDashboardAnalyticsPath(handle)}
-            linkLabel="View analytics"
+            linkLabel={t('communityDashboard.home.viewAnalytics')}
           />
         ) : null}
       </div>
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <section className="rounded-xl border border-neutral-200 p-5">
-          <h2 className="text-sm font-semibold text-neutral-900">Quick actions</h2>
+          <h2 className="text-sm font-semibold text-neutral-900">{t('communityDashboard.home.quickActions')}</h2>
           <div className="mt-4 flex flex-wrap gap-2">
             <QuickAction href={communityPath(community.handle)} icon={<ExternalLink className="h-4 w-4" />}>
-              View community
+              {t('communityDashboard.home.viewCommunity')}
             </QuickAction>
             <button type="button" onClick={() => void copyInvite()} className={quickActionClass}>
               <Copy className="h-4 w-4" aria-hidden />
-              Copy invite link
+              {t('communityDashboard.home.copyInviteLink')}
             </button>
             <QuickAction href={communityStorePath(handle)} icon={<Store className="h-4 w-4" />}>
-              Open store
+              {t('communityDashboard.home.openStore')}
             </QuickAction>
             <QuickAction href={communityDashboardSettingsPath(handle)} icon={<Settings className="h-4 w-4" />}>
-              Settings
+              {t('communityDashboard.home.settings')}
             </QuickAction>
             <QuickAction href={communityDashboardContentPath(handle)} icon={<FileText className="h-4 w-4" />}>
-              Content
+              {t('communityDashboard.nav.content')}
             </QuickAction>
           </div>
         </section>
 
         <section className="rounded-xl border border-neutral-200 p-5">
-          <h2 className="text-sm font-semibold text-neutral-900">Needs attention</h2>
+          <h2 className="text-sm font-semibold text-neutral-900">{t('communityDashboard.home.needsAttention')}</h2>
           {attentionItems.length === 0 ? (
-            <p className="mt-4 text-sm text-neutral-500">Everything looks good.</p>
+            <p className="mt-4 text-sm text-neutral-500">{t('communityDashboard.home.allGood')}</p>
           ) : (
             <ul className="mt-4 space-y-3">
               {attentionItems.map((item) => (
@@ -228,19 +242,19 @@ const CommunityDashboardHome: React.FC = () => {
 
       <section className="mt-8 rounded-xl border border-neutral-200 p-5">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold text-neutral-900">Installed apps</h2>
+          <h2 className="text-sm font-semibold text-neutral-900">{t('communityDashboard.home.installedAppsHeading')}</h2>
           <Link
             to={communityDashboardProductsPath(handle)}
             className="text-sm font-medium text-[#315efb] hover:underline"
           >
-            Manage all
+            {t('communityDashboard.home.manageAll')}
           </Link>
         </div>
         {apps.length === 0 ? (
           <p className="mt-4 text-sm text-neutral-500">
-            No apps yet.{' '}
+            {t('communityDashboard.home.noAppsYet')}{' '}
             <Link to={communityStorePath(handle)} className="font-medium text-[#315efb] hover:underline">
-              Browse the store
+              {t('communityDashboard.home.browseStore')}
             </Link>
           </p>
         ) : (
@@ -248,9 +262,9 @@ const CommunityDashboardHome: React.FC = () => {
             <table className="w-full min-w-[480px] text-left text-sm">
               <thead>
                 <tr className="border-b border-neutral-200 text-neutral-500">
-                  <th className="whitespace-nowrap pb-2 pr-4 font-medium">App</th>
-                  <th className="whitespace-nowrap pb-2 pr-4 font-medium">Type</th>
-                  <th className="whitespace-nowrap pb-2 font-medium">Visibility</th>
+                  <th className="whitespace-nowrap pb-2 pr-4 font-medium">{t('communityDashboard.home.colApp')}</th>
+                  <th className="whitespace-nowrap pb-2 pr-4 font-medium">{t('communityDashboard.home.colType')}</th>
+                  <th className="whitespace-nowrap pb-2 font-medium">{t('communityDashboard.home.colVisibility')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -265,16 +279,16 @@ const CommunityDashboardHome: React.FC = () => {
                           {app.title}
                         </span>
                       </td>
-                      <td className="py-3 pr-4 text-neutral-600">{dashboardAppLabel(app.appId)}</td>
+                      <td className="py-3 pr-4 text-neutral-600">{getDashboardAppLabel(app.appId, t)}</td>
                       <td className="py-3">
                         {visible ? (
                           <span className="inline-flex rounded-md bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-                            Visible
+                            {t('communityDashboard.visible')}
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 rounded-md bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
                             <EyeOff className="h-3 w-3" aria-hidden />
-                            Hidden
+                            {t('communityDashboard.hidden')}
                           </span>
                         )}
                       </td>
@@ -290,11 +304,13 @@ const CommunityDashboardHome: React.FC = () => {
       <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-neutral-500">
         <span className="inline-flex items-center gap-1.5">
           {isPublic ? <Globe className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-          {isPublic ? 'Public' : 'Private'} · {community.category}
+          {isPublic ? t('common.public') : t('common.private')} · {community.category}
         </span>
         {community.isPaid && (
           <span>
-            Paid access · ${typeof community.price === 'number' ? community.price.toFixed(2) : '0'}
+            {t('communityDashboard.paidAccessLine', {
+              price: typeof community.price === 'number' ? community.price.toFixed(2) : '0',
+            })}
           </span>
         )}
       </div>

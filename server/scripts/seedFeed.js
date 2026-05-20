@@ -2,8 +2,11 @@
  * Seed demo users + crypto feed posts for local / staging MongoDB.
  *
  * Usage (from server/):
- *   npm run seed:feed
- *   npm run seed:feed -- --force
+ *   npm run seed:feed          — create missing posts; refresh createdAt on existing (same content)
+ *   npm run seed:feed -- --force — wipe all @seed.mnoonx.dev users/posts and re-insert
+ *
+ * Dates: publishedAt is DD.MM.YYYY HH:mm (local). createdAt in DB = exactly that moment.
+ * Edit publishedAt in this file, then run npm run seed:feed to refresh timestamps.
  *
  * All seed accounts password: SeedDemo2024!
  */
@@ -13,9 +16,6 @@ const User = require('../models/User');
 const Post = require('../models/Post');
 
 const SEED_PASSWORD = 'SeedDemo2024!';
-
-/** «Сейчас» на момент составления ленты — от него считается сдвиг при сиде. */
-const SEED_REFERENCE_NOW = new Date(2026, 4, 19, 23, 2, 0);
 
 /**
  * @param {string} value DD.MM.YYYY HH:mm (локальное время сервера)
@@ -27,11 +27,9 @@ function parsePublishedAt(value) {
   return new Date(year, month - 1, day, hours, minutes, 0, 0);
 }
 
-/** Заданное время публикации → createdAt относительно реального Date.now(). */
+/** publishedAt → createdAt (как в файле, без сдвига от Date.now()). */
 function createdAtFromPublished(publishedAt) {
-  const anchorMs = SEED_REFERENCE_NOW.getTime();
-  const publishedMs = parsePublishedAt(publishedAt).getTime();
-  return new Date(Date.now() - (anchorMs - publishedMs));
+  return parsePublishedAt(publishedAt);
 }
 
 const USERS = [
@@ -61,6 +59,11 @@ const USERS = [
   { username: 'pepe_signals', email: 'pepe@seed.mnoonx.dev', fullName: 'Pepe Signals', bio: 'Meme coin scans — ETH & SOL.' },
   { username: 'arb_alex', email: 'arb@seed.mnoonx.dev', fullName: 'Arb Alex', bio: 'Arbitrum ecosystem & gaming.' },
   { username: 'yield_yuki', email: 'yuki@seed.mnoonx.dev', fullName: 'Yield Yuki', bio: 'Real yield · LP risk · points.' },
+  { username: 'volkov_trade', email: 'volkov@seed.mnoonx.dev', fullName: 'Волков Trade', bio: 'Свинг по BTC и мажорам. Дневник сделок на русском.' },
+  { username: 'katya_onchain', email: 'katya@seed.mnoonx.dev', fullName: 'Катя Onchain', bio: 'Потоки, резервы бирж, стейблкоины. RU.' },
+  { username: 'miner_x_ru', email: 'miner@seed.mnoonx.dev', fullName: 'Miner X RU', bio: 'Майнеры, хешрейт, давление на предложение BTC.' },
+  { username: 'luna_defi_ru', email: 'luna@seed.mnoonx.dev', fullName: 'Luna DeFi RU', bio: 'DeFi, доходность, риски смарт-контрактов.' },
+  { username: 'chart_master_ru', email: 'chart@seed.mnoonx.dev', fullName: 'Chart Master RU', bio: 'Теханализ и уровни. Без финансовых советов.' },
 ];
 
 /** @type {{ username: string; content: string; publishedAt: string; likes?: number; reposts?: number; comments?: { by: string; text: string; publishedAt: string }[] }[]} */
@@ -562,6 +565,196 @@ const POSTS = [
     likes: 3,
     comments: [{ by: 'arb_alex', text: 'Could be Arb gaming overlap wallets.', publishedAt: '17.05.2026 12:02' }],
   },
+  {
+    username: 'nova_macro_ru',
+    publishedAt: '20.05.2026 12:43',
+    content: 'CPI на этой неделе — главный катализатор. До публикации: меньше плеча, больше кэша. После — можно пересобрать книгу.',
+    likes: 7,
+    comments: [
+      { by: 'macro_mike', text: 'Same playbook — vol crush then direction.', publishedAt: '20.05.2026 09:02' },
+      { by: 'btc_oracle_ru', text: 'Согласен, спот приоритетнее перпов.', publishedAt: '20.05.2026 09:35' },
+    ],
+  },
+  {
+    username: 'sol_degen_ru',
+    publishedAt: '20.05.2026 10:13',
+    content:
+      'На SOL снова всплеск новых тикеров. Правило: если за 24ч уникальных покупателей < 800 — не лезу, даже если Twitter шумит.',
+    likes: 6,
+    reposts: 1,
+    comments: [
+      { by: 'memecoin_hunter', text: 'Holder filter saves accounts.', publishedAt: '20.05.2026 07:02' },
+      { by: 'pepe_signals', text: 'ETH memes quieter but deeper liquidity.', publishedAt: '20.05.2026 07:30' },
+    ],
+  },
+  {
+    username: 'volkov_trade',
+    publishedAt: '20.05.2026 09:43',
+    content: 'Закрыл половину позиции по BTC на локальном хае. Остаток с трейлом — не отдаю прибыль в откате без причины.',
+    likes: 5,
+    comments: [{ by: 'perp_master', text: 'VWAP trail works on 4H too.', publishedAt: '20.05.2026 06:02' }],
+  },
+  {
+    username: 'katya_onchain',
+    publishedAt: '20.05.2026 08:13',
+    content:
+      'Стейблы: чистый приток в USDC за 7 дней +$1.2B. Это не гарантия пампа, но ликвидность в системе растёт — следим за альтами с лагом.',
+    likes: 8,
+    comments: [
+      { by: 'onchain_anna', text: 'Matches my exchange reserve chart.', publishedAt: '20.05.2026 04:02' },
+      { by: 'stable_sage', text: 'Yield on stables still compressed though.', publishedAt: '20.05.2026 04:40' },
+    ],
+  },
+  {
+    username: 'miner_x_ru',
+    publishedAt: '19.05.2026 22:02',
+    content: 'Хешрейт BTC на историческом максимуме, оттоки с бирж майнеров ниже среднего — давление продаж со стороны supply смягчается.',
+    likes: 6,
+    comments: [{ by: 'btc_oracle_ru', text: 'Согласую с картиной по $94k.', publishedAt: '19.05.2026 19:02' }],
+  },
+  {
+    username: 'luna_defi_ru',
+    publishedAt: '19.05.2026 20:32',
+    content:
+      'Сравнил три L2 по комиссиям и TVL: Base лидирует по активности, Arbitrum — по экосистеме приложений. Выбор сети = выбор риска контрагента.',
+    likes: 7,
+    reposts: 1,
+    comments: [
+      { by: 'layer2_lisa', text: 'Blob fees still the long-term variable.', publishedAt: '19.05.2026 17:02' },
+      { by: 'base_builder', text: 'Base consumer apps pulling new wallets.', publishedAt: '19.05.2026 17:35' },
+    ],
+  },
+  {
+    username: 'chart_master_ru',
+    publishedAt: '19.05.2026 18:02',
+    content: 'ETH/BTC: тест сопротивления 0.032. Пробой + закрепление дневного закрытия = сигнал для альт-сезона. Пока — осторожность.',
+    likes: 10,
+    reposts: 2,
+    comments: [
+      { by: 'eth_maxi', text: 'Been waiting for this level for weeks.', publishedAt: '19.05.2026 14:02' },
+      { by: 'altseason_io', text: 'Breadth not confirming yet on my dashboard.', publishedAt: '19.05.2026 14:40' },
+      { by: 'nova_macro_ru', text: 'Жду подтверждения объёмом, не только ценой.', publishedAt: '19.05.2026 15:10' },
+    ],
+  },
+  {
+    username: 'defi_chad',
+    publishedAt: '19.05.2026 16:32',
+    content:
+      'Коротко по перп-DEX: объём есть, удержание пользователей после инсентивов — вот где рынок отбирает победителей. Смотрю retention, не только TVL.',
+    likes: 8,
+    comments: [
+      { by: 'perp_master', text: 'OI stickiness chart incoming on my side.', publishedAt: '19.05.2026 12:02' },
+      { by: 'luna_defi_ru', text: 'Retention важнее headline APY — согласна.', publishedAt: '19.05.2026 12:35' },
+    ],
+  },
+  {
+    username: 'onchain_anna',
+    publishedAt: '19.05.2026 15:02',
+    content: 'Крупный кошелёк перевёл 12k ETH на cold storage — не биржа, не мост. Такие потоки обычно нейтрально-позитивны для спота.',
+    likes: 9,
+    comments: [{ by: 'katya_onchain', text: 'Вижу тот же кластер в Nansen.', publishedAt: '19.05.2026 11:02' }],
+  },
+  {
+    username: 'perp_master',
+    publishedAt: '19.05.2026 13:32',
+    content: 'Funding на BTC перпах слегка отрицательный — шорты платят лонгам. Не перегрев лонгов, но и нет squeeze setup без катализатора.',
+    likes: 5,
+    comments: [{ by: 'funding_watcher', text: 'Spread vs Binance still tiny.', publishedAt: '19.05.2026 10:02' }],
+  },
+  {
+    username: 'macro_mike',
+    publishedAt: '19.05.2026 11:02',
+    content: 'Доходности 10Y откатились от локального пика — риск-активы дышат легче. Крипта часто реагирует с опережением на 1–2 сессии.',
+    likes: 6,
+    comments: [{ by: 'nova_macro_ru', text: 'Лаг 5–10 дней тоже бывает — не гонимся.', publishedAt: '19.05.2026 08:02' }],
+  },
+  {
+    username: 'stable_sage',
+    publishedAt: '19.05.2026 09:32',
+    content: 'USDe peg стабилен, но доходность сжалась — охота за yield уехала в L2 LP. Проверяйте IL и аудит пула, не только APY в заголовке.',
+    likes: 7,
+    comments: [{ by: 'yield_yuki', text: 'Stables-only pools for sleep.', publishedAt: '19.05.2026 06:02' }],
+  },
+  {
+    username: 'solwhale_io',
+    publishedAt: '19.05.2026 07:02',
+    content: 'SOL удерживает $148 — экосистемные мемы тянут бета. Если BTC не ломает неделю, ротация в SOL-names логична.',
+    likes: 8,
+    reposts: 1,
+    comments: [
+      { by: 'sol_degen_ru', text: 'Согласен, но размер — крошечный на новых тикерах.', publishedAt: '19.05.2026 04:02' },
+      { by: 'cryptoalpha', text: 'Watching same level on SOL/BTC.', publishedAt: '19.05.2026 04:30' },
+    ],
+  },
+  {
+    username: 'memecoin_hunter',
+    publishedAt: '18.05.2026 23:02',
+    content: 'Нарратив «AI + мем» на Base выдыхается — держатели падают третий день подряд. Ротация обратно в SOL лидеров.',
+    likes: 5,
+    comments: [{ by: 'base_builder', text: 'Base still wins on app installs though.', publishedAt: '18.05.2026 19:02' }],
+  },
+  {
+    username: 'eth_maxi',
+    publishedAt: '18.05.2026 21:32',
+    content: 'Стейкинг ETH: доходность ~3.2%, LRT мета тихая. Фокус на L2 adoption — без пользователей токен не едет, сколько ни говори про флури.',
+    likes: 6,
+    comments: [{ by: 'orbit_eth', text: 'Restaking points dilution is real.', publishedAt: '18.05.2026 17:02' }],
+  },
+  {
+    username: 'volkov_trade',
+    publishedAt: '18.05.2026 19:02',
+    content: 'Убыток по одному альту — минус 4%, стоп сработал. В плюсе неделя за счёт BTC. Дневник: эмоции выключены, правила включены.',
+    likes: 4,
+    comments: [
+      { by: 'chart_master_ru', text: 'Журнал важнее одной сделки — верно.', publishedAt: '18.05.2026 15:02' },
+      { by: 'riven_trades', text: 'Same — one bad alt, BTC saved the week.', publishedAt: '18.05.2026 15:40' },
+    ],
+  },
+  {
+    username: 'katya_onchain',
+    publishedAt: '18.05.2026 17:32',
+    content: 'Биржевые резервы BTC −2.1% за 14 дней — монеты уходят с площадок. Не бычий сигнал сам по себе, но фон укрепляется.',
+    likes: 7,
+    comments: [{ by: 'miner_x_ru', text: 'Стыкуется с данными по майнерам.', publishedAt: '18.05.2026 13:02' }],
+  },
+  {
+    username: 'luna_defi_ru',
+    publishedAt: '18.05.2026 14:02',
+    content: 'Новый пул на Base с 400% APY — 90% инсентив, 10% комиссии. Реализованная доходность за 3 дня: ~12%. Читайте мелкий шрифт.',
+    likes: 11,
+    reposts: 2,
+    comments: [
+      { by: 'yield_yuki', text: 'Incentives mask IL every time.', publishedAt: '18.05.2026 10:02' },
+      { by: 'defi_chad', text: 'Realized vs advertised — key metric.', publishedAt: '18.05.2026 10:35' },
+    ],
+  },
+  {
+    username: 'chart_master_ru',
+    publishedAt: '18.05.2026 11:32',
+    content: 'Дневка SOL: двойное дно на $142, цель $158 при пробое $150. Инвалидация — закрытие ниже $138.',
+    likes: 6,
+    comments: [{ by: 'solwhale_io', text: 'Same levels on my chart.', publishedAt: '18.05.2026 08:02' }],
+  },
+  {
+    username: 'funding_watcher',
+    publishedAt: '18.05.2026 09:02',
+    content: 'Арбитраж funding ETH между CEX и DEX: спред 0.015% — после комиссий почти ноль. Окно закрылось за 8 минут.',
+    likes: 3,
+    comments: [{ by: 'perp_master', text: 'HFT eats those instantly.', publishedAt: '18.05.2026 06:02' }],
+  },
+  {
+    username: 'web3_daily',
+    publishedAt: '17.05.2026 22:02',
+    content:
+      'Итоги дня: BTC +1.8%, ETH +0.4%, SOL +2.9%. Лидеры — мемы на Solana. Завтра — заседания ФР, волатильность с 15:30 МСК.',
+    likes: 12,
+    reposts: 2,
+    comments: [
+      { by: 'nova_macro_ru', text: 'Спасибо за краткий бриф.', publishedAt: '17.05.2026 18:02' },
+      { by: 'btc_oracle_ru', text: 'Волатильность после ФР — классика.', publishedAt: '17.05.2026 18:40' },
+      { by: 'altseason_io', text: 'ETH/BTC still the gate for alts.', publishedAt: '17.05.2026 19:10' },
+    ],
+  },
 ];
 
 function buildComments(specComments, userMap) {
@@ -611,6 +804,23 @@ async function clearSeedData() {
   console.log(`Removed ${users.length} seed users, ${deletedPosts.deletedCount} posts.`);
 }
 
+async function refreshPostTimestamps(authorId, spec, userMap) {
+  const createdAt = createdAtFromPublished(spec.publishedAt);
+  const commentDocs = buildComments(spec.comments, userMap);
+  const commentsCount = commentDocs.length;
+  await Post.updateOne(
+    { author: authorId.toString(), content: spec.content },
+    {
+      $set: {
+        createdAt,
+        updatedAt: createdAt,
+        comments: commentDocs,
+        commentsCount,
+      },
+    }
+  );
+}
+
 async function createPost(authorId, spec, userMap) {
   const createdAt = createdAtFromPublished(spec.publishedAt);
   const commentDocs = buildComments(spec.comments, userMap);
@@ -645,9 +855,8 @@ async function main() {
 
   await mongoose.connect(process.env.MONGO_URI);
   console.log('Connected to MongoDB');
-  console.log(
-    `  Reference "now": ${SEED_REFERENCE_NOW.toLocaleString('ru-RU')} → createdAt offset from real now`
-  );
+
+  console.log(`  Clock now: ${new Date().toLocaleString('ru-RU')} (createdAt = publishedAt from file)`);
 
   if (force) {
     await clearSeedData();
@@ -660,7 +869,7 @@ async function main() {
   }
 
   let created = 0;
-  let skipped = 0;
+  let refreshed = 0;
   let totalComments = 0;
 
   for (const spec of POSTS) {
@@ -672,7 +881,9 @@ async function main() {
       content: spec.content,
     });
     if (exists && !force) {
-      skipped += 1;
+      await refreshPostTimestamps(user._id, spec, userMap);
+      totalComments += spec.comments?.length ?? 0;
+      refreshed += 1;
       continue;
     }
     if (exists && force) {
@@ -680,7 +891,7 @@ async function main() {
     }
 
     await createPost(user._id, spec, userMap);
-    totalComments += (spec.comments?.length ?? 0);
+    totalComments += spec.comments?.length ?? 0;
     created += 1;
   }
 
@@ -692,8 +903,8 @@ async function main() {
   console.log('\nDone.');
   console.log(`  Users: ${userMap.size}`);
   console.log(`  Posts created: ${created}`);
+  console.log(`  Posts timestamps refreshed: ${refreshed}`);
   console.log(`  Template comments: ${totalComments}`);
-  if (skipped) console.log(`  Posts skipped (already exist): ${skipped}`);
   console.log(`\n  Password: ${SEED_PASSWORD}`);
   console.log('  Example: cryptoalpha@seed.mnoonx.dev / @cryptoalpha\n');
 

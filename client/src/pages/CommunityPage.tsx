@@ -56,6 +56,7 @@ import AddCommunityAdminModal from '../components/Community/AddCommunityAdminMod
 import { canAccessCommunityDashboard } from '../utils/communityRoles';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
+import { useTranslation } from '../i18n/useTranslation';
 
 import { API_ORIGIN, COMMUNITIES_API as API_URL, POSTS_API as POSTS_API_URL } from '../config/api';
 const OWNER_ONLY_POST_NOTICE_KEY = 'communityOwnerOnlyPostNoticeDismissed';
@@ -144,6 +145,7 @@ const CommunityPage: React.FC = () => {
   const { user, token } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const { t, locale } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -510,7 +512,7 @@ const CommunityPage: React.FC = () => {
 
     const needsCode = privateGatePreview?.requiresJoinCode === true;
     if (!isMember && needsCode && !joinCodeInput.trim()) {
-      setJoinError('Enter the join passphrase to continue.');
+      setJoinError(t('community.joinPassphraseRequired'));
       return;
     }
 
@@ -551,13 +553,13 @@ const CommunityPage: React.FC = () => {
         const data = await res.json().catch(() => ({}));
         const msg =
           (data as { code?: string; message?: string }).code === 'INVALID_JOIN_CODE'
-            ? 'Incorrect join passphrase. Try again.'
-            : (data as { message?: string }).message || 'Failed to join community';
+            ? t('community.joinIncorrectPassphrase')
+            : (data as { message?: string }).message || t('community.joinFailedGeneric');
         setJoinError(msg);
       }
     } catch (err) {
       console.error('Join error:', err);
-      setJoinError('Something went wrong. Please try again.');
+      setJoinError(t('community.joinSomethingWrong'));
     } finally {
       setJoinLoading(false);
     }
@@ -649,19 +651,22 @@ const CommunityPage: React.FC = () => {
     }
   };
 
-  const formatPostDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-    if (minutes < 1) return 'now';
-    if (minutes < 60) return `${minutes}m`;
-    if (hours < 24) return `${hours}h`;
-    if (days < 7) return `${days}d`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
+  const formatPostDate = useCallback(
+    (dateString: string) => {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diff = now.getTime() - date.getTime();
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+      if (minutes < 1) return t('home.timeNow');
+      if (minutes < 60) return t('home.timeMinutes', { count: minutes });
+      if (hours < 24) return t('home.timeHours', { count: hours });
+      if (days < 7) return t('home.timeDays', { count: days });
+      return date.toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US', { month: 'short', day: 'numeric' });
+    },
+    [t, locale]
+  );
 
   const formatCount = (count: number) => {
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
@@ -677,9 +682,9 @@ const CommunityPage: React.FC = () => {
     async (adminUserId: string) => {
       if (!token || !handle || !isOwner) return;
       const confirmed = await confirm({
-        title: 'Remove admin?',
-        message: 'They will lose admin access to this community dashboard.',
-        confirmLabel: 'Remove',
+        title: t('community.removeAdminConfirmTitle'),
+        message: t('community.removeAdminConfirmMessage'),
+        confirmLabel: t('community.removeAction'),
         variant: 'danger',
       });
       if (!confirmed) return;
@@ -691,18 +696,18 @@ const CommunityPage: React.FC = () => {
         );
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          showToast((data as { message?: string }).message || 'Failed to remove admin', 'error');
+          showToast((data as { message?: string }).message || t('community.failedRemoveAdmin'), 'error');
           return;
         }
         await fetchCommunity();
-        showToast('Admin removed');
+        showToast(t('community.adminRemovedToast'));
       } catch {
-        showToast('Network error.', 'error');
+        showToast(t('community.networkError'), 'error');
       } finally {
         setAdminActionBusy(null);
       }
     },
-    [token, handle, isOwner, fetchCommunity, confirm, showToast]
+    [token, handle, isOwner, fetchCommunity, confirm, showToast, t]
   );
 
   const canPost =
@@ -781,19 +786,19 @@ const CommunityPage: React.FC = () => {
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          showToast(typeof data?.message === 'string' ? data.message : 'Failed to update visibility', 'error');
+          showToast(typeof data?.message === 'string' ? data.message : t('community.failedUpdateVisibility'), 'error');
           return;
         }
         const data = await res.json();
         setCommunity(data);
-        showToast(visibleToMembers ? 'App is now visible to members' : 'App hidden from members');
+        showToast(visibleToMembers ? t('community.appVisibleToast') : t('community.appHiddenToast'));
       } catch (e) {
         console.error(e);
-        showToast('Failed to update visibility', 'error');
+        showToast(t('community.failedUpdateVisibility'), 'error');
       }
       setAppInstanceMenuId(null);
     },
-    [token, handle, showToast]
+    [token, handle, showToast, t]
   );
 
   const deleteAppInstance = useCallback(
@@ -802,22 +807,22 @@ const CommunityPage: React.FC = () => {
       const removed = community.installedAppInstances?.find((i) => i.id === instanceId);
       const msg =
         removed?.appId === COMMUNITY_APP_IDS.CHAT
-          ? 'Remove this chat from the community? Its messages will be deleted.'
+          ? t('community.removeAppChatBody')
           : removed?.appId === COMMUNITY_APP_IDS.COURSES
-            ? 'Remove this Courses app? All course modules in it will be deleted.'
+            ? t('community.removeAppCoursesBody')
             : removed?.appId === COMMUNITY_APP_IDS.CONTENT
-              ? 'Remove this Content app? Its document will be deleted.'
-            : removed?.appId === COMMUNITY_APP_IDS.FILES
-              ? 'Remove this Files app? All uploaded files in it will be deleted.'
-              : removed?.appId === COMMUNITY_APP_IDS.ANNOUNCEMENTS
-                ? 'Remove this Announcements app? All announcements in it will be deleted.'
-                : removed?.appId === COMMUNITY_APP_IDS.EVENTS
-                  ? 'Remove this Events app? All events in it will be deleted.'
-                  : 'Remove this app from the community?';
+              ? t('community.removeAppContentBody')
+              : removed?.appId === COMMUNITY_APP_IDS.FILES
+                ? t('community.removeAppFilesBody')
+                : removed?.appId === COMMUNITY_APP_IDS.ANNOUNCEMENTS
+                  ? t('community.removeAppAnnouncementsBody')
+                  : removed?.appId === COMMUNITY_APP_IDS.EVENTS
+                    ? t('community.removeAppEventsBody')
+                    : t('community.removeAppGenericBody');
       const confirmed = await confirm({
-        title: 'Remove app?',
+        title: t('community.removeAppConfirmTitle'),
         message: msg,
-        confirmLabel: 'Remove',
+        confirmLabel: t('community.removeAction'),
         variant: 'danger',
       });
       if (!confirmed) return;
@@ -828,12 +833,12 @@ const CommunityPage: React.FC = () => {
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          showToast(typeof data?.message === 'string' ? data.message : 'Failed to remove app', 'error');
+          showToast(typeof data?.message === 'string' ? data.message : t('community.failedRemoveApp'), 'error');
           return;
         }
         const data = await res.json();
         setCommunity(data);
-        showToast('App removed');
+        showToast(t('community.appRemovedToast'));
         if (removed?.appId === COMMUNITY_APP_IDS.CHAT) {
           const nextChats =
             data.installedAppInstances?.filter((i: InstalledAppInstance) => i.appId === COMMUNITY_APP_IDS.CHAT) ??
@@ -904,11 +909,11 @@ const CommunityPage: React.FC = () => {
         }
       } catch (e) {
         console.error(e);
-        showToast('Failed to remove app', 'error');
+        showToast(t('community.failedRemoveApp'), 'error');
       }
       setAppInstanceMenuId(null);
     },
-    [token, handle, community, leftNav, confirm, showToast]
+    [token, handle, community, leftNav, confirm, showToast, t]
   );
 
   if (loading) {
@@ -950,26 +955,31 @@ const CommunityPage: React.FC = () => {
                   <p className="mt-1 font-mono text-sm text-[#888]">@{preview.handle}</p>
                   <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-700">
                     <Lock size={12} />
-                    Private community
+                    {t('community.privateCommunityBadge')}
                   </span>
                   <p className="mt-4 max-w-xl text-[18px] text-[#888]">
-                    {preview.description || 'No description yet.'}
+                    {preview.description || t('community.noDescriptionYet')}
                   </p>
                   <p className="mt-2 text-[15px] text-[#666]">
-                    {formatCount(preview.memberCount)} {preview.memberCount === 1 ? 'member' : 'members'}
+                    {t(
+                      preview.memberCount === 1
+                        ? 'community.memberCountLineOne'
+                        : 'community.memberCountLineMany',
+                      { count: formatCount(preview.memberCount) }
+                    )}
                   </p>
                   <div className="mx-auto mt-10 w-full max-w-md rounded-2xl border border-[#ececec] bg-[#fafafa] px-6 py-8 text-center">
                     <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#315efb]">
                       <Lock size={22} />
                     </div>
-                <p className="text-[17px] font-semibold text-neutral-900">Members only</p>
+                <p className="text-[17px] font-semibold text-neutral-900">{t('community.membersOnlyTitle')}</p>
                 <p className="mt-2 text-sm leading-relaxed text-[#666]">
-                  Join this community to see the feed, apps, and chat.
+                  {t('community.membersOnlySubtitle')}
                 </p>
                 {preview.requiresJoinCode && (
                   <div className="mt-6 text-left">
                     <label htmlFor="community-join-code" className="mb-2 block text-sm font-medium text-neutral-700">
-                      Join passphrase
+                      {t('community.joinPassphraseLabel')}
                     </label>
                     <input
                       id="community-join-code"
@@ -980,7 +990,7 @@ const CommunityPage: React.FC = () => {
                         setJoinCodeInput(e.target.value);
                         setJoinError(null);
                       }}
-                      placeholder="Enter passphrase"
+                      placeholder={t('community.joinPassphrasePlaceholder')}
                       className="w-full rounded-xl border border-[#e7e7e7] bg-white px-4 py-3 text-[15px] outline-none focus:ring-2 focus:ring-[#315efb]/25"
                     />
                   </div>
@@ -997,10 +1007,10 @@ const CommunityPage: React.FC = () => {
                   className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#315efb] px-6 font-medium text-white transition-colors hover:bg-[#2547c4] disabled:opacity-60"
                 >
                   <Plus size={18} />
-                  {joinLoading ? 'Joining…' : 'Join community'}
+                  {joinLoading ? t('community.joining') : t('community.joinCommunity')}
                 </button>
                 {!token && (
-                  <p className="mt-3 text-xs text-[#888]">Sign in to join this community.</p>
+                  <p className="mt-3 text-xs text-[#888]">{t('community.signInToJoin')}</p>
                 )}
                   </div>
                 </div>
@@ -1046,7 +1056,12 @@ const CommunityPage: React.FC = () => {
                 <div className="mt-1 flex items-center gap-2">
                   <div className="h-2 w-2 rounded-full bg-green-500" />
                   <span className="text-[10px] text-green-600">
-                    {formatCount(community.memberCount)} members
+                    {t(
+                      community.memberCount === 1
+                        ? 'community.memberCountLineOne'
+                        : 'community.memberCountLineMany',
+                      { count: formatCount(community.memberCount) }
+                    )}
                   </span>
                 </div>
               </div>
@@ -1068,7 +1083,7 @@ const CommunityPage: React.FC = () => {
               }`}
             >
               <HouseHeart size={18} />
-              Home
+              {t('community.sidebarNavHome')}
             </button>
 
             {sidebarAppInstances.map((inst) => {
@@ -1139,14 +1154,14 @@ const CommunityPage: React.FC = () => {
                           className={`pointer-events-none absolute inset-0 flex items-center justify-center rounded-md text-black transition-opacity ${
                             menuOpen ? 'opacity-0' : 'opacity-100 group-hover/row:opacity-0'
                           }`}
-                          title="Hidden from members"
+                          title={t('community.hiddenFromMembersTitle')}
                         >
                           <EyeOff size={14} aria-hidden />
                         </span>
                       )}
                       <button
                         type="button"
-                        aria-label="App options"
+                        aria-label={t('community.appOptionsAria')}
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -1179,7 +1194,7 @@ const CommunityPage: React.FC = () => {
                                 role="menuitem"
                               >
                                 <Pencil className="h-3 w-3 shrink-0" />
-                                Admin settings
+                                {t('community.nestedMenuAdminSettings')}
                               </Link>
                               <button
                                 type="button"
@@ -1188,7 +1203,7 @@ const CommunityPage: React.FC = () => {
                                 role="menuitem"
                               >
                                 <Globe className="h-3 w-3 shrink-0" />
-                                <span className="min-w-0 flex-1 truncate">Change visibility</span>
+                                <span className="min-w-0 flex-1 truncate">{t('community.changeVisibility')}</span>
                                 <ChevronRight className="h-3 w-3 shrink-0 text-neutral-400" />
                               </button>
                               <div className="my-1 h-px bg-neutral-100" />
@@ -1199,7 +1214,7 @@ const CommunityPage: React.FC = () => {
                                 role="menuitem"
                               >
                                 <Trash2 className="h-3 w-3 shrink-0" />
-                                Delete app
+                                {t('community.deleteApp')}
                               </button>
                             </>
                           ) : (
@@ -1210,7 +1225,7 @@ const CommunityPage: React.FC = () => {
                                 className="flex w-full items-center gap-2 rounded px-3 py-1 text-left text-[14px] text-neutral-900 transition-colors hover:bg-black/5"
                               >
                                 <ArrowLeft className="h-3 w-3 shrink-0" aria-hidden />
-                                Back
+                                {t('common.back')}
                               </button>
                               <button
                                 type="button"
@@ -1219,7 +1234,7 @@ const CommunityPage: React.FC = () => {
                               >
                                 <span className="flex items-center gap-2">
                                   <Globe className="h-3 w-3 shrink-0" aria-hidden />
-                                  Show
+                                  {t('community.showToMembers')}
                                 </span>
                                 {instVisible && <Check className="h-3 w-3 shrink-0" aria-hidden />}
                               </button>
@@ -1230,7 +1245,7 @@ const CommunityPage: React.FC = () => {
                               >
                                 <span className="flex items-center gap-2">
                                   <Lock className="h-3 w-3 shrink-0" aria-hidden />
-                                  Hide
+                                  {t('community.hideFromMembers')}
                                 </span>
                                 {!instVisible && <Check className="h-3 w-3 shrink-0" aria-hidden />}
                               </button>
@@ -1252,7 +1267,7 @@ const CommunityPage: React.FC = () => {
                 className="w-full h-8 rounded hover:bg-[#f5f5f5] flex items-center gap-2 px-3 text-[#666] font-medium transition-all"
               >
                 <Plus size={18} />
-                Add app
+                {t('community.addApp')}
               </button>
             )}
           </div>
@@ -1354,7 +1369,7 @@ const CommunityPage: React.FC = () => {
                   className="absolute top-5 right-5 flex h-11 items-center gap-2 rounded-2xl border border-white bg-white/90 px-5 font-medium backdrop-blur transition-all hover:bg-white disabled:opacity-60"
                 >
                   <Camera size={18} />
-                  {brandingFieldBusy === 'banner' ? 'Uploading…' : 'Change banner'}
+                  {brandingFieldBusy === 'banner' ? t('upload.uploading') : t('upload.changeBanner')}
                 </button>
               )}
             </div>
@@ -1377,10 +1392,17 @@ const CommunityPage: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col pt-4">
-                  <p className="mt-4 max-w-xl text-[18px] text-[#888]">{community.description || 'Set a description...'}</p>
+                  <p className="mt-4 max-w-xl text-[18px] text-[#888]">{community.description || t('community.setDescriptionHint')}</p>
 
                   <div className="mt-2 flex flex-wrap items-center gap-3 text-[15px] text-[#666]">
-                    <span>{formatCount(community.memberCount)} members</span>
+                    <span>
+                      {t(
+                        community.memberCount === 1
+                          ? 'community.memberCountLineOne'
+                          : 'community.memberCountLineMany',
+                        { count: formatCount(community.memberCount) }
+                      )}
+                    </span>
                     <span>•</span>
                     <span
                       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
@@ -1392,18 +1414,18 @@ const CommunityPage: React.FC = () => {
                       {community.isPublic !== false ? (
                         <>
                           <Globe size={12} />
-                          Public
+                          {t('common.public')}
                         </>
                       ) : (
                         <>
                           <Lock size={12} />
-                          Private
+                          {t('common.private')}
                         </>
                       )}
                     </span>
                     <span>•</span>
                     <div className="flex items-center gap-1">
-                      <span>Created by</span>
+                      <span>{t('community.createdBy')}</span>
                       <Link to={`/@${community.owner?.username}`} className="font-semibold text-black hover:underline">
                         {community.owner?.fullName || community.owner?.username}
                       </Link>
@@ -1422,7 +1444,7 @@ const CommunityPage: React.FC = () => {
                       }`}
                     >
                       {isMember ? <UserPlus size={18} /> : <Plus size={18} />}
-                      {joinLoading ? 'Loading...' : isMember ? 'Leave' : 'Join'}
+                      {joinLoading ? t('community.joinLoading') : isMember ? t('community.leave') : t('community.join')}
                     </button>
                   )}
                 </div>
@@ -1431,7 +1453,16 @@ const CommunityPage: React.FC = () => {
 
             {/* TABS — full width, active bg + centered thick underline */}
             <div className="grid w-full grid-cols-4 border-t border-[#ececec]">
-              {(['home', 'apps', 'products', 'about'] as const).map((tab) => (
+              {(['home', 'apps', 'products', 'about'] as const).map((tab) => {
+                const tabLabel =
+                  tab === 'home'
+                    ? t('community.tabHome')
+                    : tab === 'apps'
+                      ? t('community.tabApps')
+                      : tab === 'products'
+                        ? t('community.tabProducts')
+                        : t('community.tabAbout');
+                return (
                 <button
                   key={tab}
                   type="button"
@@ -1443,7 +1474,7 @@ const CommunityPage: React.FC = () => {
                     mainTab === tab ? 'bg-neutral-100 text-black' : 'text-[#777] hover:bg-neutral-100'
                   }`}
                 >
-                  <span className="pb-2 text-center text-[17px] font-medium capitalize">{tab}</span>
+                  <span className="pb-2 text-center text-[17px] font-medium">{tabLabel}</span>
                   <span
                     className={`mb-0 h-1 w-[38%] max-w-[96px] rounded-full ${
                       mainTab === tab ? 'bg-[#315efb]' : 'bg-transparent'
@@ -1451,7 +1482,8 @@ const CommunityPage: React.FC = () => {
                     aria-hidden
                   />
                 </button>
-              ))}
+              );
+              })}
             </div>
 
             {/* TAB PANELS — same card */}
@@ -1478,13 +1510,13 @@ const CommunityPage: React.FC = () => {
                   {memberButCannotPost && !ownerOnlyPostNoticeDismissed && (
                     <div className="my-6 flex items-start gap-3 rounded-xl border border-[#ececec] bg-[#fafafa] px-4 py-3 text-sm text-[#666]">
                       <p className="min-w-0 flex-1 leading-snug">
-                        Only the community owner can publish posts in this feed.
+                        {t('community.ownerOnlyNotice')}
                       </p>
                       <button
                         type="button"
                         onClick={dismissOwnerOnlyPostNotice}
                         className="shrink-0 rounded-md p-1 text-[#888] transition-colors hover:bg-black/5 hover:text-[#444]"
-                        aria-label="Dismiss notice"
+                        aria-label={t('community.dismiss')}
                       >
                         <X size={16} aria-hidden />
                       </button>
@@ -1520,12 +1552,12 @@ const CommunityPage: React.FC = () => {
                               {post.isPrivate ? (
                                 <span className="ml-2 flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
                                   <Lock size={10} />
-                                  Private
+                                  {t('common.private')}
                                 </span>
                               ) : (
                                 <span className="ml-2 flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">
                                   <Globe size={10} />
-                                  Public
+                                  {t('common.public')}
                                 </span>
                               )}
                             </div>
@@ -1576,10 +1608,8 @@ const CommunityPage: React.FC = () => {
                   ) : (
                     <div className="flex min-h-[200px] items-center justify-center text-[17px] text-[#999]">
                       {canViewFeed
-                        ? 'Community feed is empty'
-                        : community.isPublic === false
-                          ? 'Join to see posts'
-                          : 'Join to see posts'}
+                        ? t('community.feedEmpty')
+                        : t('community.joinToSeePosts')}
                     </div>
                   )}
                   </div>
@@ -1589,13 +1619,13 @@ const CommunityPage: React.FC = () => {
               {mainTab === 'apps' && handle && (
                 <div className="mx-auto max-w-2xl px-4">
                   <div className="flex items-center justify-between border-b border-[#ececec] py-4">
-                    <h2 className="text-xl font-bold text-neutral-900">Apps</h2>
+                    <h2 className="text-xl font-bold text-neutral-900">{t('community.appsHeading')}</h2>
                     {isOwner && (
                       <button
                         type="button"
                         onClick={() => navigate(communityStorePath(handle))}
                         className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#eef2ff] text-[#315efb] transition-colors hover:bg-[#dfe7ff]"
-                        title="Add app"
+                        title={t('community.addAppTitle')}
                       >
                         <Plus className="h-5 w-5" />
                       </button>
@@ -1619,16 +1649,16 @@ const CommunityPage: React.FC = () => {
                         );
                       const kindLabel =
                         inst.appId === COMMUNITY_APP_IDS.CHAT
-                          ? 'Chat'
+                          ? t('community.appKindChat')
                           : inst.appId === COMMUNITY_APP_IDS.COURSES
-                            ? 'Courses'
+                            ? t('community.appKindCourses')
                             : inst.appId === COMMUNITY_APP_IDS.CONTENT
-                              ? 'Content'
+                              ? t('community.appKindContent')
                               : inst.appId === COMMUNITY_APP_IDS.FILES
-                                ? 'Files'
+                                ? t('community.appKindFiles')
                                 : inst.appId === COMMUNITY_APP_IDS.EVENTS
-                                  ? 'Events'
-                                  : 'Announcements';
+                                  ? t('community.appKindEvents')
+                                  : t('community.appKindAnnouncements');
                       return (
                         <button
                           key={inst.id}
@@ -1646,7 +1676,7 @@ const CommunityPage: React.FC = () => {
                     })}
                   </div>
                   {sidebarAppInstances.length === 0 && (
-                    <p className="pb-10 text-center text-[17px] text-[#999]">No apps installed yet.</p>
+                    <p className="pb-10 text-center text-[17px] text-[#999]">{t('community.noAppsInstalled')}</p>
                   )}
                 </div>
               )}
@@ -1654,14 +1684,14 @@ const CommunityPage: React.FC = () => {
               {mainTab === 'products' && handle && (
                 <div className="mx-auto max-w-2xl px-4">
                   <div className="flex items-center justify-between border-b border-[#ececec] py-4">
-                    <h2 className="text-xl font-bold text-neutral-900">Products</h2>
+                    <h2 className="text-xl font-bold text-neutral-900">{t('community.productsHeading')}</h2>
                     <div className="flex items-center gap-2">
                       {isOwner && (
                         <button
                           type="button"
                           onClick={() => navigate(communityStorePath(handle))}
                           className="mr-1 flex h-9 w-9 items-center justify-center rounded-lg bg-[#eef2ff] text-[#315efb] transition-colors hover:bg-[#dfe7ff]"
-                          title="Add from store"
+                          title={t('community.addFromStoreTitle')}
                         >
                           <Plus className="h-5 w-5" />
                         </button>
@@ -1672,7 +1702,7 @@ const CommunityPage: React.FC = () => {
                         className={`rounded-lg p-2 transition-colors ${
                           productsView === 'list' ? 'bg-[#eef2ff] text-[#315efb]' : 'text-neutral-500 hover:bg-neutral-100'
                         }`}
-                        title="List view"
+                        title={t('community.listViewTitle')}
                       >
                         <LayoutList className="h-5 w-5" />
                       </button>
@@ -1682,7 +1712,7 @@ const CommunityPage: React.FC = () => {
                         className={`rounded-lg p-2 transition-colors ${
                           productsView === 'grid' ? 'bg-[#eef2ff] text-[#315efb]' : 'text-neutral-500 hover:bg-neutral-100'
                         }`}
-                        title="Grid view"
+                        title={t('community.gridViewTitle')}
                       >
                         <LayoutGrid className="h-5 w-5" />
                       </button>
@@ -1702,12 +1732,15 @@ const CommunityPage: React.FC = () => {
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-semibold text-neutral-900">
                             {community.isPaid && community.price
-                              ? `$${community.price} · ${community.name}`
-                              : `${community.name} · apps bundle`}
+                              ? t('community.appsBundleTitlePaid', {
+                                  price: `$${community.price}`,
+                                  name: community.name,
+                                })
+                              : t('community.appsBundleTitleFree', { name: community.name })}
                           </p>
                           <p className="mt-0.5 text-xs text-neutral-500">
                             <span className="rounded-full bg-neutral-100 px-2 py-0.5 font-medium text-neutral-600">
-                              {sidebarAppInstances.length} apps
+                              {t('community.appsCountInBundle', { count: sidebarAppInstances.length })}
                             </span>
                           </p>
                         </div>
@@ -1724,7 +1757,9 @@ const CommunityPage: React.FC = () => {
                       {productsBundleOpen && (
                         <div className="divide-y divide-[#ececec]">
                           {sidebarAppInstances.length === 0 ? (
-                            <div className="px-4 py-10 text-center text-[15px] text-neutral-500">No products in this bundle yet.</div>
+                            <div className="px-4 py-10 text-center text-[15px] text-neutral-500">
+                              {t('community.noProductsInBundle')}
+                            </div>
                           ) : (
                             sidebarAppInstances.map((inst) => {
                               const IconComp =
@@ -1742,23 +1777,23 @@ const CommunityPage: React.FC = () => {
                               let primary = inst.title;
                               let secondary = inst.title;
                               if (inst.appId === COMMUNITY_APP_IDS.CHAT) {
-                                primary = inst.title || 'Chat';
-                                secondary = 'Chat';
+                                primary = inst.title || t('community.defaultChatTitle');
+                                secondary = t('community.defaultChatTitle');
                               } else if (inst.appId === COMMUNITY_APP_IDS.CONTENT) {
-                                primary = inst.title || 'Content Rewards';
-                                secondary = 'Content Rewards';
+                                primary = inst.title || t('community.defaultContentPrimary');
+                                secondary = t('community.defaultContentSecondary');
                               } else if (inst.appId === COMMUNITY_APP_IDS.ANNOUNCEMENTS) {
-                                primary = inst.title || 'Announcements';
-                                secondary = 'Forums';
+                                primary = inst.title || t('community.defaultAnnouncementsPrimary');
+                                secondary = t('community.defaultAnnouncementsSecondary');
                               } else if (inst.appId === COMMUNITY_APP_IDS.COURSES) {
-                                primary = inst.title || 'Courses';
-                                secondary = 'Courses';
+                                primary = inst.title || t('community.defaultCoursesTitle');
+                                secondary = t('community.defaultCoursesTitle');
                               } else if (inst.appId === COMMUNITY_APP_IDS.FILES) {
-                                primary = inst.title || 'Files';
-                                secondary = 'Files';
+                                primary = inst.title || t('community.defaultFilesTitle');
+                                secondary = t('community.defaultFilesTitle');
                               } else if (inst.appId === COMMUNITY_APP_IDS.EVENTS) {
-                                primary = inst.title || 'Events';
-                                secondary = 'Events';
+                                primary = inst.title || t('community.defaultEventsTitle');
+                                secondary = t('community.defaultEventsTitle');
                               }
                               const I = IconComp;
                               return (
@@ -1788,7 +1823,7 @@ const CommunityPage: React.FC = () => {
                       <span className="text-lg" aria-hidden>
                         🍔
                       </span>
-                      <span>You already have access to everything that you can purchase.</span>
+                      <span>{t('community.accessAllPurchasable')}</span>
                     </div>
                   </div>
                 </div>
@@ -1800,7 +1835,7 @@ const CommunityPage: React.FC = () => {
                     {/* <h2 className="text-lg font-semibold text-neutral-800">Team</h2> */}
                     <div className="mt-5 space-y-6">
                       <div>
-                        <p className="mb-3 text-xs font-medium uppercase tracking-[0.08em] text-[#999]">Owner</p>
+                        <p className="mb-3 text-xs font-medium uppercase tracking-[0.08em] text-[#999]">{t('community.aboutOwner')}</p>
                         <Link
                           to={`/@${community.owner.username}`}
                           className="flex items-center justify-between rounded-2xl border border-[#e5e5e5] p-4 transition-colors hover:border-[#cfcfcf] hover:bg-neutral-50"
@@ -1822,12 +1857,12 @@ const CommunityPage: React.FC = () => {
                               <p className="text-sm text-neutral-500">@{community.owner.username}</p>
                             </div>
                           </div>
-                          <span className="rounded-full bg-[#f5f5f5] px-3 py-1 text-sm font-medium text-neutral-700">Owner</span>
+                          <span className="rounded-full bg-[#f5f5f5] px-3 py-1 text-sm font-medium text-neutral-700">{t('community.ownerRole')}</span>
                         </Link>
                       </div>
                       <div>
                         <div className="mb-3 flex items-center justify-between gap-3">
-                          <p className="text-xs font-medium uppercase tracking-[0.08em] text-[#999]">Admins</p>
+                          <p className="text-xs font-medium uppercase tracking-[0.08em] text-[#999]">{t('community.aboutAdmins')}</p>
                           {isOwner && (
                             <button
                               type="button"
@@ -1835,13 +1870,13 @@ const CommunityPage: React.FC = () => {
                               className="inline-flex items-center gap-1.5 rounded-full border border-[#e5e5e5] bg-white px-3 py-1.5 text-xs font-medium text-neutral-800 transition-colors hover:border-[#cfcfcf] hover:bg-neutral-50"
                             >
                               <UserPlus className="h-3.5 w-3.5" aria-hidden />
-                              Add admin
+                              {t('community.addAdmin')}
                             </button>
                           )}
                         </div>
                         {(community.admins?.length ?? 0) === 0 ? (
                           <p className="rounded-2xl border border-dashed border-[#e5e5e5] bg-neutral-50/50 px-4 py-6 text-center text-sm text-[#888]">
-                            No additional admins yet.
+                            {t('community.noAdminsYet')}
                           </p>
                         ) : (
                           <ul className="space-y-3">
@@ -1871,7 +1906,7 @@ const CommunityPage: React.FC = () => {
                                 </Link>
                                 <div className="ml-3 flex shrink-0 items-center gap-2">
                                   <span className="rounded-full bg-[#f5f5f5] px-3 py-1 text-sm font-medium text-neutral-700">
-                                    Admin
+                                    {t('community.adminRole')}
                                   </span>
                                   {isOwner && (
                                     <button
@@ -1879,7 +1914,7 @@ const CommunityPage: React.FC = () => {
                                       disabled={adminActionBusy === admin._id}
                                       onClick={() => void handleRemoveAdmin(admin._id)}
                                       className="rounded-lg p-2 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                                      aria-label={`Remove ${admin.username} as admin`}
+                                      aria-label={t('community.removeAdminAria', { username: admin.username })}
                                     >
                                       <Trash2 className="h-4 w-4" aria-hidden />
                                     </button>
@@ -1895,11 +1930,11 @@ const CommunityPage: React.FC = () => {
                   <div className="pt-8">
                     <div className="flex items-center gap-2 text-neutral-700">
                       <Star className="h-4 w-4 text-amber-400" fill="currentColor" />
-                      <span className="text-sm font-medium">0 (0 Reviews)</span>
+                      <span className="text-sm font-medium">{t('community.reviewsLine')}</span>
                     </div>
                     <div className="flex flex-col items-center justify-center py-12 text-center text-[#999]">
                       <Star className="mb-3 h-16 w-16 text-neutral-200" strokeWidth={1.1} />
-                      <p className="text-[17px]">No reviews yet</p>
+                      <p className="text-[17px]">{t('community.noReviewsYet')}</p>
                     </div>
                   </div>
                 </div>
@@ -1918,7 +1953,7 @@ const CommunityPage: React.FC = () => {
               <div className="space-y-4">
                 <button className="w-full h-10 rounded-2xl bg-[#f5f5f5] hover:bg-[#ececec] transition-all font-medium flex items-center justify-center gap-2">
                   <Copy size={16} />
-                  Copy link
+                  {t('common.copyLink')}
                 </button>
                 {canOpenDashboard && (
                   <button
@@ -1927,7 +1962,7 @@ const CommunityPage: React.FC = () => {
                     className="flex w-full px-2 items-center gap-3 text-[16px] text-[#444] transition-all hover:text-black"
                   >
                     <LayoutDashboard size={18} />
-                    Dashboard
+                    {t('dashboard.title')}
                   </button>
                 )}
                 {isOwner && (
@@ -1937,7 +1972,7 @@ const CommunityPage: React.FC = () => {
                     className="flex w-full px-2 pb-2 items-center gap-3 text-[16px] text-[#444] transition-all hover:text-black"
                   >
                     <Bolt size={18} />
-                    Settings
+                    {t('nav.settings')}
                   </button>
                 )}
               </div>
@@ -1947,14 +1982,16 @@ const CommunityPage: React.FC = () => {
             <div className="bg-white border border-[#e7e7e7] rounded-xl overflow-hidden">
               <div className="p-2 border-b border-[#ececec] flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-md pl-2 font-semibold">People</h3>
+                  <h3 className="text-md pl-2 font-semibold">{t('community.peopleHeading')}</h3>
                   <span className="text-[#888]">{formatCount(community.memberCount)}</span>
                 </div>
-                <button className="text-[#315efb] pr-2 font-medium">See all</button>
+                <button type="button" className="text-[#315efb] pr-2 font-medium">
+                  {t('community.seeAll')}
+                </button>
               </div>
 
               <div className="p-2">
-                <p className="text-sm tracking-[0.08em] text-[#999] uppercase mb-2 px-2">Creator</p>
+                <p className="text-sm tracking-[0.08em] text-[#999] uppercase mb-2 px-2">{t('community.peopleCreator')}</p>
                 
                 <div className="flex items-center justify-between">
                   <Link to={`/@${community.owner?.username}`} className="flex items-center gap-3 flex-1">
@@ -1969,7 +2006,7 @@ const CommunityPage: React.FC = () => {
                     </div>
                   </Link>
                   <div className="px-3 h-8 rounded-full bg-[#f5f5f5] flex items-center text-sm font-medium">
-                    owner
+                    {t('community.ownerBadgeLower')}
                   </div>
                 </div>
               </div>

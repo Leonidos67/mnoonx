@@ -19,6 +19,7 @@ import MobileBottomSheet from '../components/Common/MobileBottomSheet';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 
 import { POSTS_API as API_URL, USERS_API } from '../config/api';
+import { useTranslation } from '../i18n/useTranslation';
 
 
 interface PostComment {
@@ -74,6 +75,7 @@ const Home: React.FC = () => {
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const navigate = useNavigate();
+  const { t, locale } = useTranslation();
   
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -167,7 +169,7 @@ const Home: React.FC = () => {
       }
 
       const res = await fetch(API_URL, { headers });
-      if (!res.ok) throw new Error('Failed to fetch posts');
+      if (!res.ok) throw new Error(t('common.failedToFetchPosts'));
 
       const data = await res.json();
       setPosts(data);
@@ -191,7 +193,7 @@ const Home: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, t]);
 
   // Загрузка suggested users
   const fetchSuggestedUsers = useCallback(async () => {
@@ -327,7 +329,7 @@ const Home: React.FC = () => {
         body: JSON.stringify({ content: text.trim() }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to post comment');
+      if (!res.ok) throw new Error(data.message || t('common.failedToPostComment'));
 
       if (source === 'inline') setInlineCommentText('');
       else setCommentText('');
@@ -336,7 +338,7 @@ const Home: React.FC = () => {
       updateCommentsOnPost(id, nextComments, data.commentsCount);
     } catch (err: unknown) {
       console.error('Comment error:', err);
-      showToast(err instanceof Error ? err.message : 'Failed to post comment', 'error');
+      showToast(err instanceof Error ? err.message : t('common.failedToPostComment'), 'error');
     } finally {
       setCommentSubmitting(false);
     }
@@ -358,9 +360,9 @@ const Home: React.FC = () => {
   const copyPostLink = (postId: string) => {
     const link = `${window.location.origin}/post/${postId}`;
     navigator.clipboard.writeText(link).then(() => {
-      showToast('Link copied to clipboard!');
+      showToast(t('common.linkCopied'));
     }).catch(() => {
-      showToast('Could not copy link automatically', 'error');
+      showToast(t('common.copyLinkFailed'), 'error');
     });
   };
 
@@ -398,17 +400,17 @@ const Home: React.FC = () => {
         body: JSON.stringify({ content: newContent }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to update comment');
+      if (!res.ok) throw new Error(data.message || t('common.failedToEditComment'));
 
       const nextComments = (current.comments || []).map((c) =>
         String(c._id) === commentId ? data.comment : c
       );
       updateCommentsOnPost(id, nextComments, data.commentsCount ?? current.commentsCount);
       setEditCommentTarget(null);
-      showToast('Comment updated');
+      showToast(t('common.commentUpdated'));
     } catch (err: unknown) {
       console.error('Edit comment error:', err);
-      showToast(err instanceof Error ? err.message : 'Failed to edit comment', 'error');
+      showToast(err instanceof Error ? err.message : t('common.failedToEditComment'), 'error');
     } finally {
       setEditCommentSaving(false);
     }
@@ -418,9 +420,9 @@ const Home: React.FC = () => {
     setOpenCommentMenu(null);
     if (!token) return;
     const confirmed = await confirm({
-      title: 'Delete comment?',
-      message: 'This cannot be undone. The comment will be removed from the post.',
-      confirmLabel: 'Delete',
+      title: t('common.deleteCommentTitle'),
+      message: t('common.deleteCommentMessage'),
+      confirmLabel: t('common.delete'),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -435,25 +437,25 @@ const Home: React.FC = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to delete comment');
+      if (!res.ok) throw new Error(data.message || t('common.failedToDeleteComment'));
 
       const nextComments = (current.comments || []).filter(
         (c) => String(c._id) !== commentId
       );
       updateCommentsOnPost(id, nextComments, data.commentsCount);
-      showToast('Comment deleted');
+      showToast(t('common.commentDeleted'));
     } catch (err: unknown) {
       console.error('Delete comment error:', err);
-      showToast(err instanceof Error ? err.message : 'Failed to delete comment', 'error');
+      showToast(err instanceof Error ? err.message : t('common.failedToDeleteComment'), 'error');
     }
   };
 
   const handleDeletePost = async (postId: string) => {
     if (!token) return;
     const confirmed = await confirm({
-      title: 'Delete post?',
-      message: 'This post will be permanently removed from your feed and profile.',
-      confirmLabel: 'Delete',
+      title: t('common.deletePostTitle'),
+      message: t('common.deletePostMessage'),
+      confirmLabel: t('common.delete'),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -464,16 +466,16 @@ const Home: React.FC = () => {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (!res.ok) throw new Error('Failed to delete post');
+      if (!res.ok) throw new Error(t('common.failedToDeletePost'));
 
       setPosts(prev => prev.filter(p => p._id !== postId));
       if (selectedPost?._id === postId) setSelectedPost(null);
       if (String(expandedCommentsPostId) === String(postId)) setExpandedCommentsPostId(null);
       setMenuOpenPostId(null);
-      showToast('Post deleted');
+      showToast(t('common.postDeleted'));
     } catch (err: unknown) {
       console.error('Delete post error:', err);
-      showToast(err instanceof Error ? err.message : 'Failed to delete post', 'error');
+      showToast(err instanceof Error ? err.message : t('common.failedToDeletePost'), 'error');
     }
   };
 
@@ -489,17 +491,17 @@ const Home: React.FC = () => {
         },
         body: JSON.stringify({ content: newPostContent, media: newPostMedia })
       });
-      if (!res.ok) throw new Error('Failed to create post');
+      if (!res.ok) throw new Error(t('common.failedToCreatePost'));
       
       const newPost = await res.json();
       setPosts(prev => [newPost, ...prev]);
       setNewPostContent('');
       setNewPostMedia([]);
       setIsCreateOpen(false);
-      showToast('Post published');
+      showToast(t('common.postPublished'));
     } catch (err: unknown) {
       console.error('Create post error:', err);
-      showToast(err instanceof Error ? err.message : 'Failed to create post', 'error');
+      showToast(err instanceof Error ? err.message : t('common.failedToCreatePost'), 'error');
     } finally {
       setIsPosting(false);
     }
@@ -526,7 +528,7 @@ const Home: React.FC = () => {
           }
         }}
         onClick={(e) => e.stopPropagation()}
-        placeholder={token ? 'Write a comment…' : 'Sign in to comment'}
+        placeholder={token ? t('home.writeComment') : t('home.signInToComment')}
         disabled={!token || commentSubmitting}
         className="min-w-0 flex-1 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm outline-none focus:border-black/30 focus:ring-2 focus:ring-black/5 disabled:opacity-60"
       />
@@ -579,7 +581,7 @@ const Home: React.FC = () => {
         onClick={(e) => e.stopPropagation()}
       >
         {options.variant === 'sidebar' && (
-          <p className="text-sm font-semibold text-neutral-900 mb-3">Comments</p>
+          <p className="text-sm font-semibold text-neutral-900 mb-3">{t('home.commentsHeading')}</p>
         )}
         <div className={`overflow-y-auto ${listMaxHeight} pr-1 -mr-1`}>
           {isLoading ? (
@@ -590,7 +592,7 @@ const Home: React.FC = () => {
             <>
               {(!post.comments || post.comments.length === 0) && (
                 <p className="py-4 text-center cursor-default text-sm text-neutral-500">
-                  No comments yet. Be the first to comment!
+                  {t('home.noCommentsHint')}
                 </p>
               )}
               <ul className={`space-y-3 ${options.variant === 'feed' ? 'mb-2' : 'mb-4'}`}>
@@ -686,14 +688,23 @@ const Home: React.FC = () => {
     const date = new Date(dateString);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
+    const loc = locale === 'ru' ? 'ru-RU' : 'en-US';
+    if (diff < 0) {
+      return date.toLocaleDateString(loc, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-    if (minutes < 1) return 'now';
-    if (minutes < 60) return `${minutes}m`;
-    if (hours < 24) return `${hours}h`;
-    if (days < 7) return `${days}d`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (minutes < 1) return t('home.timeNow');
+    if (minutes < 60) return t('home.timeMinutes', { count: minutes });
+    if (hours < 24) return t('home.timeHours', { count: hours });
+    if (days < 7) return t('home.timeDays', { count: days });
+    return date.toLocaleDateString(loc, { month: 'short', day: 'numeric' });
   };
 
   const formatCount = (count: number) => {
@@ -723,14 +734,14 @@ const Home: React.FC = () => {
             className="group flex items-center gap-1 font-medium text-neutral-500 transition-colors hover:text-black"
           >
             <ArrowLeft size={18} className="transition-transform group-hover:-translate-x-0.5" />
-            <span>Back</span>
+            <span>{t('common.back')}</span>
           </button>
           <button
             type="button"
             onClick={() => copyPostLink(String(post._id))}
             className="rounded-full p-2 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black"
-            aria-label="Copy post link"
-            title="Copy link"
+            aria-label={t('home.copyPostLinkAria')}
+            title={t('home.copyLinkTitle')}
           >
             <Unlink2 size={18} />
           </button>
@@ -750,7 +761,7 @@ const Home: React.FC = () => {
                   {displayName}
                 </Link>
                 <p className="text-xs text-neutral-500">
-                  {new Date(post.createdAt).toLocaleDateString('en-US', {
+                  {new Date(post.createdAt).toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US', {
                     month: 'long',
                     day: 'numeric',
                     year: 'numeric',
@@ -776,15 +787,15 @@ const Home: React.FC = () => {
             <div className="mt-4 flex items-center gap-4 border-t border-neutral-100 py-4 text-sm">
               <span>
                 <span className="font-bold text-neutral-900">{formatCount(post.repostsCount)}</span>
-                <span className="ml-1 text-neutral-500">Reposts</span>
+                <span className="ml-1 text-neutral-500">{t('home.reposts')}</span>
               </span>
               <span>
                 <span className="font-bold text-neutral-900">{formatCount(post.likesCount)}</span>
-                <span className="ml-1 text-neutral-500">Likes</span>
+                <span className="ml-1 text-neutral-500">{t('home.likesLabel')}</span>
               </span>
               <span>
                 <span className="font-bold text-neutral-900">{formatCount(post.commentsCount || 0)}</span>
-                <span className="ml-1 text-neutral-500">Comments</span>
+                <span className="ml-1 text-neutral-500">{t('home.commentsLabel')}</span>
               </span>
             </div>
 
@@ -827,7 +838,7 @@ const Home: React.FC = () => {
         {/* Header */}
         <div className="z-10 shrink-0 border-b border-neutral-200 bg-white/80 backdrop-blur-md">
           <div className="px-4 py-3">
-            <h1 className="text-xl font-bold">Home</h1>
+            <h1 className="text-xl font-bold">{t('home.title')}</h1>
           </div>
         </div>
 
@@ -890,14 +901,14 @@ const Home: React.FC = () => {
                       {post.isPrivate && (
                         <span className="ml-2 flex items-center gap-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
                           <Lock size={10} />
-                          Private
+                          {t('home.private')}
                         </span>
                       )}
                       
                       {!displayAsCommunity && post.community && (
                         <span className="ml-2 flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
                           <Globe size={10} />
-                          via {post.community.name}
+                          {t('common.via')} {post.community.name}
                         </span>
                       )}
                       
@@ -926,7 +937,7 @@ const Home: React.FC = () => {
                               className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-50 transition-colors flex items-center gap-2"
                             >
                               <Unlink2 size={14} />
-                              Copy link
+                              {t('home.copyLink')}
                             </button>
                             {isPostOwner(post) && !displayAsCommunity && (
                               <>
@@ -936,7 +947,7 @@ const Home: React.FC = () => {
                                   className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-red-50 transition-colors flex items-center gap-2 text-red-600"
                                 >
                                   <Trash size={14} />
-                                  Delete
+                                  {t('home.delete')}
                                 </button>
                               </>
                             )}
@@ -1011,8 +1022,8 @@ const Home: React.FC = () => {
             );
           }) : (
             <div className="text-center py-20 px-4">
-              <h2 className="text-2xl font-bold text-neutral-900 mb-2">No posts yet</h2>
-              <p className="text-neutral-500">Be the first to create a post!</p>
+              <h2 className="text-2xl font-bold text-neutral-900 mb-2">{t('home.emptyFeedTitle')}</h2>
+              <p className="text-neutral-500">{t('home.emptyFeedSubtitle')}</p>
             </div>
           )}
         </div>
@@ -1025,7 +1036,7 @@ const Home: React.FC = () => {
           renderSelectedPostDetail(selectedPost)
         ) : (
           <div className="flex h-full min-h-0 items-center justify-center rounded-2xl border border-neutral-200 bg-white px-6 text-neutral-500 shadow-sm">
-            <p className="text-center">Select a post to view details</p>
+            <p className="text-center">{t('home.selectPostDetails')}</p>
           </div>
         )}
         </div>
@@ -1035,7 +1046,7 @@ const Home: React.FC = () => {
       <MobileBottomSheet
         open={!!selectedPost}
         onClose={() => setSelectedPost(null)}
-        title="Post"
+        title={t('postPage.title')}
       >
         {selectedPost ? renderSelectedPostDetail(selectedPost) : null}
       </MobileBottomSheet>
@@ -1060,7 +1071,7 @@ const Home: React.FC = () => {
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
         >
           <Pen size={14} />
-          Edit
+          {t('common.edit')}
         </button>
         <div className="my-1 h-px bg-neutral-100" />
         <button
@@ -1074,18 +1085,18 @@ const Home: React.FC = () => {
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
         >
           <Trash size={14} />
-          Delete
+          {t('common.delete')}
         </button>
       </FloatingMenu>
 
       <EditTextModal
         isOpen={editCommentTarget !== null}
-        title="Edit comment"
-        description="Update your comment. Changes are visible to everyone."
+        title={t('home.editCommentTitle')}
+        description={t('home.editCommentDescription')}
         initialValue={editCommentTarget?.content ?? ''}
-        placeholder="Write your comment…"
+        placeholder={t('home.editCommentPlaceholder')}
         maxLength={2000}
-        submitLabel="Save comment"
+        submitLabel={t('home.saveComment')}
         saving={editCommentSaving}
         onClose={() => {
           if (!editCommentSaving) setEditCommentTarget(null);

@@ -25,6 +25,7 @@ import {
   communityDashboardUsersPath,
   communityStorePath,
 } from '../../constants/communityRoutes';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const chartTooltipStyle = {
   borderRadius: 8,
@@ -35,6 +36,7 @@ const chartTooltipStyle = {
 const CommunityDashboardAnalytics: React.FC = () => {
   const { handle, community } = useCommunityDashboard();
   const { token } = useAuth();
+  const { t } = useTranslation();
   const { data, loading, error } = useDashboardAnalytics(handle, token);
 
   const memberChartData = useMemo(
@@ -64,48 +66,55 @@ const CommunityDashboardAnalytics: React.FC = () => {
     [data?.memberGrowthCumulative]
   );
 
-  if (!community) return null;
-
   const summary = data?.summary;
 
-  const metrics = [
-    {
-      label: 'Total members',
-      value: loading ? '…' : String(summary?.memberCount ?? community.memberCount),
-      icon: Users,
-    },
-    {
-      label: 'Feed posts',
-      value: loading ? '…' : String(summary?.postCount ?? 0),
-      icon: FileText,
-    },
-    {
-      label: 'Installed apps',
-      value: loading ? '…' : String(summary?.appCount ?? 0),
-      icon: LayoutGrid,
-    },
-    {
-      label: 'Unread chat',
-      value: loading ? '…' : String(summary?.totalChatUnread ?? 0),
-      icon: MessageCircle,
-    },
-    {
-      label: 'Est. revenue',
-      value: loading ? '…' : formatUsd(summary?.estimatedRevenue ?? 0),
-      icon: DollarSign,
-      hint: summary?.isPaid ? `Based on $${summary.price} × paying members` : 'Enable paid access in settings',
-    },
-    {
-      label: 'New members (7d)',
-      value: loading ? '…' : String(summary?.newMembers7d ?? 0),
-      icon: UserPlus,
-    },
-  ];
+  const metrics = useMemo(
+    () => [
+      {
+        label: t('communityDashboard.analytics.totalMembers'),
+        value: loading ? '…' : String(summary?.memberCount ?? community?.memberCount ?? 0),
+        icon: Users,
+      },
+      {
+        label: t('communityDashboard.analytics.feedPosts'),
+        value: loading ? '…' : String(summary?.postCount ?? 0),
+        icon: FileText,
+      },
+      {
+        label: t('communityDashboard.analytics.installedApps'),
+        value: loading ? '…' : String(summary?.appCount ?? 0),
+        icon: LayoutGrid,
+      },
+      {
+        label: t('communityDashboard.analytics.unreadChat'),
+        value: loading ? '…' : String(summary?.totalChatUnread ?? 0),
+        icon: MessageCircle,
+      },
+      {
+        label: t('communityDashboard.analytics.estRevenue'),
+        value: loading ? '…' : formatUsd(summary?.estimatedRevenue ?? 0),
+        icon: DollarSign,
+        hint: summary?.isPaid
+          ? t('communityDashboard.analytics.revenueHintPaid', { price: String(summary?.price ?? 0) })
+          : t('communityDashboard.analytics.revenueHintFree'),
+      },
+      {
+        label: t('communityDashboard.analytics.newMembers7d'),
+        value: loading ? '…' : String(summary?.newMembers7d ?? 0),
+        icon: UserPlus,
+      },
+    ],
+    [community?.memberCount, loading, summary, t]
+  );
+
+  if (!community) return null;
 
   return (
     <div className="min-h-full bg-white p-4 lg:p-8">
-      <h1 className="text-2xl font-bold text-neutral-900">Analytics</h1>
-      <p className="mt-1 text-sm text-neutral-500">Last 30 days for {community.name}</p>
+      <h1 className="text-2xl font-bold text-neutral-900">{t('communityDashboard.analytics.title')}</h1>
+      <p className="mt-1 text-sm text-neutral-500">
+        {t('communityDashboard.analytics.last30Days', { name: community.name })}
+      </p>
 
       {error ? (
         <p className="mt-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -132,7 +141,7 @@ const CommunityDashboardAnalytics: React.FC = () => {
         </div>
       ) : (
         <div className="mt-10 grid gap-8 lg:grid-cols-2">
-          <ChartCard title="New members per day" subtitle="Daily joins">
+          <ChartCard title={t('communityDashboard.analytics.chartNewMembers')} subtitle={t('communityDashboard.analytics.chartNewMembersSub')}>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={memberChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
@@ -151,12 +160,12 @@ const CommunityDashboardAnalytics: React.FC = () => {
                   width={28}
                 />
                 <Tooltip contentStyle={chartTooltipStyle} />
-                <Bar dataKey="count" fill="#315efb" radius={[4, 4, 0, 0]} name="New members" />
+                <Bar dataKey="count" fill="#315efb" radius={[4, 4, 0, 0]} name={t('communityDashboard.analytics.seriesNewMembers')} />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard title="Posts published" subtitle="Daily feed activity">
+          <ChartCard title={t('communityDashboard.analytics.chartPosts')} subtitle={t('communityDashboard.analytics.chartPostsSub')}>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={postsChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
@@ -175,14 +184,14 @@ const CommunityDashboardAnalytics: React.FC = () => {
                   width={28}
                 />
                 <Tooltip contentStyle={chartTooltipStyle} />
-                <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} name="Posts" />
+                <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} name={t('communityDashboard.analytics.seriesPosts')} />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
 
           <ChartCard
-            title="Member growth"
-            subtitle="Cumulative members (by join date)"
+            title={t('communityDashboard.analytics.chartGrowth')}
+            subtitle={t('communityDashboard.analytics.chartGrowthSub')}
             className="lg:col-span-2"
           >
             <ResponsiveContainer width="100%" height={280}>
@@ -215,7 +224,7 @@ const CommunityDashboardAnalytics: React.FC = () => {
                   stroke="#315efb"
                   strokeWidth={2}
                   fill="url(#memberGrad)"
-                  name="Total members"
+                  name={t('communityDashboard.analytics.seriesTotalMembers')}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -228,22 +237,22 @@ const CommunityDashboardAnalytics: React.FC = () => {
           to={communityDashboardUsersPath(handle)}
           className="text-sm font-medium text-[#315efb] hover:underline"
         >
-          View users
+          {t('communityDashboard.analytics.linkViewUsers')}
         </Link>
         <Link
           to={communityDashboardContentPath(handle)}
           className="text-sm font-medium text-[#315efb] hover:underline"
         >
-          View content
+          {t('communityDashboard.analytics.linkViewContent')}
         </Link>
         <Link
           to={communityDashboardInvitesPath(handle)}
           className="text-sm font-medium text-[#315efb] hover:underline"
         >
-          Invites
+          {t('communityDashboard.analytics.linkInvites')}
         </Link>
         <Link to={communityStorePath(handle)} className="text-sm font-medium text-[#315efb] hover:underline">
-          Open store
+          {t('communityDashboard.analytics.linkOpenStore')}
         </Link>
       </div>
     </div>

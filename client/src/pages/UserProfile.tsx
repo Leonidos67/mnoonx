@@ -30,6 +30,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 
 import { USERS_API as API_URL, POSTS_API as POSTS_API_URL } from '../config/api';
+import { useTranslation } from '../i18n/useTranslation';
 
 type Post = FeedPost;
 
@@ -64,6 +65,7 @@ const UserProfileComponent: React.FC = () => {
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const navigate = useNavigate();
+  const { t, locale } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
   const isLgUp = useMediaQuery('(min-width: 1024px)');
 
@@ -202,9 +204,9 @@ const UserProfileComponent: React.FC = () => {
   const copyPostLink = (postId: string) => {
     const link = `${window.location.origin}/post/${postId}`;
     navigator.clipboard.writeText(link).then(() => {
-      showToast('Link copied to clipboard!');
+      showToast(t('common.linkCopied'));
     }).catch(() => {
-      showToast('Could not copy link automatically', 'error');
+      showToast(t('common.copyLinkFailed'), 'error');
     });
   };
 
@@ -212,9 +214,9 @@ const UserProfileComponent: React.FC = () => {
     setMenuOpenPostId(null);
     if (!token) return;
     const confirmed = await confirm({
-      title: 'Delete post?',
-      message: 'This post will be permanently removed from your profile.',
-      confirmLabel: 'Delete',
+      title: t('common.deletePostTitle'),
+      message: t('userProfile.deletePostMessageProfile'),
+      confirmLabel: t('common.delete'),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -229,7 +231,7 @@ const UserProfileComponent: React.FC = () => {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.message || 'Failed to delete post');
+        throw new Error(data.message || t('common.failedToDeletePost'));
       }
 
       setPosts((prev) => prev.filter((p) => String(p._id) !== postId));
@@ -242,10 +244,10 @@ const UserProfileComponent: React.FC = () => {
         postsCount: Math.max(0, (prev.postsCount || 1) - 1)
       } : null);
       
-      showToast('Post deleted');
+      showToast(t('common.postDeleted'));
     } catch (err: unknown) {
       console.error('Delete post error:', err);
-      showToast(err instanceof Error ? err.message : 'Failed to delete post', 'error');
+      showToast(err instanceof Error ? err.message : t('common.failedToDeletePost'), 'error');
     }
   };
 
@@ -270,16 +272,16 @@ const UserProfileComponent: React.FC = () => {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.message || 'Failed to update post');
+        throw new Error(data.message || t('common.failedToUpdatePost'));
       }
 
       const updatedPost = await res.json();
       patchPostInLists(postId, updatedPost);
       setEditPostTarget(null);
-      showToast('Post updated');
+      showToast(t('common.postUpdated'));
     } catch (err: unknown) {
       console.error('Edit post error:', err);
-      showToast(err instanceof Error ? err.message : 'Failed to edit post', 'error');
+      showToast(err instanceof Error ? err.message : t('common.failedToUpdatePost'), 'error');
     } finally {
       setEditPostSaving(false);
     }
@@ -288,7 +290,7 @@ const UserProfileComponent: React.FC = () => {
   const fetchProfile = useCallback(async (cleanUsername: string) => {
     if (!cleanUsername || cleanUsername === 'undefined') {
       setLoading(false);
-      setError('Invalid username');
+      setError(t('userProfile.invalidUsername'));
       return;
     }
     try {
@@ -299,7 +301,7 @@ const UserProfileComponent: React.FC = () => {
       
       const res = await fetch(`${API_URL}/${cleanUsername}`, { headers });
       if (!res.ok) {
-        setError(res.status === 404 ? 'User not found' : 'Failed to load profile');
+        setError(res.status === 404 ? t('userProfile.userNotFound') : t('userProfile.failedLoadProfile'));
         setLoading(false);
         return;
       }
@@ -323,11 +325,11 @@ const UserProfileComponent: React.FC = () => {
       
     } catch (err) {
       console.error('Fetch profile error:', err);
-      setError('Failed to load profile');
+      setError(t('userProfile.failedLoadProfile'));
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [token, t]);
 
   const fetchFollowers = useCallback(async (cleanUsername: string) => {
     if (!cleanUsername || cleanUsername === 'undefined') return;
@@ -420,7 +422,7 @@ const UserProfileComponent: React.FC = () => {
       fetchReposts(profileSlug);
     } else {
       setLoading(false);
-      setError('Invalid username');
+      setError(t('userProfile.invalidUsername'));
     }
   }, [profileSlug, fetchProfile, fetchFollowers, fetchFollowing, fetchReposts]);
 
@@ -450,7 +452,7 @@ const UserProfileComponent: React.FC = () => {
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.message || 'Failed to create post');
+        throw new Error(data.message || t('common.failedToCreatePost'));
       }
       const newPost = await res.json();
       
@@ -461,10 +463,10 @@ const UserProfileComponent: React.FC = () => {
       setNewPostContent('');
       setNewPostMedia([]);
       closeComposer();
-      showToast('Post published');
+      showToast(t('common.postPublished'));
     } catch (err: unknown) {
       console.error('Create post error:', err);
-      showToast(err instanceof Error ? err.message : 'Failed to create post', 'error');
+      showToast(err instanceof Error ? err.message : t('common.failedToCreatePost'), 'error');
     } finally {
       setIsPosting(false);
     }
@@ -514,8 +516,7 @@ const UserProfileComponent: React.FC = () => {
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    return `${months[date.getMonth()]} ${date.getFullYear()}`;
+    return date.toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US', { month: 'long', year: 'numeric' });
   };
 
   const formatPostDate = (dateString: string) => {
@@ -525,11 +526,12 @@ const UserProfileComponent: React.FC = () => {
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
-    if (minutes < 1) return 'now';
-    if (minutes < 60) return `${minutes}m`;
-    if (hours < 24) return `${hours}h`;
-    if (days < 7) return `${days}d`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const loc = locale === 'ru' ? 'ru-RU' : 'en-US';
+    if (minutes < 1) return t('home.timeNow');
+    if (minutes < 60) return t('home.timeMinutes', { count: minutes });
+    if (hours < 24) return t('home.timeHours', { count: hours });
+    if (days < 7) return t('home.timeDays', { count: days });
+    return date.toLocaleDateString(loc, { month: 'short', day: 'numeric' });
   };
 
   const formatCount = (count: number) => {
@@ -537,6 +539,16 @@ const UserProfileComponent: React.FC = () => {
     if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
     return count.toString();
   };
+
+  const activeTabTitle = useMemo(() => {
+    const keys = {
+      posts: 'userProfile.posts',
+      reposts: 'userProfile.reposts',
+      replies: 'userProfile.replies',
+      media: 'userProfile.media',
+    } as const;
+    return t(keys[activeTab]);
+  }, [activeTab, t]);
 
   const filteredFollowers = followers.filter(f => 
     f.fullName?.toLowerCase().includes(searchFollower.toLowerCase()) ||
@@ -559,7 +571,7 @@ const UserProfileComponent: React.FC = () => {
           <div className="flex items-center gap-2 mb-2 text-sm text-neutral-500">
             <Repeat2 size={14} className="text-green-600 shrink-0" />
             <Link to={`/@${profile.username}`} className="font-medium hover:underline text-neutral-700">
-              {profile.fullName} reposted
+              {profile.fullName} {t('userProfile.reposted')}
             </Link>
           </div>
         )}
@@ -600,7 +612,7 @@ const UserProfileComponent: React.FC = () => {
                       className="w-full text-left py-1 px-3 text-[14px] rounded hover:bg-black/5 transition-colors flex items-center gap-2"
                     >
                       <Unlink2 className="h-3 w-3" />
-                      Copy link
+                      {t('home.copyLink')}
                     </button>
                     {isPostOwner(post) && (
                       <>
@@ -609,7 +621,7 @@ const UserProfileComponent: React.FC = () => {
                           className="w-full text-left py-1 px-3 text-[14px] rounded hover:bg-black/5 transition-colors flex items-center gap-2"
                         >
                           <Pen className="h-3 w-3" />
-                          Edit
+                          {t('common.edit')}
                         </button>
                         <div className="h-px bg-neutral-100 my-1" />
                         <button
@@ -617,7 +629,7 @@ const UserProfileComponent: React.FC = () => {
                           className="w-full text-left px-3 py-1 text-[14px] rounded hover:bg-red-50 transition-colors flex items-center gap-2 text-red-600"
                         >
                           <Trash className="h-3 w-3" />
-                          Delete
+                          {t('common.delete')}
                         </button>
                       </>
                     )}
@@ -703,8 +715,8 @@ const UserProfileComponent: React.FC = () => {
   if (error || !profile) {
     return (
       <div className="flex flex-col justify-center items-center h-screen">
-        <p className="text-xl text-neutral-500 mb-4">{error || 'Profile not found'}</p>
-        <button onClick={() => navigate('/')} className="px-4 py-2 bg-black text-white rounded-full hover:bg-neutral-800 transition-colors">Back to Home</button>
+        <p className="text-xl text-neutral-500 mb-4">{error || t('userProfile.profileNotFound')}</p>
+        <button onClick={() => navigate('/')} className="px-4 py-2 bg-black text-white rounded-full hover:bg-neutral-800 transition-colors">{t('userProfile.backToHome')}</button>
       </div>
     );
   }
@@ -733,12 +745,12 @@ const UserProfileComponent: React.FC = () => {
           </div>
           <div className="flex gap-2 mt-2">
             {isOwnProfile ? (
-              <button onClick={() => navigate('/settings')} className="px-5 py-2 border border-neutral-300 hover:bg-neutral-100 text-neutral-900 rounded-full font-semibold text-sm transition-colors">Edit profile</button>
+              <button onClick={() => navigate('/settings')} className="px-5 py-2 border border-neutral-300 hover:bg-neutral-100 text-neutral-900 rounded-full font-semibold text-sm transition-colors">{t('userProfile.editProfile')}</button>
             ) : (
               <>
                 <button onClick={handleFollow} disabled={followLoading}
                   className={`px-5 py-2 rounded-full font-semibold text-sm transition-all ${isFollowing ? 'bg-white border border-neutral-300 text-neutral-900 hover:border-red-300 hover:text-red-600 hover:bg-red-50' : 'bg-black text-white hover:bg-neutral-800'} ${followLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                  {followLoading ? 'Loading...' : isFollowing ? 'Following' : 'Follow'}
+                  {followLoading ? t('userProfile.followLoading') : isFollowing ? t('userProfile.followingBtn') : t('userProfile.follow')}
                 </button>
                 <button className="p-2 border border-neutral-300 hover:bg-neutral-100 rounded-full transition-colors"><MessageCircle size={18} /></button>
                 <button className="p-2 border border-neutral-300 hover:bg-neutral-100 rounded-full transition-colors"><MoreHorizontal size={18} /></button>
@@ -751,19 +763,19 @@ const UserProfileComponent: React.FC = () => {
             {profile.website && (<div className="flex items-center gap-1"><LinkIcon size={16} /><a href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{profile.website.replace(/^https?:\/\//, '')}</a></div>)}
           </div>
           <div className="flex gap-5 mb-2 text-md">
-            <button className="hover:underline"><span className="font-bold text-neutral-900">{formatCount(profile.followingCount || 0)}</span><span className="text-neutral-500 ml-1">Following</span></button>
-            <button className="hover:underline"><span className="font-bold text-neutral-900">{formatCount(profile.followersCount || 0)}</span><span className="text-neutral-500 ml-1">Followers</span></button>
+            <button className="hover:underline"><span className="font-bold text-neutral-900">{formatCount(profile.followingCount || 0)}</span><span className="text-neutral-500 ml-1">{t('userProfile.following')}</span></button>
+            <button className="hover:underline"><span className="font-bold text-neutral-900">{formatCount(profile.followersCount || 0)}</span><span className="text-neutral-500 ml-1">{t('userProfile.followers')}</span></button>
           </div>
-          <div className="flex text-sm items-center gap-1"><Calendar size={14} /><span>Joined {formatDate(profile.createdAt)}</span></div>
+          <div className="flex text-sm items-center gap-1"><Calendar size={14} /><span>{t('userProfile.joinedLine', { date: formatDate(profile.createdAt) })}</span></div>
         </div>
 
         {/* Tabs */}
         <div className="flex border-b border-neutral-200">
           {[
-            { id: 'posts', label: 'Posts' },
-            { id: 'reposts', label: 'Reposts' },
-            { id: 'replies', label: 'Replies' },
-            { id: 'media', label: 'Media' },
+            { id: 'posts', label: t('userProfile.posts') },
+            { id: 'reposts', label: t('userProfile.reposts') },
+            { id: 'replies', label: t('userProfile.replies') },
+            { id: 'media', label: t('userProfile.media') },
           ].map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
               className={`flex-1 py-2 text-sm font-medium text-center hover:bg-neutral-50 transition-colors relative ${activeTab === tab.id ? 'text-neutral-900 bg-neutral-50' : 'text-neutral-500'}`}>
@@ -801,8 +813,8 @@ const UserProfileComponent: React.FC = () => {
               posts.map((post) => renderPostCard(post))
             ) : (
               <div className="text-center py-20 px-4">
-                <h2 className="text-2xl font-bold text-neutral-900 mb-2">No posts yet</h2>
-                <p className="text-neutral-500">When @{profile.username} posts, those posts will show up here.</p>
+                <h2 className="text-2xl font-bold text-neutral-900 mb-2">{t('userProfile.noPosts')}</h2>
+                <p className="text-neutral-500">{t('userProfile.noPostsHint', { name: profile.username })}</p>
               </div>
             )}
           </div>
@@ -818,9 +830,9 @@ const UserProfileComponent: React.FC = () => {
               reposts.map((post) => renderPostCard(post, { showRepostBanner: true }))
             ) : (
               <div className="text-center py-20 px-4">
-                <h2 className="text-2xl font-bold text-neutral-900 mb-2">No reposts yet</h2>
+                <h2 className="text-2xl font-bold text-neutral-900 mb-2">{t('userProfile.noReposts')}</h2>
                 <p className="text-neutral-500">
-                  When @{profile.username} reposts something, it will show up here.
+                  {t('userProfile.noRepostsHint', { name: profile.username })}
                 </p>
               </div>
             )}
@@ -829,8 +841,8 @@ const UserProfileComponent: React.FC = () => {
 
         {(activeTab === 'replies' || activeTab === 'media') && (
           <div className="text-center py-20 px-4">
-            <h2 className="text-2xl font-bold text-neutral-900 mb-2">No {activeTab} yet</h2>
-            <p className="text-neutral-500">When @{profile.username} has {activeTab}, they&apos;ll show up here.</p>
+            <h2 className="text-2xl font-bold text-neutral-900 mb-2">{t('userProfile.noTabYet', { tab: activeTabTitle })}</h2>
+            <p className="text-neutral-500">{t('userProfile.noTabHint', { name: profile.username, tab: activeTabTitle })}</p>
           </div>
         )}
         </div>
@@ -861,10 +873,10 @@ const UserProfileComponent: React.FC = () => {
           ) : (
             <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto">
           <div className="rounded-2xl bg-neutral-50 p-4">
-            <h2 className="text-xl font-bold mb-4">Followers ({followers.length})</h2>
+            <h2 className="text-xl font-bold mb-4">{t('userProfile.followersHeading', { count: followers.length })}</h2>
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
-              <input type="text" value={searchFollower} onChange={(e) => setSearchFollower(e.target.value)} placeholder="Search followers..."
+              <input type="text" value={searchFollower} onChange={(e) => setSearchFollower(e.target.value)} placeholder={t('userProfile.searchFollowersPlaceholder')}
                 className="w-full pl-9 pr-4 py-2 bg-white border border-neutral-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-black/10 transition-all" />
             </div>
             <div className="space-y-1 max-h-[400px] overflow-y-auto">
@@ -880,12 +892,12 @@ const UserProfileComponent: React.FC = () => {
                   </div>
                 </Link>
               )) : (
-                <div className="text-center py-8"><p className="text-neutral-500 text-sm">{searchFollower ? 'No followers found' : 'No followers yet'}</p></div>
+                <div className="text-center py-8"><p className="text-neutral-500 text-sm">{searchFollower ? t('userProfile.noFollowersFound') : t('userProfile.noFollowersYet')}</p></div>
               )}
             </div>
           </div>
           <div className="bg-neutral-50 rounded-2xl p-4">
-            <h2 className="text-xl font-bold mb-4">Following ({following.length})</h2>
+            <h2 className="text-xl font-bold mb-4">{t('userProfile.followingHeading', { count: following.length })}</h2>
             <div className="space-y-1 max-h-[300px] overflow-y-auto">
               {following.length > 0 ? following.slice(0, 5).map(follow => (
                 <Link key={follow._id || follow.username} to={`/@${follow.username}`} className="flex items-center justify-between p-3 hover:bg-white rounded-xl transition-colors group">
@@ -899,7 +911,7 @@ const UserProfileComponent: React.FC = () => {
                   </div>
                 </Link>
               )) : (
-                <div className="text-center py-8"><p className="text-neutral-500 text-sm">Not following anyone yet</p></div>
+                <div className="text-center py-8"><p className="text-neutral-500 text-sm">{t('userProfile.notFollowingAnyone')}</p></div>
               )}
             </div>
           </div>
@@ -911,7 +923,7 @@ const UserProfileComponent: React.FC = () => {
       <MobileBottomSheet
         open={!!selectedPost}
         onClose={() => setSelectedPost(null)}
-        title="Post"
+        title={t('postPage.title')}
       >
         {selectedPost ? (
           <PostDetailPanel
@@ -955,7 +967,7 @@ const UserProfileComponent: React.FC = () => {
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
         >
           <Pen size={14} />
-          Edit
+          {t('common.edit')}
         </button>
         <div className="my-1 h-px bg-neutral-100" />
         <button
@@ -968,18 +980,18 @@ const UserProfileComponent: React.FC = () => {
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
         >
           <Trash size={14} />
-          Delete
+          {t('common.delete')}
         </button>
       </FloatingMenu>
 
       <EditTextModal
         isOpen={editPostTarget !== null}
-        title="Edit post"
-        description="Update your post text. Media attachments are not changed here."
+        title={t('userProfile.editPostTitle')}
+        description={t('userProfile.editPostDescription')}
         initialValue={editPostTarget?.content ?? ''}
-        placeholder="What's on your mind?"
+        placeholder={t('postComposer.whatsOnMind')}
         maxLength={5000}
-        submitLabel="Save post"
+        submitLabel={t('userProfile.savePost')}
         saving={editPostSaving}
         onClose={() => {
           if (!editPostSaving) setEditPostTarget(null);
@@ -989,12 +1001,12 @@ const UserProfileComponent: React.FC = () => {
 
       <EditTextModal
         isOpen={editCommentTarget !== null}
-        title="Edit comment"
-        description="Update your comment. Changes are visible to everyone."
+        title={t('home.editCommentTitle')}
+        description={t('home.editCommentDescription')}
         initialValue={editCommentTarget?.content ?? ''}
-        placeholder="Write your comment…"
+        placeholder={t('home.editCommentPlaceholder')}
         maxLength={2000}
-        submitLabel="Save comment"
+        submitLabel={t('home.saveComment')}
         saving={editCommentSaving}
         onClose={() => {
           if (!editCommentSaving) setEditCommentTarget(null);

@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useTranslation } from '../../i18n/useTranslation';
 import SimpleWizard, { WizardStep } from '../Common/SimpleWizard';
 
 import { COMMUNITIES_API as API_URL } from '../../config/api';
@@ -19,42 +20,6 @@ function slugifyHandle(name: string): string {
   return s || 'community';
 }
 
-const BUSINESS_STEPS: WizardStep[] = [
-  {
-    id: 'name',
-    title: 'Name your hub',
-    subtitle: 'Pick a business name. We will generate a unique URL from it.',
-  },
-  {
-    id: 'about',
-    title: 'Tell your story',
-    subtitle: 'Add a short description so members know what your community is about.',
-  },
-  {
-    id: 'visibility',
-    title: 'Choose visibility',
-    subtitle: 'You can change this later in community settings.',
-  },
-];
-
-const PERSONAL_STEPS: WizardStep[] = [
-  {
-    id: 'name',
-    title: 'Name your space',
-    subtitle: 'Pick a name for your personal community. We will generate a unique URL from it.',
-  },
-  {
-    id: 'about',
-    title: 'Describe your space',
-    subtitle: 'A few words about what members can expect here.',
-  },
-  {
-    id: 'visibility',
-    title: 'Choose visibility',
-    subtitle: 'You can change this later in community settings.',
-  },
-];
-
 interface CommunityCreateWizardProps {
   variant: CommunityWizardVariant;
 }
@@ -62,9 +27,50 @@ interface CommunityCreateWizardProps {
 const CommunityCreateWizard: React.FC<CommunityCreateWizardProps> = ({ variant }) => {
   const { token } = useAuth();
   const { showToast } = useToast();
+  const { t } = useTranslation();
   const navigate = useNavigate();
-  const steps = variant === 'business' ? BUSINESS_STEPS : PERSONAL_STEPS;
-  const headerLabel = variant === 'business' ? 'Business community' : 'Personal community';
+
+  const steps = useMemo((): WizardStep[] => {
+    if (variant === 'business') {
+      return [
+        {
+          id: 'name',
+          title: t('newPage.wizard.steps.businessNameTitle'),
+          subtitle: t('newPage.wizard.steps.businessNameSub'),
+        },
+        {
+          id: 'about',
+          title: t('newPage.wizard.steps.businessAboutTitle'),
+          subtitle: t('newPage.wizard.steps.businessAboutSub'),
+        },
+        {
+          id: 'visibility',
+          title: t('newPage.wizard.steps.visibilityTitle'),
+          subtitle: t('newPage.wizard.steps.visibilitySub'),
+        },
+      ];
+    }
+    return [
+      {
+        id: 'name',
+        title: t('newPage.wizard.steps.personalNameTitle'),
+        subtitle: t('newPage.wizard.steps.personalNameSub'),
+      },
+      {
+        id: 'about',
+        title: t('newPage.wizard.steps.personalAboutTitle'),
+        subtitle: t('newPage.wizard.steps.personalAboutSub'),
+      },
+      {
+        id: 'visibility',
+        title: t('newPage.wizard.steps.visibilityTitle'),
+        subtitle: t('newPage.wizard.steps.visibilitySub'),
+      },
+    ];
+  }, [t, variant]);
+
+  const headerLabel =
+    variant === 'business' ? t('newPage.wizard.businessHeader') : t('newPage.wizard.personalHeader');
 
   const [stepIndex, setStepIndex] = useState(0);
   const [name, setName] = useState('');
@@ -107,10 +113,7 @@ const CommunityCreateWizard: React.FC<CommunityCreateWizardProps> = ({ variant }
 
     const baseHandle = slugifyHandle(trimmedName);
     if (!/^[a-zA-Z0-9-]+$/.test(baseHandle)) {
-      showToast(
-        'Name must yield a valid URL handle (letters, numbers, hyphens). Try a Latin name or abbreviation.',
-        'info'
-      );
+      showToast(t('newPage.wizard.toastInvalidHandle'), 'info');
       return;
     }
 
@@ -145,15 +148,15 @@ const CommunityCreateWizard: React.FC<CommunityCreateWizardProps> = ({ variant }
           if (!/^[a-zA-Z0-9-]+$/.test(handle)) break;
           continue;
         }
-        throw new Error(msg || 'Failed to create community');
+        throw new Error(msg || t('createCommunity.toastCreateFailed'));
       }
-      showToast('Could not find an available community URL. Try a different name.', 'error');
+      showToast(t('newPage.wizard.toastNoUrl'), 'error');
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Error', 'error');
+      showToast(e instanceof Error ? e.message : t('createCommunity.toastGenericError'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [buildDescription, communityType, name, navigate, token, showToast]);
+  }, [buildDescription, communityType, name, navigate, token, showToast, t]);
 
   const handleNext = useCallback(() => {
     if (stepIndex < steps.length - 1) {
@@ -172,25 +175,27 @@ const CommunityCreateWizard: React.FC<CommunityCreateWizardProps> = ({ variant }
       onBack={handleBack}
       onNext={handleNext}
       canNext={canNext}
-      finishLabel="Create community"
+      finishLabel={t('createCommunity.submit')}
       loading={loading}
       headerLabel={headerLabel}
     >
       {stepId === 'name' && (
         <div className="space-y-4">
           <label className="block text-[15px] font-medium">
-            {variant === 'business' ? 'Business name' : 'Community name'}
+            {variant === 'business' ? t('newPage.wizard.businessName') : t('newPage.wizard.communityName')}
           </label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder={variant === 'business' ? 'e.g. Nova Labs' : 'e.g. Alex Hub'}
+            placeholder={
+              variant === 'business' ? t('newPage.wizard.businessNamePh') : t('newPage.wizard.communityNamePh')
+            }
             className="h-[64px] w-full rounded-2xl border border-[#e5e5e5] bg-white px-5 text-[16px] focus:border-black focus:outline-none"
             autoFocus
           />
           {name.trim() && (
             <p className="text-[15px] text-[#666]">
-              URL preview:{' '}
+              {t('newPage.wizard.urlPreview')}{' '}
               <span className="font-medium text-black">/community/{handlePreview}</span>
             </p>
           )}
@@ -200,14 +205,12 @@ const CommunityCreateWizard: React.FC<CommunityCreateWizardProps> = ({ variant }
       {stepId === 'about' && (
         <div className="space-y-6">
           <div>
-            <label className="mb-3 block text-[15px] font-medium">Description</label>
+            <label className="mb-3 block text-[15px] font-medium">{t('newPage.wizard.description')}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={
-                variant === 'business'
-                  ? 'Describe your business or community...'
-                  : 'What is this space about?'
+                variant === 'business' ? t('newPage.wizard.businessDescPh') : t('newPage.wizard.personalDescPh')
               }
               className="min-h-[160px] w-full resize-none rounded-2xl border border-[#e5e5e5] bg-white p-5 text-[16px] focus:border-black focus:outline-none"
               autoFocus
@@ -223,13 +226,13 @@ const CommunityCreateWizard: React.FC<CommunityCreateWizardProps> = ({ variant }
                   onChange={() => setHasWebsite(!hasWebsite)}
                   className="h-5 w-5"
                 />
-                <span className="text-[15px] font-medium">I already have a website</span>
+                <span className="text-[15px] font-medium">{t('newPage.wizard.hasWebsite')}</span>
               </label>
               {hasWebsite && (
                 <input
                   value={website}
                   onChange={(e) => setWebsite(e.target.value)}
-                  placeholder="https://"
+                  placeholder={t('newPage.wizard.websitePh')}
                   className="mt-5 h-[60px] w-full rounded-2xl border border-[#e5e5e5] bg-[#fafafa] px-5 text-[16px] focus:border-black focus:outline-none"
                 />
               )}
@@ -249,14 +252,14 @@ const CommunityCreateWizard: React.FC<CommunityCreateWizardProps> = ({ variant }
           >
             {communityType === 'private' && (
               <span className="absolute right-4 top-4 flex h-7 items-center rounded-full bg-black px-3 text-xs font-medium text-white">
-                Selected
+                {t('newPage.wizard.selected')}
               </span>
             )}
-            <h3 className="text-[18px] font-semibold text-black">Private</h3>
+            <h3 className="text-[18px] font-semibold text-black">{t('newPage.wizard.private')}</h3>
             <p className="mt-3 text-[15px] leading-relaxed text-[#666]">
               {variant === 'business'
-                ? 'Invite-only or paid access for members and exclusive content.'
-                : 'Only people you approve can join and see posts.'}
+                ? t('newPage.wizard.privateBusinessDesc')
+                : t('newPage.wizard.privatePersonalDesc')}
             </p>
           </button>
 
@@ -269,14 +272,14 @@ const CommunityCreateWizard: React.FC<CommunityCreateWizardProps> = ({ variant }
           >
             {communityType === 'public' && (
               <span className="absolute right-4 top-4 flex h-7 items-center rounded-full bg-black px-3 text-xs font-medium text-white">
-                Selected
+                {t('newPage.wizard.selected')}
               </span>
             )}
-            <h3 className="text-[18px] font-semibold text-black">Public</h3>
+            <h3 className="text-[18px] font-semibold text-black">{t('newPage.wizard.public')}</h3>
             <p className="mt-3 text-[15px] leading-relaxed text-[#666]">
               {variant === 'business'
-                ? 'Anyone can discover and join to grow your audience.'
-                : 'Visible in Discover; anyone can request to join.'}
+                ? t('newPage.wizard.publicBusinessDesc')
+                : t('newPage.wizard.publicPersonalDesc')}
             </p>
           </button>
         </div>

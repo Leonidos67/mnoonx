@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { profilePath } from '../constants/paths';
 
 import { USERS_API as API_URL, MESSAGES_API } from '../config/api';
+import { useTranslation } from '../i18n/useTranslation';
 
 interface DirectoryUser {
   id: string;
@@ -17,6 +18,7 @@ interface DirectoryUser {
 
 const Users: React.FC = () => {
   const { token, user } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [users, setUsers] = useState<DirectoryUser[]>([]);
@@ -48,8 +50,8 @@ const Users: React.FC = () => {
   }, [token, query]);
 
   useEffect(() => {
-    const t = window.setTimeout(() => void load(), 300);
-    return () => clearTimeout(t);
+    const timer = window.setTimeout(() => void load(), 300);
+    return () => clearTimeout(timer);
   }, [load]);
 
   const startMessage = async (username: string) => {
@@ -77,17 +79,15 @@ const Users: React.FC = () => {
   if (!token) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-12 text-center text-neutral-600">
-        <p>Sign in to browse members.</p>
+        <p>{t('users.signIn')}</p>
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
-      <h1 className="text-2xl font-bold text-neutral-900">Members</h1>
-      <p className="mt-1 text-sm text-neutral-500">
-        All registered users — search by username and send a message.
-      </p>
+      <h1 className="text-2xl font-bold text-neutral-900">{t('users.membersTitle')}</h1>
+      <p className="mt-1 text-sm text-neutral-500">{t('users.subtitle')}</p>
 
       <div className="relative mt-6">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
@@ -95,7 +95,7 @@ const Users: React.FC = () => {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by username or name..."
+          placeholder={t('users.searchPlaceholder')}
           className="w-full rounded-xl border border-neutral-200 py-3 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-black/10"
         />
       </div>
@@ -105,7 +105,7 @@ const Users: React.FC = () => {
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-black" />
         </div>
       ) : users.length === 0 ? (
-        <p className="py-16 text-center text-neutral-500">No users found.</p>
+        <p className="py-16 text-center text-neutral-500">{t('users.noUsers')}</p>
       ) : (
         <ul className="mt-6 divide-y divide-neutral-100 rounded-2xl border border-neutral-200 bg-white">
           {users.map((u) => (
@@ -122,7 +122,7 @@ const Users: React.FC = () => {
                 <p className="font-semibold text-neutral-900">{u.fullName}</p>
                 <p className="text-sm text-neutral-500">@{u.username}</p>
                 <p className="text-xs text-neutral-400 mt-0.5">
-                  {u.followersCount.toLocaleString()} followers
+                  {t('users.followersCount', { count: u.followersCount.toLocaleString() })}
                 </p>
               </div>
               <div className="flex shrink-0 gap-2">
@@ -131,7 +131,7 @@ const Users: React.FC = () => {
                   onClick={() => navigate(profilePath(u.username))}
                   className="rounded-xl border border-neutral-200 px-3 py-2 text-sm font-medium hover:bg-neutral-50"
                 >
-                  Profile
+                  {t('users.profile')}
                 </button>
                 {!u.isSelf && u.username !== user?.username && (
                   <button
@@ -141,7 +141,7 @@ const Users: React.FC = () => {
                     className="inline-flex items-center gap-1.5 rounded-xl bg-[#315efb] px-3 py-2 text-sm font-medium text-white hover:bg-[#2547c4] disabled:opacity-60"
                   >
                     <MessageCircle className="h-4 w-4" />
-                    {messagingId === u.username ? 'Opening…' : 'Message'}
+                    {messagingId === u.username ? t('users.opening') : t('users.message')}
                   </button>
                 )}
               </div>

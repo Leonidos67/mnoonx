@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCommunityDashboard } from '../../context/CommunityDashboardContext';
 import { communityPath } from '../../constants/communityRoutes';
 import { profilePath } from '../../constants/paths';
+import { useTranslation } from '../../i18n/useTranslation';
 
 import { COMMUNITIES_API as API_URL } from '../../config/api';
 
@@ -22,9 +23,9 @@ interface FeedPost {
   createdAt: string;
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   try {
-    return new Date(iso).toLocaleDateString('en-US', {
+    return new Date(iso).toLocaleDateString(locale === 'ru' ? 'ru-RU' : 'en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -43,6 +44,7 @@ function excerpt(text: string, max = 120): string {
 const CommunityDashboardContent: React.FC = () => {
   const { handle, community } = useCommunityDashboard();
   const { token } = useAuth();
+  const { t, locale } = useTranslation();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,18 +59,18 @@ const CommunityDashboardContent: React.FC = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { message?: string }).message || 'Failed to load posts.');
+        setError((data as { message?: string }).message || t('communityDashboard.content.loadFailed'));
         setPosts([]);
         return;
       }
       setPosts(Array.isArray(data) ? data : []);
     } catch {
-      setError('Failed to load posts.');
+      setError(t('communityDashboard.content.loadFailed'));
       setPosts([]);
     } finally {
       setLoading(false);
     }
-  }, [handle, token]);
+  }, [handle, token, t]);
 
   useEffect(() => {
     void load();
@@ -79,15 +81,17 @@ const CommunityDashboardContent: React.FC = () => {
       <div className="border-b border-neutral-200 px-4 py-4 lg:px-8 lg:py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-900">Content</h1>
-            <p className="mt-1 text-sm text-neutral-500">Posts in {community?.name ?? 'community'} feed</p>
+            <h1 className="text-2xl font-bold text-neutral-900">{t('communityDashboard.content.title')}</h1>
+            <p className="mt-1 text-sm text-neutral-500">
+              {t('communityDashboard.content.subtitle', { name: community?.name ?? 'community' })}
+            </p>
           </div>
           <Link
             to={communityPath(handle)}
             className="inline-flex h-9 items-center gap-2 rounded-lg border border-neutral-200 px-4 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
           >
             <ExternalLink className="h-4 w-4" aria-hidden />
-            Open feed
+            {t('communityDashboard.content.openFeed')}
           </Link>
         </div>
       </div>
@@ -101,13 +105,13 @@ const CommunityDashboardContent: React.FC = () => {
           <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
         ) : posts.length === 0 ? (
           <div className="py-20 text-center">
-            <p className="text-lg font-medium text-neutral-800">No posts yet</p>
-            <p className="mt-2 text-sm text-neutral-500">Publish from the community feed.</p>
+            <p className="text-lg font-medium text-neutral-800">{t('communityDashboard.content.noPosts')}</p>
+            <p className="mt-2 text-sm text-neutral-500">{t('communityDashboard.content.publishHint')}</p>
             <Link
               to={communityPath(handle)}
               className="mt-4 inline-block text-sm font-medium text-[#315efb] hover:underline"
             >
-              Go to community
+              {t('communityDashboard.content.goToCommunity')}
             </Link>
           </div>
         ) : (
@@ -115,11 +119,11 @@ const CommunityDashboardContent: React.FC = () => {
             <table className="w-full min-w-[720px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b border-neutral-200">
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500">Author</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500">Post</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500">Engagement</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500">Date</th>
-                  <th className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500">Link</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500">{t('communityDashboard.content.colAuthor')}</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500">{t('communityDashboard.content.colPost')}</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500">{t('communityDashboard.content.colEngagement')}</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500">{t('communityDashboard.content.colDate')}</th>
+                  <th className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500">{t('communityDashboard.content.colLink')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -148,14 +152,14 @@ const CommunityDashboardContent: React.FC = () => {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-4 text-neutral-600">
-                      {formatDate(post.createdAt)}
+                      {formatDate(post.createdAt, locale)}
                     </td>
                     <td className="px-4 py-4">
                       <Link
                         to={`/post/${post._id}`}
                         className="text-sm font-medium text-[#315efb] hover:underline"
                       >
-                        View
+                        {t('communityDashboard.content.view')}
                       </Link>
                     </td>
                   </tr>
@@ -163,7 +167,12 @@ const CommunityDashboardContent: React.FC = () => {
               </tbody>
             </table>
             <p className="mt-4 text-sm text-neutral-500">
-              Showing {posts.length} post{posts.length === 1 ? '' : 's'}
+              {t(
+                posts.length === 1
+                  ? 'communityDashboard.content.showingPosts'
+                  : 'communityDashboard.content.showingPostsMany',
+                { count: posts.length }
+              )}
             </p>
           </div>
         )}

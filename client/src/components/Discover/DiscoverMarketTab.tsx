@@ -17,6 +17,7 @@ import TradingViewChart from '../AI/TradingViewChart';
 import { formatPct, formatUsd, pctClass } from '../AI/marketFormat';
 import type { CoinDetail, CoinMarketRow, MarketsResponse, SearchCoinResult } from '../../types/ai';
 import { useAIChatPanel } from '../../context/AIChatPanelContext';
+import { useTranslation } from '../../i18n/useTranslation';
 
 import { AI_API as API_AI } from '../../config/api';
 const TABLE_PAGE_SIZE = 20;
@@ -58,6 +59,7 @@ const TokenRow: React.FC<TokenRowProps> = ({ coin, onSelect, showRank = true }) 
 
 const DiscoverMarketTab: React.FC = () => {
   const { askAI, openPanel } = useAIChatPanel();
+  const { t } = useTranslation();
 
   const [marketsData, setMarketsData] = useState<MarketsResponse | null>(null);
   const [allMarkets, setAllMarkets] = useState<CoinMarketRow[]>([]);
@@ -87,17 +89,17 @@ const DiscoverMarketTab: React.FC = () => {
       const res = await fetch(`${API_AI}/markets?per_page=100`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error((body as { message?: string }).message || 'Failed to load markets');
+        throw new Error((body as { message?: string }).message || t('discover.marketTab.loadMarketsFailed'));
       }
       const data = (await res.json()) as MarketsResponse & { markets: CoinMarketRow[] };
       setMarketsData(data);
       setAllMarkets(data.markets ?? []);
     } catch (e) {
-      setMarketsError(e instanceof Error ? e.message : 'Failed to load market data');
+      setMarketsError(e instanceof Error ? e.message : t('discover.marketTab.loadMarketDataFailed'));
     } finally {
       setMarketsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -108,7 +110,7 @@ const DiscoverMarketTab: React.FC = () => {
         const res = await fetch(`${API_AI}/markets?per_page=100`);
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error((body as { message?: string }).message || 'Failed to load markets');
+          throw new Error((body as { message?: string }).message || t('discover.marketTab.loadMarketsFailed'));
         }
         const data = (await res.json()) as MarketsResponse & { markets: CoinMarketRow[] };
         if (cancelled) return;
@@ -116,7 +118,7 @@ const DiscoverMarketTab: React.FC = () => {
         setAllMarkets(data.markets ?? []);
       } catch (e) {
         if (!cancelled) {
-          setMarketsError(e instanceof Error ? e.message : 'Failed to load market data');
+          setMarketsError(e instanceof Error ? e.message : t('discover.marketTab.loadMarketDataFailed'));
         }
       } finally {
         if (!cancelled) setMarketsLoading(false);
@@ -126,7 +128,7 @@ const DiscoverMarketTab: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const q = searchQuery.trim();
@@ -166,22 +168,27 @@ const DiscoverMarketTab: React.FC = () => {
       setDetailError(null);
       setSelectedCoin(null);
       setChartSymbol(symbol);
-      onAskAboutToken(`Analyze $${symbol.toUpperCase()} (${name})`);
+      onAskAboutToken(
+        t('discover.marketTab.aiAnalyzePrompt', {
+          symbol: `$${symbol.toUpperCase()}`,
+          name,
+        })
+      );
       try {
         const res = await fetch(`${API_AI}/coins/${encodeURIComponent(id)}`);
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          throw new Error((body as { message?: string }).message || 'Failed to load token');
+          throw new Error((body as { message?: string }).message || t('discover.marketTab.loadTokenFailed'));
         }
         const data = (await res.json()) as CoinDetail;
         setSelectedCoin(data);
       } catch (e) {
-        setDetailError(e instanceof Error ? e.message : 'Failed to load token');
+        setDetailError(e instanceof Error ? e.message : t('discover.marketTab.loadTokenFailed'));
       } finally {
         setDetailLoading(false);
       }
     },
-    [onAskAboutToken]
+    [onAskAboutToken, t]
   );
 
   const showSearchDropdown = searchQuery.trim().length >= 2;
@@ -268,10 +275,8 @@ const DiscoverMarketTab: React.FC = () => {
   return (
     <div className="w-full pb-12">
       <div className="mb-2 mt-4 text-center">
-        <h1 className="text-4xl font-bold text-gray-900">Market</h1>
-        <p className="mt-1 text-gray-600">
-          Track prices, market momentum, and AI-powered crypto insights
-        </p>
+        <h1 className="text-4xl font-bold text-gray-900">{t('discover.market')}</h1>
+        <p className="mt-1 text-gray-600">{t('discover.marketTab.tagline')}</p>
       </div>
 
       <div className="mb-10 flex justify-center">
@@ -281,7 +286,7 @@ const DiscoverMarketTab: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search tokens, symbols, or contract addresses..."
+            placeholder={t('discover.marketTab.searchPlaceholder')}
             className="w-full rounded-2xl border border-gray-200 bg-white py-3 pl-14 pr-12 focus:border-blue-500 focus:outline-none"
           />
           {searchQuery && (
@@ -292,16 +297,18 @@ const DiscoverMarketTab: React.FC = () => {
                 setSearchResults([]);
               }}
               className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 hover:bg-gray-100"
-              aria-label="Clear search"
+              aria-label={t('discover.marketTab.clearSearch')}
             >
               <X className="h-5 w-5" />
             </button>
           )}
           {showSearchDropdown && (
             <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 max-h-72 overflow-y-auto rounded-2xl border border-gray-200 bg-white p-2 shadow-lg">
-              {searchLoading && <p className="px-4 py-3 text-sm text-gray-500">Searching…</p>}
+              {searchLoading && (
+                <p className="px-4 py-3 text-sm text-gray-500">{t('discover.marketTab.searching')}</p>
+              )}
               {!searchLoading && searchResults.length === 0 && (
-                <p className="px-4 py-3 text-sm text-gray-500">No tokens found</p>
+                <p className="px-4 py-3 text-sm text-gray-500">{t('discover.marketTab.noTokensFound')}</p>
               )}
               {!searchLoading &&
                 searchResults.map((coin) => (
@@ -317,11 +324,7 @@ const DiscoverMarketTab: React.FC = () => {
       <MarketQuickToolsBar
         activeTool={activeTool}
         onToggleTool={toggleTool}
-        onAskAlpha={() =>
-          onAskAboutToken(
-            'Give me a concise market overview for the top cryptocurrencies right now.'
-          )
-        }
+        onAskAlpha={() => onAskAboutToken(t('discover.marketTab.aiMarketOverviewPrompt'))}
       />
 
       <div className="mb-6">
@@ -363,10 +366,17 @@ const DiscoverMarketTab: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => onAskAboutToken(`Analyze $${selectedCoin.symbol.toUpperCase()} (${selectedCoin.name})`)}
+                onClick={() =>
+                  onAskAboutToken(
+                    t('discover.marketTab.aiAnalyzePrompt', {
+                      symbol: `$${selectedCoin.symbol.toUpperCase()}`,
+                      name: selectedCoin.name,
+                    })
+                  )
+                }
                 className="mt-4 w-full rounded-xl bg-black py-2.5 text-sm font-semibold text-white"
               >
-                AI-анализ — {selectedCoin.symbol.toUpperCase()}
+                {t('discover.marketTab.aiAnalysis', { symbol: selectedCoin.symbol.toUpperCase() })}
               </button>
             </>
           )}
@@ -383,7 +393,7 @@ const DiscoverMarketTab: React.FC = () => {
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-center text-sm text-red-700">
           {marketsError}
           <button type="button" onClick={() => void loadMarkets()} className="ml-2 font-semibold underline">
-            Повторить
+            {t('discover.marketTab.retry')}
           </button>
         </div>
       )}
@@ -392,7 +402,7 @@ const DiscoverMarketTab: React.FC = () => {
         <div className="space-y-6">
           <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
               <div className="border-b border-neutral-100 px-4 py-3">
-                <h2 className="text-base font-bold text-neutral-900">Криптовалюты</h2>
+                <h2 className="text-base font-bold text-neutral-900">{t('discover.marketTab.cryptocurrencies')}</h2>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[880px] text-sm">
@@ -401,20 +411,20 @@ const DiscoverMarketTab: React.FC = () => {
                       <th className="px-4 py-3 text-left">
                         <button type="button" onClick={() => toggleSort('rank')}>#</button>
                       </th>
-                      <th className="px-4 py-3 text-left">Имя</th>
+                      <th className="px-4 py-3 text-left">{t('discover.marketTab.colName')}</th>
                       <th className="px-4 py-3 text-right">
-                        <button type="button" onClick={() => toggleSort('price')}>Цена</button>
+                        <button type="button" onClick={() => toggleSort('price')}>{t('discover.marketTab.colPrice')}</button>
                       </th>
                       <th className="px-4 py-3 text-right">
-                        <button type="button" onClick={() => toggleSort('change24h')}>24ч %</button>
+                        <button type="button" onClick={() => toggleSort('change24h')}>{t('discover.marketTab.colChange24h')}</button>
                       </th>
                       <th className="px-4 py-3 text-right">
-                        <button type="button" onClick={() => toggleSort('change7d')}>7дн %</button>
+                        <button type="button" onClick={() => toggleSort('change7d')}>{t('discover.marketTab.colChange7d')}</button>
                       </th>
                       <th className="px-4 py-3 text-right">
-                        <button type="button" onClick={() => toggleSort('marketCap')}>Рын. кап.</button>
+                        <button type="button" onClick={() => toggleSort('marketCap')}>{t('discover.marketTab.colMarketCap')}</button>
                       </th>
-                      <th className="px-4 py-3 text-right">Объём</th>
+                      <th className="px-4 py-3 text-right">{t('discover.marketTab.colVolume')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -450,11 +460,11 @@ const DiscoverMarketTab: React.FC = () => {
               </div>
               <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-sm">
                 <button type="button" disabled={tablePage === 0} onClick={() => setTablePage((p) => p - 1)} className="disabled:opacity-40">
-                  <ChevronLeft className="inline h-4 w-4" /> Назад
+                  <ChevronLeft className="inline h-4 w-4" /> {t('discover.marketTab.prevPage')}
                 </button>
                 <span className="text-neutral-500">{tablePage + 1} / {tablePageCount}</span>
                 <button type="button" disabled={tablePage >= tablePageCount - 1} onClick={() => setTablePage((p) => p + 1)} className="disabled:opacity-40">
-                  Далее <ChevronRight className="inline h-4 w-4" />
+                  {t('discover.marketTab.nextPage')} <ChevronRight className="inline h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -462,7 +472,7 @@ const DiscoverMarketTab: React.FC = () => {
             <div className="flex min-h-[480px] min-w-0 flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
               <div className="shrink-0 border-b border-neutral-100 px-4 py-3">
                 <h3 className="text-base font-bold text-neutral-900">
-                  График — {chartSymbol.toUpperCase()}
+                  {t('discover.marketTab.chartTitle', { symbol: chartSymbol.toUpperCase() })}
                 </h3>
               </div>
               <TradingViewChart symbol={chartSymbol} fillParent className="min-h-0 flex-1" />
@@ -471,14 +481,14 @@ const DiscoverMarketTab: React.FC = () => {
             {/* <AlphaPulse variant="light" /> */}
             <div className="rounded-xl border border-neutral-200 bg-white p-4">
               <h3 className="mb-2 flex items-center gap-2 font-bold">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" /> High trust
+                <ShieldCheck className="h-4 w-4 text-emerald-600" /> {t('discover.marketTab.highTrust')}
               </h3>
               {marketsData.highTrust.map((c) => (
                 <TokenRow key={c.id} coin={c} onSelect={loadCoinDetail} />
               ))}
             </div>
             <div className="rounded-xl border border-neutral-200 bg-white p-4">
-              <h3 className="mb-2 font-bold">Trending</h3>
+              <h3 className="mb-2 font-bold">{t('discover.marketTab.trending')}</h3>
               {marketsData.trending.map((c) => (
                 <TokenRow key={c.id} coin={c} onSelect={loadCoinDetail} />
               ))}

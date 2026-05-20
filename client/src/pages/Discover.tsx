@@ -7,6 +7,7 @@ import DiscoverMarketTab from '../components/Discover/DiscoverMarketTab';
 import DiscoverExportBackground from '../components/Discover/DiscoverExportBackground';
 import MobileBottomSheet from '../components/Common/MobileBottomSheet';
 import { COMMUNITIES_API as API_URL } from '../config/api';
+import { useTranslation } from '../i18n/useTranslation';
 
 const SECTION_PAGE_SIZE = 4;
 
@@ -52,7 +53,9 @@ interface CommunityCardProps {
   onOpen: (community: Community) => void;
 }
 
-const CommunityCard: React.FC<CommunityCardProps> = ({ community, onOpen }) => (
+const CommunityCard: React.FC<CommunityCardProps> = ({ community, onOpen }) => {
+  const { t } = useTranslation();
+  return (
   <div
     className="bg-white border border-gray-200 rounded-3xl p-4 hover:border-gray-300 hover:shadow-md transition-all cursor-pointer"
     onClick={() => onOpen(community)}
@@ -76,11 +79,11 @@ const CommunityCard: React.FC<CommunityCardProps> = ({ community, onOpen }) => (
           <h3 className="font-semibold text-lg">{community.name}</h3>
           {community.isPublic === false && (
             <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-700">
-              Private
+              {t('discover.private')}
             </span>
           )}
           {community.isPaid && (
-            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">Paid</span>
+            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">{t('discover.paid')}</span>
           )}
         </div>
         <p className="text-sm text-gray-600 line-clamp-2">{community.description}</p>
@@ -88,7 +91,9 @@ const CommunityCard: React.FC<CommunityCardProps> = ({ community, onOpen }) => (
     </div>
 
     <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
-      <span>{community.memberCount.toLocaleString()} members</span>
+      <span>
+        {t('discover.membersCount', { count: community.memberCount.toLocaleString() })}
+      </span>
       <span className="px-2 py-1 bg-gray-100 rounded-full text-xs">{community.category}</span>
     </div>
 
@@ -100,10 +105,11 @@ const CommunityCard: React.FC<CommunityCardProps> = ({ community, onOpen }) => (
         onOpen(community);
       }}
     >
-      View Community
+      {t('discover.viewCommunity')}
     </button>
   </div>
-);
+  );
+};
 
 interface CommunitySectionProps {
   title: string;
@@ -112,6 +118,7 @@ interface CommunitySectionProps {
 }
 
 const CommunitySection: React.FC<CommunitySectionProps> = ({ title, communities, onOpen }) => {
+  const { t } = useTranslation();
   const [visibleCount, setVisibleCount] = useState(SECTION_PAGE_SIZE);
   const visible = communities.slice(0, visibleCount);
   const hasMore = visibleCount < communities.length;
@@ -133,7 +140,7 @@ const CommunitySection: React.FC<CommunitySectionProps> = ({ title, communities,
             onClick={() => setVisibleCount((n) => n + SECTION_PAGE_SIZE)}
             className="px-8 py-2.5 rounded-full border border-gray-300 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 transition-colors"
           >
-            Show more
+            {t('discover.showMore')}
           </button>
         </div>
       )}
@@ -144,6 +151,7 @@ const CommunitySection: React.FC<CommunitySectionProps> = ({ title, communities,
 const Discover: React.FC = () => {
   const { token } = useAuth();
   const { showToast } = useToast();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = tabFromParams(searchParams);
@@ -198,12 +206,12 @@ const Discover: React.FC = () => {
       });
 
       if (res.ok) {
-        showToast('Joined community successfully!');
+        showToast(t('discover.joinSuccess'));
         fetchCommunities();
         closeCommunityPreview();
       } else {
         const data = await res.json();
-        showToast(data.message || 'Failed to join', 'error');
+        showToast(data.message || t('discover.joinFailed'), 'error');
       }
     } catch (err) {
       console.error('Join error:', err);
@@ -242,7 +250,7 @@ const Discover: React.FC = () => {
           type="button"
           onClick={closeCommunityPreview}
           className="absolute right-4 top-4 hidden text-white/80 transition-colors hover:text-white lg:block"
-          aria-label="Close"
+          aria-label={t('common.close')}
         >
           <X className="h-6 w-6" strokeWidth={2} aria-hidden />
         </button>
@@ -271,22 +279,24 @@ const Discover: React.FC = () => {
 
       <div className="overflow-y-auto overscroll-contain pb-4 pt-4 max-lg:px-0 sm:p-6">
         <div className="mb-6">
-          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-gray-500">About</h3>
+          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-gray-500">{t('discover.about')}</h3>
           <p className="leading-relaxed text-gray-700">{community.description}</p>
         </div>
 
         <div className="mb-6 flex items-center justify-between rounded-2xl bg-gray-50 p-4">
           <div>
-            <p className="text-xs text-gray-500">Members</p>
+            <p className="text-xs text-gray-500">{t('discover.membersLabel')}</p>
             <p className="text-2xl font-bold text-gray-900">{community.memberCount.toLocaleString()}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500">Category</p>
+            <p className="text-xs text-gray-500">{t('discover.category')}</p>
             <p className="text-lg font-semibold text-gray-900">{community.category}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-500">Type</p>
-            <p className="text-lg font-semibold text-gray-900">{community.isPublic ? 'Public' : 'Private'}</p>
+            <p className="text-xs text-gray-500">{t('discover.type')}</p>
+            <p className="text-lg font-semibold text-gray-900">
+              {community.isPublic ? t('common.public') : t('common.private')}
+            </p>
           </div>
         </div>
 
@@ -297,7 +307,7 @@ const Discover: React.FC = () => {
             disabled={joinLoading}
             className="flex-1 rounded-2xl bg-black py-3 font-semibold text-white transition-colors hover:bg-neutral-800 disabled:opacity-50"
           >
-            {joinLoading ? 'Joining...' : 'Join Community'}
+            {joinLoading ? t('discover.joining') : t('discover.joinCommunity')}
           </button>
           <button
             type="button"
@@ -307,7 +317,7 @@ const Discover: React.FC = () => {
             }}
             className="flex-1 rounded-2xl bg-gray-100 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-200"
           >
-            View Page
+            {t('discover.viewPage')}
           </button>
         </div>
       </div>
@@ -327,7 +337,7 @@ const Discover: React.FC = () => {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Discover
+            {t('discover.title')}
           </button>
           <button
             type="button"
@@ -338,9 +348,9 @@ const Discover: React.FC = () => {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            Market
+            {t('discover.market')}
             <span className="absolute -top-2 -right-1 bg-blue-100 text-blue-500 text-[10px] font-bold px-1.5 py-0 rounded-full shadow-sm">
-              NEW
+              {t('discover.marketNew')}
             </span>
           </button>
         </div>
@@ -351,8 +361,8 @@ const Discover: React.FC = () => {
       ) : (
         <>
           <div className="mb-2 mt-4 text-center">
-            <h1 className="text-4xl font-bold text-gray-900">Discover</h1>
-            <p className="text-gray-600 mt-1">Find communities and creators worth following</p>
+            <h1 className="text-4xl font-bold text-gray-900">{t('discover.title')}</h1>
+            <p className="text-gray-600 mt-1">{t('discover.tabTagline')}</p>
           </div>
 
           <div className="flex justify-center mb-10">
@@ -360,7 +370,7 @@ const Discover: React.FC = () => {
               <Search className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search communities, traders, or keywords..."
+                placeholder={t('discover.searchWidePlaceholder')}
                 value={discoverSearch}
                 onChange={(e) => setDiscoverSearch(e.target.value)}
                 className="w-full py-3 pl-14 pr-5 bg-white border border-gray-200 rounded-2xl focus:outline-none focus:border-blue-500"
@@ -374,25 +384,25 @@ const Discover: React.FC = () => {
             </div>
           ) : filteredCommunities.length === 0 ? (
             <div className="text-center py-20">
-              <p className="text-gray-500">No communities found.</p>
+              <p className="text-gray-500">{t('discover.noCommunitiesFound')}</p>
               <button
                 type="button"
                 onClick={() => navigate('/create-community')}
                 className="mt-4 px-6 py-2 bg-black text-white rounded-full"
               >
-                Create community
+                {t('discover.createCommunity')}
               </button>
             </div>
           ) : (
             <>
               <CommunitySection
-                title="Popular communities"
+                title={t('discover.sectionPopular')}
                 communities={popularCommunities}
                 onOpen={openCommunityPreview}
               />
               <DiscoverExportBackground />
               <CommunitySection
-                title="Public communities"
+                title={t('discover.sectionPublic')}
                 communities={publicCommunities}
                 onOpen={openCommunityPreview}
               />
@@ -421,7 +431,7 @@ const Discover: React.FC = () => {
       <MobileBottomSheet
         open={!!selectedCommunity}
         onClose={closeCommunityPreview}
-        title={selectedCommunity?.name ?? 'Community'}
+        title={selectedCommunity?.name ?? t('discover.sheetFallbackTitle')}
       >
         {selectedCommunity ? (
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

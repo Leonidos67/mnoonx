@@ -1,8 +1,9 @@
 // pages/Settings.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { useTranslation } from '../i18n/useTranslation';
 import {
   User,
   Edit,
@@ -31,24 +32,15 @@ type SettingsSectionId =
   | 'payments'
   | 'resolution';
 
-const MENU_ITEMS: {
+type MenuItem = {
   id: SettingsSectionId;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  { id: 'account', label: 'Account settings', icon: User },
-  { id: 'edit-profile', label: 'Edit profile', icon: Edit },
-  { id: 'invites', label: 'Invites', icon: Users },
-  { id: 'connected', label: 'Connected accounts', icon: LinkIcon },
-  { id: 'security', label: 'Account security', icon: Shield },
-  { id: 'orders', label: 'Orders', icon: ShoppingBag },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'payments', label: 'Payment methods', icon: CreditCard },
-  { id: 'resolution', label: 'Resolution center', icon: AlertCircle },
-];
+};
 
 const Settings: React.FC = () => {
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const [activeSection, setActiveSection] = useState<SettingsSectionId>('edit-profile');
@@ -64,11 +56,26 @@ const Settings: React.FC = () => {
     website: '',
   });
 
+  const menuItems: MenuItem[] = useMemo(
+    () => [
+      { id: 'account', label: t('settings.accountSettings'), icon: User },
+      { id: 'edit-profile', label: t('settings.editProfile'), icon: Edit },
+      { id: 'invites', label: t('settings.invites'), icon: Users },
+      { id: 'connected', label: t('settings.connectedAccounts'), icon: LinkIcon },
+      { id: 'security', label: t('settings.accountSecurity'), icon: Shield },
+      { id: 'orders', label: t('settings.orders'), icon: ShoppingBag },
+      { id: 'notifications', label: t('settings.notifications'), icon: Bell },
+      { id: 'payments', label: t('settings.paymentMethods'), icon: CreditCard },
+      { id: 'resolution', label: t('settings.resolutionCenter'), icon: AlertCircle },
+    ],
+    [t]
+  );
+
   useEffect(() => {
     if (isDesktop) setMobileView('menu');
   }, [isDesktop]);
 
-  const activeItem = MENU_ITEMS.find((item) => item.id === activeSection) ?? MENU_ITEMS[1];
+  const activeItem = menuItems.find((item) => item.id === activeSection) ?? menuItems[1];
 
   const selectSection = (id: SettingsSectionId) => {
     setActiveSection(id);
@@ -89,7 +96,7 @@ const Settings: React.FC = () => {
       case 'edit-profile':
         return (
           <div className="mx-auto w-full max-w-2xl">
-            <h2 className="mb-6 hidden text-2xl font-bold lg:mb-8 lg:block">Edit profile</h2>
+            <h2 className="mb-6 hidden text-2xl font-bold lg:mb-8 lg:block">{t('settings.editProfileHeading')}</h2>
 
             <div className="mb-8 flex items-center space-x-4 rounded-xl bg-neutral-50 p-4">
               <div className="relative shrink-0">
@@ -98,7 +105,7 @@ const Settings: React.FC = () => {
                     user?.avatar ||
                     `https://ui-avatars.com/api/?name=${formData.name}&background=6366f1&color=fff&size=96`
                   }
-                  alt="Avatar"
+                  alt={t('settings.avatarAlt')}
                   className="h-24 w-24 rounded-full object-cover"
                 />
                 <button
@@ -115,46 +122,46 @@ const Settings: React.FC = () => {
             </div>
 
             <div className="mb-6">
-              <label className="mb-2 block text-sm font-medium text-neutral-700">Name</label>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">{t('settings.name')}</label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
                 maxLength={100}
                 className="w-full rounded-xl border border-neutral-200 px-4 py-3 transition-all focus:outline-none focus:ring-2 focus:ring-black/10"
-                placeholder="Your name"
+                placeholder={t('settings.namePlaceholder')}
               />
               <p className="mt-1 text-sm text-neutral-400">{formData.name.length}/100</p>
             </div>
 
             <div className="mb-6">
-              <label className="mb-2 block text-sm font-medium text-neutral-700">Username</label>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">{t('settings.username')}</label>
               <input
                 type="text"
                 value={formData.username}
                 onChange={(e) => handleInputChange('username', e.target.value)}
                 maxLength={42}
                 className="w-full rounded-xl border border-neutral-200 px-4 py-3 transition-all focus:outline-none focus:ring-2 focus:ring-black/10"
-                placeholder="Username"
+                placeholder={t('settings.usernamePlaceholder')}
               />
               <p className="mt-1 text-sm text-neutral-400">{formData.username.length}/42</p>
             </div>
 
             <div className="mb-6">
-              <label className="mb-2 block text-sm font-medium text-neutral-700">Bio</label>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">{t('settings.bio')}</label>
               <textarea
                 value={formData.bio}
                 onChange={(e) => handleInputChange('bio', e.target.value)}
                 maxLength={200}
                 rows={3}
                 className="w-full resize-none rounded-xl border border-neutral-200 px-4 py-3 transition-all focus:outline-none focus:ring-2 focus:ring-black/10"
-                placeholder={formData.bio ? '' : 'No bio'}
+                placeholder={formData.bio ? '' : t('settings.bioPlaceholder')}
               />
               <p className="mt-1 text-sm text-neutral-400">{formData.bio.length}/200</p>
             </div>
 
             <div className="mb-6">
-              <label className="mb-2 block text-sm font-medium text-neutral-700">Date of birth</label>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">{t('settings.dateOfBirth')}</label>
               <div className="flex items-center space-x-2">
                 <input
                   type="text"
@@ -186,36 +193,34 @@ const Settings: React.FC = () => {
             </div>
 
             <div className="mt-8 border-t border-neutral-200 pt-6">
-              <h3 className="mb-4 text-lg font-semibold">More details</h3>
-              <p className="mb-6 text-sm text-neutral-500">
-                Choose what appears on your profile and other discovery surfaces.
-              </p>
+              <h3 className="mb-4 text-lg font-semibold">{t('settings.moreDetails')}</h3>
+              <p className="mb-6 text-sm text-neutral-500">{t('settings.moreDetailsHint')}</p>
 
               <div className="mb-4">
                 <label className="mb-2 flex items-center gap-2 text-sm font-medium text-neutral-700">
                   <MapPin size={16} />
-                  <span>Location</span>
+                  <span>{t('settings.location')}</span>
                 </label>
                 <input
                   type="text"
                   value={formData.location}
                   onChange={(e) => handleInputChange('location', e.target.value)}
                   className="w-full rounded-xl border border-neutral-200 px-4 py-3 transition-all focus:outline-none focus:ring-2 focus:ring-black/10"
-                  placeholder="Add your location"
+                  placeholder={t('settings.locationPlaceholder')}
                 />
               </div>
 
               <div className="mb-4">
                 <label className="mb-2 flex items-center gap-2 text-sm font-medium text-neutral-700">
                   <LinkIcon size={16} />
-                  <span>Website</span>
+                  <span>{t('settings.website')}</span>
                 </label>
                 <input
                   type="url"
                   value={formData.website}
                   onChange={(e) => handleInputChange('website', e.target.value)}
                   className="w-full rounded-xl border border-neutral-200 px-4 py-3 transition-all focus:outline-none focus:ring-2 focus:ring-black/10"
-                  placeholder="https://"
+                  placeholder={t('settings.websitePlaceholder')}
                 />
               </div>
             </div>
@@ -224,15 +229,15 @@ const Settings: React.FC = () => {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <div className="rounded-xl bg-neutral-50 p-4 text-center">
                   <p className="text-2xl font-bold">$0</p>
-                  <p className="text-sm text-neutral-500">Total earned</p>
+                  <p className="text-sm text-neutral-500">{t('settings.totalEarned')}</p>
                 </div>
                 <div className="rounded-xl bg-neutral-50 p-4 text-center">
                   <p className="text-2xl font-bold">0</p>
-                  <p className="text-sm text-neutral-500">Owned mnoonxes</p>
+                  <p className="text-sm text-neutral-500">{t('settings.ownedMnoonxes')}</p>
                 </div>
                 <div className="rounded-xl bg-neutral-50 p-4 text-center">
                   <p className="text-2xl font-bold">0</p>
-                  <p className="text-sm text-neutral-500">Joined mnoonxes</p>
+                  <p className="text-sm text-neutral-500">{t('settings.joinedMnoonxes')}</p>
                 </div>
               </div>
             </div>
@@ -242,7 +247,7 @@ const Settings: React.FC = () => {
                 type="button"
                 className="w-full rounded-xl bg-black py-3 font-medium text-white transition-colors hover:bg-neutral-800 active:scale-[0.99]"
               >
-                Save changes
+                {t('settings.saveChanges')}
               </button>
             </div>
           </div>
@@ -251,14 +256,14 @@ const Settings: React.FC = () => {
       case 'account':
         return (
           <div className="mx-auto w-full max-w-2xl">
-            <h2 className="mb-6 hidden text-2xl font-bold lg:block">Account settings</h2>
+            <h2 className="mb-6 hidden text-2xl font-bold lg:block">{t('settings.accountHeading')}</h2>
             <div className="space-y-4">
               <div className="rounded-xl bg-neutral-50 p-4">
-                <p className="font-medium">Email</p>
-                <p className="text-neutral-500">{user?.email || 'Not set'}</p>
+                <p className="font-medium">{t('settings.email')}</p>
+                <p className="text-neutral-500">{user?.email || t('settings.notSet')}</p>
               </div>
               <div className="rounded-xl bg-neutral-50 p-4">
-                <p className="font-medium">Member since</p>
+                <p className="font-medium">{t('settings.memberSince')}</p>
                 <p className="text-neutral-500">
                   {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
                 </p>
@@ -270,20 +275,22 @@ const Settings: React.FC = () => {
       case 'notifications':
         return (
           <div className="mx-auto w-full max-w-2xl">
-            <h2 className="mb-6 hidden text-2xl font-bold lg:block">Notifications</h2>
+            <h2 className="mb-6 hidden text-2xl font-bold lg:block">{t('settings.notificationsHeading')}</h2>
             <div className="space-y-4">
-              {['Push notifications', 'Email notifications', 'SMS notifications'].map((item) => (
-                <div
-                  key={item}
-                  className="flex items-center justify-between rounded-xl bg-neutral-50 p-4"
-                >
-                  <span className="font-medium">{item}</span>
-                  <label className="relative inline-flex cursor-pointer items-center">
-                    <input type="checkbox" className="peer sr-only" />
-                    <div className="peer h-6 w-11 rounded-full bg-neutral-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-neutral-300 after:bg-white after:transition-all peer-checked:bg-black peer-checked:after:translate-x-full peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-black/10" />
-                  </label>
-                </div>
-              ))}
+              {[t('settings.pushNotifications'), t('settings.emailNotifications'), t('settings.smsNotifications')].map(
+                (item) => (
+                  <div
+                    key={item}
+                    className="flex items-center justify-between rounded-xl bg-neutral-50 p-4"
+                  >
+                    <span className="font-medium">{item}</span>
+                    <label className="relative inline-flex cursor-pointer items-center">
+                      <input type="checkbox" className="peer sr-only" />
+                      <div className="peer h-6 w-11 rounded-full bg-neutral-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-neutral-300 after:bg-white after:transition-all peer-checked:bg-black peer-checked:after:translate-x-full peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-black/10" />
+                    </label>
+                  </div>
+                )
+              )}
             </div>
           </div>
         );
@@ -291,7 +298,7 @@ const Settings: React.FC = () => {
       default:
         return (
           <div className="flex h-48 items-center justify-center">
-            <p className="text-lg text-neutral-500">Coming soon</p>
+            <p className="text-lg text-neutral-500">{t('settings.comingSoon')}</p>
           </div>
         );
     }
@@ -309,11 +316,11 @@ const Settings: React.FC = () => {
       >
         <nav className="flex min-h-0 flex-1 flex-col p-2">
           <div className="shrink-0 px-2 pt-2">
-            <h1 className="text-xl font-semibold text-neutral-800">Settings</h1>
+            <h1 className="text-xl font-semibold text-neutral-800">{t('settings.title')}</h1>
           </div>
 
           <div className="mt-3 min-h-0 flex-1 space-y-1 overflow-y-auto">
-            {MENU_ITEMS.map((item) => {
+            {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeSection === item.id;
               return (
@@ -342,7 +349,7 @@ const Settings: React.FC = () => {
               className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left font-medium text-red-600 transition-colors hover:bg-red-50 active:scale-[0.99]"
             >
               <LogOut className="h-5 w-5 shrink-0" />
-              Log out
+              {t('common.logOut')}
             </button>
           </div>
         </nav>
@@ -358,7 +365,7 @@ const Settings: React.FC = () => {
             type="button"
             onClick={() => setMobileView('menu')}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-neutral-800 transition-colors hover:bg-black/5 active:scale-95"
-            aria-label="Back to settings"
+            aria-label={t('settings.backToSettingsAria')}
           >
             <ArrowLeft className="h-5 w-5" strokeWidth={2} />
           </button>

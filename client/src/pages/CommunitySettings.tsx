@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { communityPath, COMMUNITY_SETTINGS_SEGMENT } from '../constants/communityRoutes';
 import { isCommunityOwner } from '../utils/communityOwner';
 import { useConfirm } from '../context/ConfirmContext';
+import { useTranslation } from '../i18n/useTranslation';
 
 import { COMMUNITIES_API as API_URL } from '../config/api';
 
@@ -18,6 +19,17 @@ const CATEGORIES = [
   'NFT',
   'Other',
 ] as const;
+
+const SETTINGS_CATEGORY_TKEY: Record<(typeof CATEGORIES)[number], string> = {
+  Memecoins: 'communitySettings.categoryMemecoins',
+  Futures: 'communitySettings.categoryFutures',
+  'On-Chain': 'communitySettings.categoryOnChain',
+  Airdrops: 'communitySettings.categoryAirdrops',
+  Education: 'communitySettings.categoryEducation',
+  DeFi: 'communitySettings.categoryDeFi',
+  NFT: 'communitySettings.categoryNFT',
+  Other: 'communitySettings.categoryOther',
+};
 
 interface Community {
   _id: string;
@@ -41,6 +53,7 @@ const CommunitySettings: React.FC = () => {
   const navigate = useNavigate();
   const { user, token } = useAuth();
   const { confirm } = useConfirm();
+  const { t } = useTranslation();
 
   const handle = handleParam?.toLowerCase() || '';
 
@@ -91,11 +104,11 @@ const CommunitySettings: React.FC = () => {
         return;
       }
     } catch {
-      setError('Failed to load community.');
+      setError(t('communitySettings.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [handle, token, navigate, user]);
+  }, [handle, token, navigate, user, t]);
 
   useEffect(() => {
     load();
@@ -127,12 +140,12 @@ const CommunitySettings: React.FC = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { message?: string }).message || 'Failed to save');
+        setError((data as { message?: string }).message || t('communitySettings.saveFailed'));
         return;
       }
       setCommunity(data as Community);
     } catch {
-      setError('Network error.');
+      setError(t('communitySettings.networkError'));
     } finally {
       setSaving(false);
     }
@@ -158,9 +171,9 @@ const CommunitySettings: React.FC = () => {
   const handleDeleteCommunity = async () => {
     if (!token || !community || !canSubmitDelete) return;
     const confirmed = await confirm({
-      title: 'Delete community?',
-      message: 'This is permanent. All posts, chats, apps, and uploaded files will be removed.',
-      confirmLabel: 'Delete forever',
+      title: t('communitySettings.deleteCommunityTitle'),
+      message: t('communitySettings.deleteCommunityMessage'),
+      confirmLabel: t('communitySettings.deleteConfirmButton'),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -173,12 +186,12 @@ const CommunitySettings: React.FC = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { message?: string }).message || 'Failed to delete');
+        setError((data as { message?: string }).message || t('communitySettings.deleteFailed'));
         return;
       }
       navigate('/discover', { replace: true });
     } catch {
-      setError('Network error.');
+      setError(t('communitySettings.networkError'));
     } finally {
       setDeleting(false);
     }
@@ -192,23 +205,26 @@ const CommunitySettings: React.FC = () => {
           className="inline-flex items-center gap-2 text-neutral-600 hover:text-black text-sm font-medium mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to {community.name}
+          {t('communitySettings.backToNamed', { name: community.name })}
         </Link>
-        <h1 className="text-2xl font-bold text-neutral-900">Community settings</h1>
+        <h1 className="text-2xl font-bold text-neutral-900">{t('communitySettings.title')}</h1>
         <p className="text-neutral-500 text-sm mt-1">
-          /community/{community.handle}/{COMMUNITY_SETTINGS_SEGMENT}
+          {t('communitySettings.pathHint', {
+            handle: community.handle,
+            segment: COMMUNITY_SETTINGS_SEGMENT,
+          })}
         </p>
       </div>
 
       {!token && (
         <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6">
-          Sign in to edit this community.
+          {t('communitySettings.signInToEdit')}
         </p>
       )}
 
       {token && !canEdit && (
         <p className="text-sm text-red-800 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-6">
-          You do not have permission to edit this community.
+          {t('communitySettings.noPermission')}
         </p>
       )}
 
@@ -218,7 +234,7 @@ const CommunitySettings: React.FC = () => {
 
       <div className="space-y-6 bg-white border border-neutral-200 rounded-2xl p-6 shadow-sm">
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-2">Name</label>
+          <label className="block text-sm font-medium text-neutral-700 mb-2">{t('communitySettings.name')}</label>
           <input
             type="text"
             value={name}
@@ -229,7 +245,9 @@ const CommunitySettings: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-2">Description</label>
+          <label className="block text-sm font-medium text-neutral-700 mb-2">
+            {t('communitySettings.description')}
+          </label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -240,31 +258,35 @@ const CommunitySettings: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-2">Avatar URL</label>
+          <label className="block text-sm font-medium text-neutral-700 mb-2">
+            {t('communitySettings.avatarUrl')}
+          </label>
           <input
             type="url"
             value={avatar}
             onChange={(e) => setAvatar(e.target.value)}
             disabled={!canEdit}
-            placeholder="https://..."
+            placeholder={t('communitySettings.urlPlaceholder')}
             className="w-full px-4 py-3 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/10 disabled:bg-neutral-50"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-2">Banner URL</label>
+          <label className="block text-sm font-medium text-neutral-700 mb-2">
+            {t('communitySettings.bannerUrl')}
+          </label>
           <input
             type="url"
             value={banner}
             onChange={(e) => setBanner(e.target.value)}
             disabled={!canEdit}
-            placeholder="https://..."
+            placeholder={t('communitySettings.urlPlaceholder')}
             className="w-full px-4 py-3 border border-neutral-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black/10 disabled:bg-neutral-50"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-2">Category</label>
+          <label className="block text-sm font-medium text-neutral-700 mb-2">{t('communitySettings.category')}</label>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -273,7 +295,7 @@ const CommunitySettings: React.FC = () => {
           >
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>
-                {c}
+                {t(SETTINGS_CATEGORY_TKEY[c])}
               </option>
             ))}
           </select>
@@ -281,7 +303,7 @@ const CommunitySettings: React.FC = () => {
 
         <div className="space-y-4">
           <div>
-            <p className="text-sm font-medium text-neutral-700 mb-2">Community visibility</p>
+            <p className="text-sm font-medium text-neutral-700 mb-2">{t('communitySettings.visibilityHeading')}</p>
             <div className="flex flex-col gap-2 sm:flex-row sm:gap-4">
               <label className="flex flex-1 cursor-pointer items-center gap-2 rounded-xl border border-neutral-200 px-4 py-3 has-[:checked]:border-[#315efb] has-[:checked]:bg-[#eef2ff]">
                 <input
@@ -294,9 +316,9 @@ const CommunitySettings: React.FC = () => {
                 />
                 <Globe className="h-4 w-4 shrink-0 text-neutral-500" />
                 <span className="text-sm font-medium">
-                  Public
+                  {t('communitySettings.visibilityPublicTitle')}
                   <span className="mt-0.5 block text-xs font-normal text-neutral-500">
-                    Listed in Discover; content is visible to everyone
+                    {t('communitySettings.visibilityPublicHint')}
                   </span>
                 </span>
               </label>
@@ -311,9 +333,9 @@ const CommunitySettings: React.FC = () => {
                 />
                 <Lock className="h-4 w-4 shrink-0 text-neutral-500" />
                 <span className="text-sm font-medium">
-                  Private
+                  {t('communitySettings.visibilityPrivateTitle')}
                   <span className="mt-0.5 block text-xs font-normal text-neutral-500">
-                    Listed in Discover; content is members only
+                    {t('communitySettings.visibilityPrivateHint')}
                   </span>
                 </span>
               </label>
@@ -330,10 +352,10 @@ const CommunitySettings: React.FC = () => {
             <span>
               <span className="flex items-center gap-2 text-sm font-medium text-neutral-900">
                 <MessageSquare className="h-4 w-4 text-neutral-500" />
-                Members can publish posts
+                {t('communitySettings.membersCanPostTitle')}
               </span>
               <span className="mt-1 block text-xs text-neutral-500">
-                When off, only the community owner can post to the feed.
+                {t('communitySettings.membersCanPostHint')}
               </span>
             </span>
           </label>
@@ -346,30 +368,30 @@ const CommunitySettings: React.FC = () => {
               className="rounded border-neutral-300"
             />
             <CreditCard className="w-4 h-4 text-neutral-500" />
-            <span className="text-sm font-medium">Paid access</span>
+            <span className="text-sm font-medium">{t('communitySettings.paidAccess')}</span>
           </label>
           {!isPublic && (
             <div>
-              <label className="mb-2 block text-sm font-medium text-neutral-700">Join passphrase</label>
+              <label className="mb-2 block text-sm font-medium text-neutral-700">
+                {t('communitySettings.joinPassphrase')}
+              </label>
               <input
                 type="text"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value)}
                 disabled={!canEdit}
-                placeholder="Leave empty to allow join without a passphrase"
+                placeholder={t('communitySettings.joinPassphrasePlaceholder')}
                 maxLength={64}
                 className="w-full rounded-xl border border-neutral-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black/10 disabled:bg-neutral-50"
               />
-              <p className="mt-1 text-xs text-neutral-500">
-                New members must enter this passphrase to join. Only you can see it in settings.
-              </p>
+              <p className="mt-1 text-xs text-neutral-500">{t('communitySettings.joinPassphraseHint')}</p>
             </div>
           )}
         </div>
 
         {isPaid && (
           <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-2">Price</label>
+            <label className="block text-sm font-medium text-neutral-700 mb-2">{t('communitySettings.price')}</label>
             <input
               type="number"
               min={0}
@@ -384,7 +406,7 @@ const CommunitySettings: React.FC = () => {
 
         <div className="flex items-center gap-2 text-sm text-neutral-500 pt-2 border-t border-neutral-100">
           <Users className="w-4 h-4" />
-          <span>{community.memberCount} members</span>
+          <span>{t('communitySettings.membersCount', { count: community.memberCount })}</span>
           <span className="mx-1">·</span>
           <span className="font-mono text-xs">@{community.handle}</span>
         </div>
@@ -397,19 +419,18 @@ const CommunitySettings: React.FC = () => {
             className="w-full flex items-center justify-center gap-2 bg-black text-white py-3 rounded-xl font-medium hover:bg-neutral-800 transition-colors disabled:opacity-50"
           >
             <Save className="w-5 h-5" />
-            {saving ? 'Saving…' : 'Save changes'}
+            {saving ? t('communitySettings.saving') : t('communitySettings.saveChanges')}
           </button>
         )}
       </div>
 
       {canEdit && (
         <div className="mt-8 rounded-2xl border border-red-200 bg-red-50/60 p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-red-900">Danger zone</h2>
-          <p className="mt-1 text-sm text-red-800/90">
-            Deleting a community is permanent. Posts, members, apps, and uploaded files will be removed.
-          </p>
+          <h2 className="text-lg font-semibold text-red-900">{t('communitySettings.dangerZone')}</h2>
+          <p className="mt-1 text-sm text-red-800/90">{t('communitySettings.dangerZoneBody')}</p>
           <label className="mt-4 block text-sm font-medium text-red-900">
-            Type the handle to confirm: <span className="font-mono">@{community.handle}</span>
+            {t('communitySettings.deleteConfirmLabel')}{' '}
+            <span className="font-mono">@{community.handle}</span>
           </label>
           <input
             type="text"
@@ -426,7 +447,7 @@ const CommunitySettings: React.FC = () => {
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-red-300 bg-white py-3 font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Trash2 className="h-5 w-5" />
-            {deleting ? 'Deleting…' : 'Delete community permanently'}
+            {deleting ? t('communitySettings.deleting') : t('communitySettings.deleteForever')}
           </button>
         </div>
       )}

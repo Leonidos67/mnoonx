@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Image, Loader2 } from 'lucide-react';
 import PostMediaUpload, { PostMediaUploadHandle } from './PostMediaUpload';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useTranslation } from '../../i18n/useTranslation';
 import { MAX_POST_MEDIA } from '../../utils/postMedia';
 
 export type PostComposerVariant = 'home' | 'profile' | 'community';
@@ -37,6 +38,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
   token,
   variant = 'home',
 }) => {
+  const { t } = useTranslation();
   const isLgUp = useMediaQuery('(min-width: 1024px)');
   const mobileFull = isOpen && !isLgUp;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -55,8 +57,8 @@ const PostComposer: React.FC<PostComposerProps> = ({
 
   useEffect(() => {
     if (!mobileFull) return;
-    const t = window.setTimeout(() => textareaRef.current?.focus(), 50);
-    return () => window.clearTimeout(t);
+    const timer = window.setTimeout(() => textareaRef.current?.focus(), 50);
+    return () => window.clearTimeout(timer);
   }, [mobileFull]);
 
   useEffect(() => {
@@ -103,7 +105,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
       return (
         <div className={closedWrapperClass}>
           <button type="button" onClick={onOpen} className={closedInnerClass}>
-            What&apos;s on your mind?
+            {t('postComposer.whatsOnMind')}
           </button>
         </div>
       );
@@ -122,7 +124,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
         <div className={closedInnerClass}>
           <img src={avatarSrc} alt="" className="h-10 w-10 rounded-full" />
           <div className="flex-1">
-            <p className="text-base text-neutral-500">What&apos;s on your mind?</p>
+            <p className="text-base text-neutral-500">{t('postComposer.whatsOnMind')}</p>
           </div>
         </div>
       </div>
@@ -140,7 +142,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
             ref={textareaRef}
             value={content}
             onChange={(e) => onContentChange(e.target.value)}
-            placeholder="What's on your mind?"
+            placeholder={t('postComposer.whatsOnMind')}
             className={
               mobileFull
                 ? 'min-h-0 w-full flex-1 resize-none bg-transparent text-base text-neutral-900 outline-none placeholder:text-neutral-500'
@@ -174,7 +176,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
             ) : (
               <Image size={18} />
             )}
-            <span>{mediaUploading ? 'Uploading…' : 'Add photos'}</span>
+            <span>{mediaUploading ? t('postComposer.uploading') : t('postComposer.addPhotos')}</span>
           </button>
         ) : (
           <span />
@@ -185,7 +187,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
             onClick={onCancel}
             className="rounded-full px-4 py-2 text-sm font-semibold transition-colors hover:bg-neutral-100"
           >
-            Cancel
+            {t('postComposer.cancel')}
           </button>
           <button
             type="button"
@@ -196,10 +198,10 @@ const PostComposer: React.FC<PostComposerProps> = ({
             {isPosting ? (
               <>
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                Posting...
+                {t('postComposer.posting')}
               </>
             ) : (
-              <>Post</>
+              <>{t('postComposer.post')}</>
             )}
           </button>
         </div>

@@ -2,14 +2,33 @@ import type { LucideIcon } from 'lucide-react';
 import {
   MessagesSquare,
   GraduationCap,
-  Quote,
-  CloudDownload,
+  FileText,
+  FolderOpen,
   Megaphone,
   Calendar,
-  LayoutGrid,
 } from 'lucide-react';
-import { COMMUNITY_APP_IDS, type CommunityAppId } from '../../../constants/communityApps';
+import { COMMUNITY_APP_IDS } from '../../../constants/communityApps';
 
+export function getDashboardAppLabel(appId: string, t: (key: string) => string): string {
+  switch (appId) {
+    case COMMUNITY_APP_IDS.CHAT:
+      return t('community.appKindChat');
+    case COMMUNITY_APP_IDS.COURSES:
+      return t('community.appKindCourses');
+    case COMMUNITY_APP_IDS.CONTENT:
+      return t('community.appKindContent');
+    case COMMUNITY_APP_IDS.FILES:
+      return t('community.appKindFiles');
+    case COMMUNITY_APP_IDS.ANNOUNCEMENTS:
+      return t('community.appKindAnnouncements');
+    case COMMUNITY_APP_IDS.EVENTS:
+      return t('community.appKindEvents');
+    default:
+      return appId;
+  }
+}
+
+/** @deprecated Use getDashboardAppLabel(appId, t) */
 export function dashboardAppLabel(appId: string): string {
   switch (appId) {
     case COMMUNITY_APP_IDS.CHAT:
@@ -30,20 +49,20 @@ export function dashboardAppLabel(appId: string): string {
 }
 
 export function dashboardAppIcon(appId: string): LucideIcon {
-  switch (appId as CommunityAppId) {
+  switch (appId) {
     case COMMUNITY_APP_IDS.CHAT:
       return MessagesSquare;
     case COMMUNITY_APP_IDS.COURSES:
       return GraduationCap;
     case COMMUNITY_APP_IDS.CONTENT:
-      return Quote;
+      return FileText;
     case COMMUNITY_APP_IDS.FILES:
-      return CloudDownload;
+      return FolderOpen;
     case COMMUNITY_APP_IDS.ANNOUNCEMENTS:
       return Megaphone;
     case COMMUNITY_APP_IDS.EVENTS:
       return Calendar;
     default:
-      return LayoutGrid;
+      return FileText;
   }
 }

@@ -22,6 +22,7 @@ import {
   type DashboardMembership,
 } from '../../hooks/useDashboardAnalytics';
 import { communityDashboardSettingsPath } from '../../constants/communityRoutes';
+import { useTranslation } from '../../i18n/useTranslation';
 
 import { COMMUNITIES_API as API_URL } from '../../config/api';
 const PAGE_SIZE = 25;
@@ -41,24 +42,6 @@ interface MemberRow {
 
 type UsersTab = 'users' | 'memberships';
 type SortKey = 'joinedAt' | 'totalSpend';
-
-function formatRelativeTime(iso: string): string {
-  if (!iso) return '—';
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return '—';
-  const seconds = Math.floor((Date.now() - then) / 1000);
-  if (seconds < 60) return 'Just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months} month${months === 1 ? '' : 's'} ago`;
-  const years = Math.floor(months / 12);
-  return `${years} year${years === 1 ? '' : 's'} ago`;
-}
 
 function displayName(row: MemberRow): string {
   return row.fullName?.trim() || row.username;
@@ -89,6 +72,14 @@ const MembershipsPanel: React.FC<{
   error: string | null;
   handle: string;
 }> = ({ memberships, loading, error, handle }) => {
+  const { t } = useTranslation();
+
+  const statusLabel = (status: string) => {
+    if (status === 'Hidden') return t('communityDashboard.hidden');
+    if (status === 'Visible') return t('communityDashboard.visible');
+    return status;
+  };
+
   if (loading) {
     return (
       <div className="flex flex-1 justify-center bg-white py-24">
@@ -106,9 +97,9 @@ const MembershipsPanel: React.FC<{
   if (memberships.length === 0) {
     return (
       <p className="py-24 text-center text-sm text-neutral-500">
-        No memberships configured.{' '}
+        {t('communityDashboard.users.noMembershipsConfigured')}{' '}
         <Link to={communityDashboardSettingsPath(handle)} className="text-[#315efb] hover:underline">
-          Monetization settings
+          {t('communityDashboard.users.monetizationSettings')}
         </Link>
       </p>
     );
@@ -118,13 +109,13 @@ const MembershipsPanel: React.FC<{
       <table className="w-full min-w-[880px] border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-neutral-200">
-            <HeaderCell label="Product" />
-            <HeaderCell label="Type" />
-            <HeaderCell label="Price" />
-            <HeaderCell label="Billing" />
-            <HeaderCell label="Status" />
-            <HeaderCell label="Active users" />
-            <HeaderCell label="All-time revenue" />
+            <HeaderCell label={t('communityDashboard.users.colProduct')} />
+            <HeaderCell label={t('communityDashboard.users.colType')} />
+            <HeaderCell label={t('communityDashboard.users.colPrice')} />
+            <HeaderCell label={t('communityDashboard.users.colBilling')} />
+            <HeaderCell label={t('communityDashboard.users.colStatus')} />
+            <HeaderCell label={t('communityDashboard.users.colActiveUsers')} />
+            <HeaderCell label={t('communityDashboard.users.colAllTimeRevenue')} />
           </tr>
         </thead>
         <tbody>
@@ -142,7 +133,7 @@ const MembershipsPanel: React.FC<{
                       : 'bg-neutral-100 text-neutral-600'
                   }`}
                 >
-                  {row.status}
+                  {statusLabel(row.status)}
                 </span>
               </td>
               <td className="px-4 py-4 text-neutral-700">{row.activeUsers}</td>
@@ -158,6 +149,51 @@ const MembershipsPanel: React.FC<{
 const CommunityDashboardUsers: React.FC = () => {
   const { handle } = useCommunityDashboard();
   const { token } = useAuth();
+  const { t } = useTranslation();
+
+  const formatRelativeTime = useCallback(
+    (iso: string): string => {
+      if (!iso) return '—';
+      const then = new Date(iso).getTime();
+      if (Number.isNaN(then)) return '—';
+      const seconds = Math.floor((Date.now() - then) / 1000);
+      if (seconds < 60) return t('communityDashboard.users.justNow');
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) {
+        return t(
+          minutes === 1 ? 'communityDashboard.users.minutesAgo' : 'communityDashboard.users.minutesAgoMany',
+          { count: minutes }
+        );
+      }
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) {
+        return t(
+          hours === 1 ? 'communityDashboard.users.hoursAgo' : 'communityDashboard.users.hoursAgoMany',
+          { count: hours }
+        );
+      }
+      const days = Math.floor(hours / 24);
+      if (days < 30) {
+        return t(
+          days === 1 ? 'communityDashboard.users.daysAgo' : 'communityDashboard.users.daysAgoMany',
+          { count: days }
+        );
+      }
+      const months = Math.floor(days / 30);
+      if (months < 12) {
+        return t(
+          months === 1 ? 'communityDashboard.users.monthsAgo' : 'communityDashboard.users.monthsAgoMany',
+          { count: months }
+        );
+      }
+      const years = Math.floor(months / 12);
+      return t(
+        years === 1 ? 'communityDashboard.users.yearsAgo' : 'communityDashboard.users.yearsAgoMany',
+        { count: years }
+      );
+    },
+    [t]
+  );
   const {
     data: analyticsData,
     loading: analyticsLoading,
@@ -181,19 +217,19 @@ const CommunityDashboardUsers: React.FC = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { message?: string }).message || 'Failed to load members.');
+        setError((data as { message?: string }).message || t('communityDashboard.users.loadFailed'));
         setMembers([]);
         return;
       }
       setMembers(Array.isArray(data) ? data : []);
       setPage(0);
     } catch {
-      setError('Failed to load members.');
+      setError(t('communityDashboard.users.loadFailed'));
       setMembers([]);
     } finally {
       setLoading(false);
     }
-  }, [handle, token]);
+  }, [handle, token, t]);
 
   useEffect(() => {
     void load();
@@ -276,7 +312,7 @@ const CommunityDashboardUsers: React.FC = () => {
                 : 'border-transparent text-neutral-500 hover:text-neutral-800'
             }`}
           >
-            Users
+            {t('communityDashboard.users.tabUsers')}
           </button>
           <button
             type="button"
@@ -287,7 +323,7 @@ const CommunityDashboardUsers: React.FC = () => {
                 : 'border-transparent text-neutral-500 hover:text-neutral-800'
             }`}
           >
-            Memberships
+            {t('communityDashboard.users.tabMemberships')}
           </button>
         </div>
       </div>
@@ -323,18 +359,18 @@ const CommunityDashboardUsers: React.FC = () => {
             ) : error ? (
               <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
             ) : total === 0 ? (
-              <p className="py-20 text-center text-neutral-500">No members yet.</p>
+              <p className="py-20 text-center text-neutral-500">{t('communityDashboard.users.noMembers')}</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[960px] border-collapse text-left text-sm">
                   <thead>
                     <tr className="border-b border-neutral-200">
-                      <HeaderCell label="User" />
-                      <HeaderCell label="Email" />
-                      <HeaderCell label="Status" />
-                      <HeaderCell label="Country" />
+                      <HeaderCell label={t('communityDashboard.users.colUser')} />
+                      <HeaderCell label={t('communityDashboard.users.colEmail')} />
+                      <HeaderCell label={t('communityDashboard.users.colStatus')} />
+                      <HeaderCell label={t('communityDashboard.users.colCountry')} />
                       <HeaderCell
-                        label="Total spend"
+                        label={t('communityDashboard.users.colTotalSpend')}
                         sortIcon={<ArrowUpDown className="h-3.5 w-3.5 text-neutral-400" aria-hidden />}
                       />
                       <th className="whitespace-nowrap px-4 py-3 text-left text-sm font-medium text-neutral-500">
@@ -343,7 +379,7 @@ const CommunityDashboardUsers: React.FC = () => {
                           onClick={toggleJoinedSort}
                           className="inline-flex items-center gap-1.5 whitespace-nowrap hover:text-neutral-700"
                         >
-                          Joined at
+                          {t('communityDashboard.users.colJoinedAt')}
                           <ChevronDown
                             className={`h-3.5 w-3.5 text-neutral-500 transition-transform ${
                               sortKey === 'joinedAt' && sortDir === 'asc' ? 'rotate-180' : ''
@@ -353,8 +389,8 @@ const CommunityDashboardUsers: React.FC = () => {
                           <GripVertical className="h-3.5 w-3.5 text-neutral-300" aria-hidden />
                         </button>
                       </th>
-                      <HeaderCell label="Last accessed" />
-                      <HeaderCell label="Contact" />
+                      <HeaderCell label={t('communityDashboard.users.colLastAccessed')} />
+                      <HeaderCell label={t('communityDashboard.users.colContact')} />
                     </tr>
                   </thead>
                   <tbody>
@@ -392,7 +428,7 @@ const CommunityDashboardUsers: React.FC = () => {
                             <Link
                               to="/messenger"
                               className="text-neutral-500 transition-colors hover:text-neutral-800"
-                              title="Message"
+                              title={t('communityDashboard.users.messageTitle')}
                             >
                               <MessageCircle className="h-4 w-4" strokeWidth={1.75} aria-hidden />
                             </Link>
@@ -400,7 +436,7 @@ const CommunityDashboardUsers: React.FC = () => {
                               <a
                                 href={`mailto:${row.email}`}
                                 className="text-neutral-500 transition-colors hover:text-neutral-800"
-                                title="Email"
+                                title={t('communityDashboard.users.emailTitle')}
                               >
                                 <Mail className="h-4 w-4" strokeWidth={1.75} aria-hidden />
                               </a>
@@ -418,7 +454,11 @@ const CommunityDashboardUsers: React.FC = () => {
           {!loading && !error && total > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-neutral-200 bg-white px-4 py-1">
               <p className="text-sm text-neutral-500">
-                Showing {rangeStart} to {rangeEnd} of {total}
+                {t('communityDashboard.users.showingRange', {
+                  start: rangeStart,
+                  end: rangeEnd,
+                  total,
+                })}
               </p>
               <div className="flex items-center gap-1">
                 <button
@@ -426,7 +466,7 @@ const CommunityDashboardUsers: React.FC = () => {
                   disabled={safePage === 0}
                   onClick={() => setPage(0)}
                   className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
-                  aria-label="First page"
+                  aria-label={t('communityDashboard.users.pageFirst')}
                 >
                   <ChevronsLeft className="h-4 w-4" aria-hidden />
                 </button>
@@ -435,7 +475,7 @@ const CommunityDashboardUsers: React.FC = () => {
                   disabled={safePage === 0}
                   onClick={() => setPage((p) => Math.max(0, p - 1))}
                   className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
-                  aria-label="Previous page"
+                  aria-label={t('communityDashboard.users.pagePrev')}
                 >
                   <ChevronLeft className="h-4 w-4" aria-hidden />
                 </button>
@@ -444,7 +484,7 @@ const CommunityDashboardUsers: React.FC = () => {
                   disabled={safePage >= totalPages - 1}
                   onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                   className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
-                  aria-label="Next page"
+                  aria-label={t('communityDashboard.users.pageNext')}
                 >
                   <ChevronRight className="h-4 w-4" aria-hidden />
                 </button>
@@ -453,7 +493,7 @@ const CommunityDashboardUsers: React.FC = () => {
                   disabled={safePage >= totalPages - 1}
                   onClick={() => setPage(totalPages - 1)}
                   className="flex h-8 w-8 items-center justify-center rounded-md text-neutral-500 hover:bg-neutral-100 disabled:opacity-30"
-                  aria-label="Last page"
+                  aria-label={t('communityDashboard.users.pageLast')}
                 >
                   <ChevronsRight className="h-4 w-4" aria-hidden />
                 </button>

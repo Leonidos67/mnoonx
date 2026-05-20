@@ -18,6 +18,7 @@ import { isCommunityOwner } from '../utils/communityOwner';
 import { COMMUNITY_APP_IDS } from '../constants/communityApps';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { useTranslation } from '../i18n/useTranslation';
 import ResponsiveDialogShell from '../components/Common/ResponsiveDialogShell';
 
 import { COMMUNITIES_API as API } from '../config/api';
@@ -54,7 +55,7 @@ interface StoreApp {
   iconColor: string;
 }
 
-const CATEGORIES: AppCategory[] = [
+const STORE_CATEGORIES: AppCategory[] = [
   'All',
   'Community',
   'Business & productivity',
@@ -64,110 +65,83 @@ const CATEGORIES: AppCategory[] = [
   'Education',
 ];
 
-const APPS: StoreApp[] = [
+const STORE_CATEGORY_TKEY: Record<AppCategory, string> = {
+  All: 'communityStore.catAll',
+  Community: 'communityStore.catCommunity',
+  'Business & productivity': 'communityStore.catBusinessProductivity',
+  'Social media': 'communityStore.catSocialMedia',
+  Trading: 'communityStore.catTrading',
+  AI: 'communityStore.catAI',
+  Education: 'communityStore.catEducation',
+};
+
+const APP_DEFS = [
   {
     id: COMMUNITY_APP_IDS.CHAT,
-    name: 'Chat',
-    vendor: 'MNOONX',
-    vendorBadge: 'mnoonx',
-    priceLabel: 'Free to install',
-    description: 'Allow your users to talk to each other.',
-    longDescription:
-      'Real-time chat helps members coordinate trades, share quick updates, and build relationships without leaving your community hub. It is ideal for time-sensitive signals, casual banter, and onboarding questions that do not need a full forum thread. Messages are scoped to your community so conversations stay relevant and moderated under your rules. When paired with your feed and forums, chat becomes the “live layer” that keeps people coming back daily.',
-    installs: '8,963',
-    category: 'Community',
+    i18nKey: 'chat',
+    category: 'Community' as AppCategory,
     Icon: MessagesSquare,
     iconBg: 'bg-orange-100',
     iconColor: 'text-orange-600',
   },
   {
     id: COMMUNITY_APP_IDS.CONTENT,
-    name: 'Content',
-    vendor: 'MNOONX',
-    vendorBadge: 'mnoonx',
-    priceLabel: 'Free to install',
-    description: 'Easily share written documents and free-form text content with your users.',
-    longDescription:
-      'The Content app is built for long-form writeups: research notes, newsletters, playbooks, and structured updates that deserve more than a single post. You can publish rich text resources members can revisit, quote, and share—perfect for education-heavy communities. It helps creators package expertise into evergreen pages while still benefiting from community distribution and discussion elsewhere.',
-    installs: '6,754',
-    category: 'Community',
+    i18nKey: 'content',
+    category: 'Community' as AppCategory,
     Icon: FileText,
     iconBg: 'bg-violet-100',
     iconColor: 'text-violet-600',
   },
   {
     id: COMMUNITY_APP_IDS.COURSES,
-    name: 'Courses',
-    vendor: 'MNOONX',
-    vendorBadge: 'mnoonx',
-    priceLabel: 'Free to install',
-    description: 'Create and sell online courses, coaching, and educational content.',
-    longDescription:
-      'Courses turn your expertise into structured learning paths: modules, lessons, and progress that members can follow at their own pace. It is a strong fit for communities teaching trading, on-chain analysis, or workflow skills where outcomes improve with sequencing and repetition. You can combine free previews with paid sections as you grow, and keep students engaged with community discussion tied to each lesson.',
-    installs: '3,437',
-    category: 'Education',
+    i18nKey: 'courses',
+    category: 'Education' as AppCategory,
     Icon: GraduationCap,
     iconBg: 'bg-purple-100',
     iconColor: 'text-purple-600',
   },
   {
     id: COMMUNITY_APP_IDS.FILES,
-    name: 'Files',
-    vendor: 'MNOONX',
-    vendorBadge: 'mnoonx',
-    priceLabel: 'Free to install',
-    description: 'Sell access to exclusive files, templates, and more.',
-    longDescription:
-      'Files unlocks a simple way to distribute templates, indicators, spreadsheets, PDFs, and other downloads to members—either as a perk or a paid add-on. It reduces friction for communities that repeatedly share the same resources and need a clean permission model. You can organize bundles for different tiers and keep sensitive materials out of public channels while still staying inside your community experience.',
-    installs: '3,135',
-    category: 'Business & productivity',
+    i18nKey: 'files',
+    category: 'Business & productivity' as AppCategory,
     Icon: FolderOpen,
     iconBg: 'bg-blue-100',
     iconColor: 'text-blue-600',
   },
   {
     id: COMMUNITY_APP_IDS.ANNOUNCEMENTS,
-    name: 'Announcements',
-    vendor: 'MNOONX',
-    vendorBadge: 'mnoonx',
-    priceLabel: 'Free to install',
-    description:
-      'Your announcements deserve better than a feed post. Reach members instantly via text and email with 98%+ open rates. Schedule, send, and know they actually saw it.',
-    longDescription:
-      'Announcements is built for moments when reach and certainty matter: launches, policy changes, security notices, and time-critical updates. Instead of hoping members see a feed post, you can deliver a dedicated announcement experience designed for high visibility and optional multi-channel delivery. Scheduling and read signals help admins operate confidently, while members get fewer missed-critical updates and less noise in day-to-day browsing.',
-    installs: '861',
-    category: 'Community',
+    i18nKey: 'announcements',
+    category: 'Community' as AppCategory,
     Icon: Megaphone,
     iconBg: 'bg-red-100',
     iconColor: 'text-red-600',
   },
   {
     id: COMMUNITY_APP_IDS.EVENTS,
-    name: 'Events',
-    vendor: 'MNOONX',
-    vendorBadge: 'mnoonx',
-    priceLabel: 'Free to install',
-    description: 'Sell access to virtual or in person events',
-    longDescription:
-      'Events helps you publish a clear calendar for your community: launches, AMAs, meetups, and paid sessions in one place. Members see what is coming next, share links easily, and you can keep everything aligned with your MNOONX-style monetization story. It is a strong fit for creators who run recurring calls, office hours, or ticketed virtual events alongside chat and announcements.',
-    installs: '847 installs in last 7 days',
-    category: 'Community',
+    i18nKey: 'events',
+    category: 'Community' as AppCategory,
     Icon: Calendar,
     iconBg: 'bg-amber-100',
     iconColor: 'text-amber-600',
   },
-];
+] as const;
 
 const VendorMark: React.FC<{ type: StoreApp['vendorBadge'] }> = ({ type }) => {
   if (type === 'mnoonx') {
-    return <img src="https://img.icons8.com/?size=100&id=ck3ZwyamgGAW&format=png&color=000000" alt="" className='w-4 h-4' />;
+    return (
+      <img
+        src="https://img.icons8.com/?size=100&id=ck3ZwyamgGAW&format=png&color=000000"
+        alt=""
+        className="h-4 w-4"
+      />
+    );
   }
   if (type === 'brand') {
     return <span className="h-4 w-4 shrink-0 rounded bg-amber-500" aria-hidden />;
   }
   return (
     <span
-      className="h-4 w-4 shrink-0 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-[9px] font-bold text-white flex items-center justify-center"
+      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-[9px] font-bold text-white"
       aria-hidden
     >
       a
@@ -180,9 +154,9 @@ const CommunityStore: React.FC = () => {
   const navigate = useNavigate();
   const { user, token } = useAuth();
   const { showToast } = useToast();
+  const { t } = useTranslation();
   const [activeCategory, setActiveCategory] = useState<AppCategory>('All');
   const [search, setSearch] = useState('');
-  const [sortLabel] = useState('Most weekly installs');
   const [installedInstances, setInstalledInstances] = useState<InstalledAppInstance[]>([]);
   const [ownerId, setOwnerId] = useState<string | null>(null);
   const [installingId, setInstallingId] = useState<string | null>(null);
@@ -191,9 +165,26 @@ const CommunityStore: React.FC = () => {
   const [modalVisible, setModalVisible] = useState(true);
   const [modalNote, setModalNote] = useState('');
 
-  const isOwner = Boolean(
-    user?.id && ownerId && String(user.id) === String(ownerId)
+  const apps = useMemo<StoreApp[]>(
+    () =>
+      APP_DEFS.map((def) => ({
+        id: def.id,
+        name: t(`communityStore.apps.${def.i18nKey}.name`),
+        vendor: 'MNOONX',
+        vendorBadge: 'mnoonx' as const,
+        priceLabel: t('communityStore.freeToInstall'),
+        description: t(`communityStore.apps.${def.i18nKey}.description`),
+        longDescription: t(`communityStore.apps.${def.i18nKey}.longDescription`),
+        installs: t(`communityStore.apps.${def.i18nKey}.installs`),
+        category: def.category,
+        Icon: def.Icon,
+        iconBg: def.iconBg,
+        iconColor: def.iconColor,
+      })),
+    [t]
   );
+
+  const isOwner = Boolean(user?.id && ownerId && String(user.id) === String(ownerId));
 
   const loadCommunity = useCallback(async () => {
     if (!handle) return;
@@ -249,11 +240,14 @@ const CommunityStore: React.FC = () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        showToast((data as { message?: string }).message || 'Could not install app', 'error');
+        showToast((data as { message?: string }).message || t('communityStore.couldNotInstall'), 'error');
         return;
       }
       setInstalledInstances(Array.isArray(data.installedAppInstances) ? data.installedAppInstances : []);
-      const newId = typeof (data as { newInstanceId?: string }).newInstanceId === 'string' ? (data as { newInstanceId: string }).newInstanceId : undefined;
+      const newId =
+        typeof (data as { newInstanceId?: string }).newInstanceId === 'string'
+          ? (data as { newInstanceId: string }).newInstanceId
+          : undefined;
       closeInstallModal();
       if (app.id === COMMUNITY_APP_IDS.CHAT) {
         navigate(communityPath(handle), {
@@ -287,7 +281,7 @@ const CommunityStore: React.FC = () => {
         });
       }
     } catch {
-      showToast('Network error', 'error');
+      showToast(t('community.networkError'), 'error');
     } finally {
       setInstallingId(null);
     }
@@ -295,7 +289,7 @@ const CommunityStore: React.FC = () => {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return APPS.filter((app) => {
+    return apps.filter((app) => {
       const catOk = activeCategory === 'All' || app.category === activeCategory;
       if (!catOk) return false;
       if (!q) return true;
@@ -306,56 +300,58 @@ const CommunityStore: React.FC = () => {
         app.vendor.toLowerCase().includes(q)
       );
     });
-  }, [activeCategory, search]);
+  }, [activeCategory, search, apps]);
 
   return (
     <div className="min-h-screen bg-white text-neutral-900">
-      <div className="max-w-full mx-auto px-2 sm:px-4 py-4 sm:py-6">
+      <div className="mx-auto max-w-full px-2 py-4 sm:px-4 sm:py-6">
         <Link
           to={handle ? communityPath(handle) : '/discover'}
-          className="inline-flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900 transition-colors"
+          className="inline-flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
         >
-          <ArrowLeft className="w-4 h-4" />
-          Back to community
+          <ArrowLeft className="h-4 w-4" />
+          {t('communityStore.backToCommunity')}
         </Link>
 
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-2">
-          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-neutral-900">App store</h1>
-          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto lg:min-w-[420px]">
+        <div className="mb-2 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <h1 className="text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl">
+            {t('communityStore.pageTitle')}
+          </h1>
+          <div className="flex w-full flex-col gap-3 sm:flex-row lg:min-w-[420px] lg:w-auto">
             <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
               <input
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search apps..."
-                className="w-full pl-10 pr-4 py-2.5 rounded-full border border-neutral-200 bg-neutral-50/80 text-sm text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-[#315efb]/25 focus:border-[#315efb] transition-shadow"
+                placeholder={t('communityStore.searchPlaceholder')}
+                className="w-full rounded-full border border-neutral-200 bg-neutral-50/80 py-2.5 pl-10 pr-4 text-sm text-neutral-900 placeholder:text-neutral-400 transition-shadow focus:border-[#315efb] focus:outline-none focus:ring-2 focus:ring-[#315efb]/25"
               />
             </div>
             <button
               type="button"
-              className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-full border border-neutral-200 bg-white text-sm font-medium text-neutral-800 hover:bg-neutral-50 min-w-[200px] sm:min-w-[220px]"
+              className="flex min-w-[200px] items-center justify-between gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2.5 text-sm font-medium text-neutral-800 hover:bg-neutral-50 sm:min-w-[220px]"
             >
-              <span className="truncate">{sortLabel}</span>
-              <ChevronDown className="w-4 h-4 text-neutral-500 shrink-0" />
+              <span className="truncate">{t('communityStore.sortMostWeekly')}</span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-neutral-500" />
             </button>
           </div>
         </div>
 
-        <div className="border-b border-neutral-200 mb-8 -mx-1">
-          <div className="flex gap-1 overflow-x-auto pb-0 scrollbar-thin scrollbar-thumb-neutral-200">
-            {CATEGORIES.map((cat) => {
+        <div className="-mx-1 mb-8 border-b border-neutral-200">
+          <div className="scrollbar-thin scrollbar-thumb-neutral-200 flex gap-1 overflow-x-auto pb-0">
+            {STORE_CATEGORIES.map((cat) => {
               const active = activeCategory === cat;
               return (
                 <button
                   key={cat}
                   type="button"
                   onClick={() => setActiveCategory(cat)}
-                  className={`shrink-0 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-colors relative ${
+                  className={`relative shrink-0 whitespace-nowrap px-3 py-2.5 text-sm font-medium transition-colors ${
                     active ? 'text-neutral-900' : 'text-neutral-500 hover:text-neutral-800'
                   }`}
                 >
-                  {cat}
+                  {t(STORE_CATEGORY_TKEY[cat])}
                   {active && (
                     <span className="absolute bottom-0 left-3 right-3 h-0.5 rounded-full bg-[#315efb]" />
                   )}
@@ -365,7 +361,7 @@ const CommunityStore: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
           {filtered.map((app) => {
             const chatCount = installedInstances.filter((i) => i.appId === app.id).length;
             const installed = chatCount > 0;
@@ -381,17 +377,17 @@ const CommunityStore: React.FC = () => {
             return (
               <article
                 key={app.id}
-                className="flex flex-col rounded-xl border border-neutral-200 bg-white p-4 sm:p-5 shadow-sm hover:shadow-md hover:border-neutral-300/80 transition-shadow"
+                className="flex flex-col rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-shadow hover:border-neutral-300/80 hover:shadow-md sm:p-5"
               >
                 <div className="flex gap-3">
                   <div
                     className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${app.iconBg} ${app.iconColor}`}
                   >
-                    <app.Icon className="w-6 h-6" strokeWidth={1.75} />
+                    <app.Icon className="h-6 w-6" strokeWidth={1.75} />
                   </div>
                   <div className="min-w-0 flex-1 pr-2">
                     <div className="flex items-start justify-between gap-2">
-                      <h2 className="text-base font-bold text-neutral-900 leading-tight">{app.name}</h2>
+                      <h2 className="text-base font-bold leading-tight text-neutral-900">{app.name}</h2>
                       {canInstall ? (
                         <div className="flex shrink-0 items-center gap-1.5">
                           <button
@@ -400,16 +396,20 @@ const CommunityStore: React.FC = () => {
                             onClick={() => openInstallModal(app)}
                             title={
                               !token
-                                ? 'Sign in'
+                                ? t('communityStore.signInTitle')
                                 : !isOwner
-                                  ? 'Only the community owner can install apps'
+                                  ? t('communityStore.ownerOnlyInstall')
                                   : installed
-                                    ? 'Already added'
-                                    : 'Add to community'
+                                    ? t('communityStore.alreadyAdded')
+                                    : t('communityStore.add')
                             }
                             className="rounded-full bg-[#315efb] px-4 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#2547c4] disabled:cursor-not-allowed disabled:opacity-45"
                           >
-                            {busy && installModalApp?.id === app.id ? '…' : installed ? 'Added' : 'Add'}
+                            {busy && installModalApp?.id === app.id
+                              ? t('communityStore.addBusy')
+                              : installed
+                                ? t('communityStore.added')
+                                : t('communityStore.add')}
                           </button>
                           {installed && isOwner && token && (
                             <button
@@ -417,15 +417,15 @@ const CommunityStore: React.FC = () => {
                               disabled={busy}
                               onClick={() => openInstallModal(app)}
                               className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-semibold text-neutral-800 transition-colors hover:bg-neutral-50 disabled:opacity-45"
-                              title="Add another instance"
+                              title={t('communityStore.addMoreTitle')}
                             >
-                              Add more
+                              {t('communityStore.addMore')}
                             </button>
                           )}
                         </div>
                       ) : (
                         <span className="shrink-0 rounded-full border border-neutral-200 px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
-                          Soon
+                          {t('communityStore.soon')}
                         </span>
                       )}
                     </div>
@@ -438,17 +438,17 @@ const CommunityStore: React.FC = () => {
                   </div>
                 </div>
                 <p className="mt-3 text-sm leading-relaxed text-neutral-600">{app.description}</p>
-                <details className="mt-2 group">
-                  <summary className="cursor-pointer text-xs font-semibold text-[#315efb] list-none [&::-webkit-details-marker]:hidden flex items-center gap-1">
-                    <span className="group-open:rotate-90 transition-transform inline-block">▸</span>
-                    Read more
+                <details className="group mt-2">
+                  <summary className="flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-[#315efb] [&::-webkit-details-marker]:hidden">
+                    <span className="inline-block transition-transform group-open:rotate-90">▸</span>
+                    {t('communityStore.readMore')}
                   </summary>
-                  <p className="mt-2 text-sm leading-relaxed text-neutral-600 border-t border-neutral-100 pt-2">
+                  <p className="mt-2 border-t border-neutral-100 pt-2 text-sm leading-relaxed text-neutral-600">
                     {app.longDescription}
                   </p>
                 </details>
-                <div className="mt-auto pt-4 flex items-center gap-1.5 text-xs text-neutral-400">
-                  <Download className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+                <div className="mt-auto flex items-center gap-1.5 pt-4 text-xs text-neutral-400">
+                  <Download className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
                   <span>{app.installs}</span>
                 </div>
               </article>
@@ -457,14 +457,14 @@ const CommunityStore: React.FC = () => {
         </div>
 
         {filtered.length === 0 && (
-          <div className="text-center py-16 text-neutral-500 text-sm">No apps match your filters.</div>
+          <div className="py-16 text-center text-sm text-neutral-500">{t('communityStore.emptyFilters')}</div>
         )}
 
         {installModalApp && (
           <ResponsiveDialogShell
             open={!!installModalApp}
             onClose={closeInstallModal}
-            title={`Add ${installModalApp.name}`}
+            title={t('communityStore.addModalTitle', { name: installModalApp.name })}
             sheetPadded
             disableClose={!!installingId}
             zIndexClass="z-[200]"
@@ -472,12 +472,12 @@ const CommunityStore: React.FC = () => {
           >
             <div aria-labelledby="install-modal-title">
               <h2 id="install-modal-title" className="text-lg font-semibold text-neutral-900">
-                Add {installModalApp.name}
+                {t('communityStore.addModalHeading', { name: installModalApp.name })}
               </h2>
-              <p className="mt-1 text-sm text-neutral-500">Configure this app before adding it to your community.</p>
+              <p className="mt-1 text-sm text-neutral-500">{t('communityStore.addModalSubtitle')}</p>
 
               <label className="mt-5 block text-sm font-medium text-neutral-800">
-                Display name
+                {t('communityStore.displayName')}
                 <input
                   type="text"
                   value={modalTitle}
@@ -487,8 +487,8 @@ const CommunityStore: React.FC = () => {
                 />
               </label>
 
-              <p className="mt-4 text-sm font-medium text-neutral-800">Visibility for members</p>
-              <p className="text-xs text-neutral-500">Private: only you see this app in the sidebar. Public: members see it.</p>
+              <p className="mt-4 text-sm font-medium text-neutral-800">{t('communityStore.visibilityForMembers')}</p>
+              <p className="text-xs text-neutral-500">{t('communityStore.visibilityHint')}</p>
               <div className="mt-2 flex gap-2">
                 <button
                   type="button"
@@ -499,7 +499,7 @@ const CommunityStore: React.FC = () => {
                       : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50'
                   }`}
                 >
-                  Show to members
+                  {t('communityStore.showToMembers')}
                 </button>
                 <button
                   type="button"
@@ -510,18 +510,19 @@ const CommunityStore: React.FC = () => {
                       : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50'
                   }`}
                 >
-                  Hide (owner only)
+                  {t('communityStore.hideOwnerOnly')}
                 </button>
               </div>
 
               <label className="mt-4 block text-sm font-medium text-neutral-800">
-                Note <span className="font-normal text-neutral-400">(optional)</span>
+                {t('communityStore.noteLabel')}{' '}
+                <span className="font-normal text-neutral-400">{t('communityStore.noteOptional')}</span>
                 <textarea
                   value={modalNote}
                   onChange={(e) => setModalNote(e.target.value)}
                   rows={3}
                   maxLength={500}
-                  placeholder="Internal note — e.g. who this channel is for"
+                  placeholder={t('communityStore.notePlaceholder')}
                   className="mt-1.5 w-full resize-none rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-[#315efb] focus:ring-2 focus:ring-[#315efb]/20"
                 />
               </label>
@@ -532,7 +533,7 @@ const CommunityStore: React.FC = () => {
                   onClick={closeInstallModal}
                   className="rounded-xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="button"
@@ -540,7 +541,7 @@ const CommunityStore: React.FC = () => {
                   onClick={() => void submitInstall()}
                   className="rounded-xl bg-[#315efb] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2547c4] disabled:opacity-45"
                 >
-                  {installingId ? 'Adding…' : 'Add to community'}
+                  {installingId ? t('communityStore.adding') : t('communityStore.addToCommunity')}
                 </button>
               </div>
             </div>
