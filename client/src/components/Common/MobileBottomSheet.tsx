@@ -32,7 +32,7 @@ const MobileBottomSheet: React.FC<MobileBottomSheetProps> = ({
   return (
     <Drawer.Root
       open={open}
-      onOpenChange={(nextOpen) => {
+      onOpenChange={(nextOpen: boolean) => {
         if (!nextOpen) onClose();
       }}
       dismissible={dismissible}

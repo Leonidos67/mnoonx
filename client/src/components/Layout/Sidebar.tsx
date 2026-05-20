@@ -17,6 +17,7 @@ import { communityPath, communitySettingsPath } from '../../constants/communityR
 import { profilePath } from '../../constants/paths';
 
 import { COMMUNITIES_API as API_COMMUNITIES } from '../../config/api';
+import MnoonxLogo from './MnoonxLogo';
 
 interface MyCommunity {
   _id: string;
@@ -105,17 +106,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
         >
           <Menu className="h-5 w-5" strokeWidth={2} aria-hidden />
         </button>
-        <Link
-          to="/"
-          className="flex min-w-0 flex-1 items-center gap-2 text-2xl font-bold text-gray-900 transition-transform active:scale-[0.99]"
-        >
-          <img
-            src="https://img.icons8.com/?size=100&id=ck3ZwyamgGAW&format=png&color=000000"
-            className="h-8 w-8 shrink-0"
-            alt=""
-          />
-          <span className="pixelify-logo truncate">MNOONX</span>
-        </Link>
+        <MnoonxLogo className="min-w-0 flex-1" size="md" />
       </div>
 
       <nav className="flex-1 p-2 overflow-y-auto">

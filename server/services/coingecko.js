@@ -73,8 +73,8 @@ async function coingeckoFetch(path, params = {}) {
       const text = await res.text().catch(() => '');
       const err = new Error(
         res.status === 429
-          ? 'CoinGecko rate limit reached. Please wait a minute and try again.'
-          : `CoinGecko request failed (${res.status})`
+          ? `An error occurred on the server side. Error code: ${res.status}`
+          : `An error occurred on the server side. Error code: ${res.status}`
       );
       err.status = res.status;
       err.body = text;

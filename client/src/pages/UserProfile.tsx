@@ -5,39 +5,34 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import EditTextModal from '../components/Common/EditTextModal';
-import { 
-  Calendar, MapPin, Link as LinkIcon, 
-  MessageCircle, Repeat2, Heart,
-  MoreHorizontal, Share,
-  Search, Smile, Send, X,
+import {
+  Calendar,
+  MapPin,
+  Link as LinkIcon,
+  MessageCircle,
+  Repeat2,
+  Heart,
+  MoreHorizontal,
+  Search,
+  Smile,
+  Send,
   Pen,
   Trash,
-  Unlink2
+  Unlink2,
 } from 'lucide-react';
+import MobileBottomSheet from '../components/Common/MobileBottomSheet';
+import FloatingMenu from '../components/Common/FloatingMenu';
+import PostDetailPanel from '../components/Posts/PostDetailPanel';
+import { PostCommentsSection } from '../components/Posts/PostCommentsSection';
+import { usePostDetail } from '../hooks/usePostDetail';
+import type { FeedPost } from '../types/postFeed';
 import PostMediaUpload from '../components/Posts/PostMediaUpload';
 import PostMediaGallery from '../components/Posts/PostMediaGallery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 
 import { USERS_API as API_URL, POSTS_API as POSTS_API_URL } from '../config/api';
 
-interface Post {
-  _id: string;
-  content: string;
-  author: {
-    _id?: string;
-    username: string;
-    fullName: string;
-    avatar: string;
-  };
-  likesCount: number;
-  commentsCount: number;
-  repostsCount: number;
-  viewsCount: number;
-  createdAt: string;
-  media: string[];
-  isLiked?: boolean;
-  isReposted?: boolean;
-}
+type Post = FeedPost;
 
 interface UserProfile {
   _id: string;
@@ -74,7 +69,7 @@ const UserProfileComponent: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<FeedPost[]>([]);
   const [followers, setFollowers] = useState<FollowerUser[]>([]);
   const [following, setFollowing] = useState<FollowerUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +77,7 @@ const UserProfileComponent: React.FC = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'posts' | 'reposts' | 'replies' | 'media'>('posts');
-  const [reposts, setReposts] = useState<Post[]>([]);
+  const [reposts, setReposts] = useState<FeedPost[]>([]);
   const [repostsLoading, setRepostsLoading] = useState(false);
   const [searchFollower, setSearchFollower] = useState('');
 
@@ -96,6 +91,32 @@ const UserProfileComponent: React.FC = () => {
   const [menuOpenPostId, setMenuOpenPostId] = useState<string | null>(null);
   const [editPostTarget, setEditPostTarget] = useState<{ postId: string; content: string } | null>(null);
   const [editPostSaving, setEditPostSaving] = useState(false);
+
+  const postDetail = usePostDetail(posts, reposts, setPosts, setReposts);
+  const {
+    selectedPost,
+    setSelectedPost,
+    commentText,
+    setCommentText,
+    inlineCommentText,
+    setInlineCommentText,
+    commentSubmitting,
+    commentsLoadingPostId,
+    expandedCommentsPostId,
+    setExpandedCommentsPostId,
+    openCommentMenu,
+    setOpenCommentMenu,
+    editCommentTarget,
+    setEditCommentTarget,
+    editCommentSaving,
+    handleSubmitComment,
+    toggleFeedComments,
+    isCommentOwner,
+    submitEditComment,
+    handleDeleteComment,
+    onPostDeleted,
+    patchPostInLists,
+  } = postDetail;
 
   // Проверка владельца поста
   const isPostOwner = (post: Post) => {
@@ -140,12 +161,7 @@ const UserProfileComponent: React.FC = () => {
           data.liked ? newSet.add(postId) : newSet.delete(postId);
           return newSet;
         });
-        setPosts(prev => prev.map(post =>
-          post._id === postId ? { ...post, likesCount: data.likesCount, isLiked: data.liked } : post
-        ));
-        setReposts(prev => prev.map(post =>
-          post._id === postId ? { ...post, likesCount: data.likesCount, isLiked: data.liked } : post
-        ));
+        patchPostInLists(postId, { likesCount: data.likesCount, isLiked: data.liked });
       }
     } catch (err) {
       console.error('Like error:', err);
@@ -169,9 +185,7 @@ const UserProfileComponent: React.FC = () => {
           data.reposted ? newSet.add(postId) : newSet.delete(postId);
           return newSet;
         });
-        setPosts(prev => prev.map(post =>
-          post._id === postId ? { ...post, repostsCount: data.repostsCount, isReposted: data.reposted } : post
-        ));
+        patchPostInLists(postId, { repostsCount: data.repostsCount, isReposted: data.reposted });
         if (profileSlug) {
           if (data.reposted) {
             fetchReposts(profileSlug);
@@ -220,6 +234,7 @@ const UserProfileComponent: React.FC = () => {
 
       setPosts((prev) => prev.filter((p) => String(p._id) !== postId));
       setReposts((prev) => prev.filter((p) => String(p._id) !== postId));
+      onPostDeleted(postId);
       
       // Обновляем счетчик
       setProfile(prev => prev ? {
@@ -259,8 +274,7 @@ const UserProfileComponent: React.FC = () => {
       }
 
       const updatedPost = await res.json();
-      setPosts((prev) => prev.map((p) => (p._id === postId ? updatedPost : p)));
-      setReposts((prev) => prev.map((p) => (String(p._id) === postId ? updatedPost : p)));
+      patchPostInLists(postId, updatedPost);
       setEditPostTarget(null);
       showToast('Post updated');
     } catch (err: unknown) {
@@ -392,6 +406,11 @@ const UserProfileComponent: React.FC = () => {
       return username.replace(/^@/, '').trim();
     }
   }, [username]);
+
+  useEffect(() => {
+    setSelectedPost(null);
+    setExpandedCommentsPostId(null);
+  }, [profileSlug, setSelectedPost]);
 
   useEffect(() => {
     if (profileSlug && profileSlug !== 'undefined') {
@@ -530,7 +549,13 @@ const UserProfileComponent: React.FC = () => {
     const showRepostBanner = options?.showRepostBanner ?? false;
 
     return (
-      <article key={postId} className="p-4 hover:bg-neutral-50 transition-colors border-b border-neutral-200 group/article">
+      <article
+        key={postId}
+        onClick={() => setSelectedPost(post)}
+        className={`p-4 hover:bg-neutral-50 transition-colors border-b border-neutral-200 group/article cursor-pointer ${
+          selectedPost?._id === post._id ? 'bg-neutral-50' : ''
+        }`}
+      >
         {showRepostBanner && profile && (
           <div className="flex items-center gap-2 mb-2 text-sm text-neutral-500">
             <Repeat2 size={14} className="text-green-600 shrink-0" />
@@ -539,12 +564,14 @@ const UserProfileComponent: React.FC = () => {
             </Link>
           </div>
         )}
-        <div className="flex space-x-3 cursor-pointer" onClick={() => navigate(`/post/${postId}`)}>
-          <img
-            src={post.author.avatar || `https://ui-avatars.com/api/?name=${post.author.fullName}&background=000&color=fff&size=40&bold=true`}
-            alt={post.author.fullName}
-            className="w-10 h-10 rounded-full hover:opacity-90 transition-opacity cursor-pointer"
-          />
+        <div className="flex space-x-3">
+          <Link to={`/@${post.author.username}`} onClick={(e) => e.stopPropagation()}>
+            <img
+              src={post.author.avatar || `https://ui-avatars.com/api/?name=${post.author.fullName}&background=000&color=fff&size=40&bold=true`}
+              alt={post.author.fullName}
+              className="w-10 h-10 rounded-full hover:opacity-90 transition-opacity object-cover"
+            />
+          </Link>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1 flex-wrap">
               <Link to={`/@${post.author.username}`} className="font-bold hover:underline truncate" onClick={(e) => e.stopPropagation()}>
@@ -600,40 +627,66 @@ const UserProfileComponent: React.FC = () => {
               </div>
             </div>
             {post.content?.trim() ? (
-              <p className="mt-1 text-neutral-900 leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
+              <p className="mt-1 text-neutral-900 leading-relaxed whitespace-pre-wrap break-words text-[15px]">
+                {post.content}
+              </p>
             ) : null}
             {post.media && post.media.length > 0 && (
               <PostMediaGallery media={post.media} meta={buildPostLightboxMeta(post)} />
             )}
-            <div className="flex items-center gap-1 mt-3 max-w-md">
+            <div className="flex items-center gap-1 mt-1 max-w-md">
               <button
                 onClick={(e) => { e.stopPropagation(); handleLike(postId); }}
                 className={`flex items-center transition-colors group ${likedPosts.has(postId) ? 'text-red-500' : 'text-neutral-500 hover:text-red-500'}`}
               >
                 <div className="p-2 rounded-full group-hover:bg-red-50 transition-colors">
-                  <Heart size={18} fill={likedPosts.has(postId) ? 'currentColor' : 'none'} />
+                  <Heart size={16} fill={likedPosts.has(postId) ? 'currentColor' : 'none'} />
                 </div>
-                <span className="text-sm">{formatCount(post.likesCount || 0)}</span>
+                <span className="text-xs">{formatCount(post.likesCount || 0)}</span>
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); navigate(`/post/${postId}`); }}
-                className="flex items-center text-neutral-500 hover:text-blue-500 transition-colors group"
+                onClick={(e) => toggleFeedComments(postId, e)}
+                className={`flex items-center transition-colors group ${
+                  expandedCommentsPostId === postId ? 'text-black' : 'text-neutral-500 hover:text-black'
+                }`}
               >
-                <div className="p-2 rounded-full group-hover:bg-blue-50 transition-colors">
-                  <MessageCircle size={18} />
+                <div className="p-2 rounded-full group-hover:bg-black/5 transition-colors">
+                  <MessageCircle size={16} />
                 </div>
-                <span className="text-sm">{formatCount(post.commentsCount || 0)}</span>
+                <span className="text-xs">{formatCount(post.commentsCount || 0)}</span>
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); handleRepost(postId); }}
-                className={`flex items-center transition-colors group ${repostedPosts.has(postId) ? 'text-green-500' : 'text-neutral-500 hover:text-green-500'}`}
+                className={`flex items-center transition-colors group ${
+                  repostedPosts.has(postId) ? 'text-black' : 'text-neutral-500 hover:text-black'
+                }`}
               >
-                <div className="p-2 rounded-full group-hover:bg-green-50 transition-colors">
-                  <Repeat2 size={18} fill={repostedPosts.has(postId) ? 'currentColor' : 'none'} />
+                <div className="p-2 rounded-full group-hover:bg-black/5 transition-colors">
+                  <Repeat2 size={16} fill={repostedPosts.has(postId) ? 'currentColor' : 'none'} />
                 </div>
-                <span className="text-sm">{formatCount(post.repostsCount || 0)}</span>
+                <span className="text-xs">{formatCount(post.repostsCount || 0)}</span>
               </button>
             </div>
+
+            {expandedCommentsPostId === postId && (
+              <PostCommentsSection
+                post={post}
+                variant="feed"
+                text={inlineCommentText}
+                onTextChange={setInlineCommentText}
+                onSubmit={() => void handleSubmitComment(postId, 'inline')}
+                token={token}
+                commentSubmitting={commentSubmitting}
+                commentsLoading={commentsLoadingPostId === postId}
+                isCommentOwner={isCommentOwner}
+                openCommentMenu={openCommentMenu}
+                onCommentMenuToggle={(c, pid, rect, isOpen) => {
+                  setOpenCommentMenu(
+                    isOpen ? null : { commentId: c._id, postId: pid, content: c.content, rect },
+                  );
+                }}
+              />
+            )}
           </div>
         </div>
       </article>
@@ -660,8 +713,8 @@ const UserProfileComponent: React.FC = () => {
   const isOwnProfile = user?.username === profile.username;
 
   return (
-    <div className="flex gap-6 max-w-[1200px] mx-auto px-0 py-0">
-      <div className="flex-1 max-w-[600px] border-x border-neutral-200 min-h-screen">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1200px] gap-6">
+      <div className="flex h-full min-h-0 max-w-[600px] flex-1 flex-col border-x border-neutral-200 bg-white overflow-y-auto">
         {/* Profile Info */}
         <div className="px-4 pb-4 mt-4">
           <div className="flex justify-between items-start">
@@ -798,10 +851,30 @@ const UserProfileComponent: React.FC = () => {
 
       </div>
 
-      {/* Right Sidebar */}
-      <div className="hidden lg:block w-[350px] flex-shrink-0">
-        <div className="sticky top-4 space-y-4">
-          <div className="bg-neutral-50 rounded-2xl p-4">
+      <div className="hidden h-full min-h-0 w-[400px] shrink-0 flex-col py-4 pr-4 lg:flex">
+        <div className="flex min-h-0 flex-1 flex-col">
+          {selectedPost ? (
+            <PostDetailPanel
+              post={selectedPost}
+              onClose={() => setSelectedPost(null)}
+              onCopyLink={copyPostLink}
+              commentText={commentText}
+              onCommentTextChange={setCommentText}
+              onSubmitComment={() => void handleSubmitComment(String(selectedPost._id), 'sidebar')}
+              token={token}
+              commentSubmitting={commentSubmitting}
+              commentsLoading={commentsLoadingPostId === String(selectedPost._id)}
+              isCommentOwner={isCommentOwner}
+              openCommentMenu={openCommentMenu}
+              onCommentMenuToggle={(c, pid, rect, isOpen) => {
+                setOpenCommentMenu(
+                  isOpen ? null : { commentId: c._id, postId: pid, content: c.content, rect },
+                );
+              }}
+            />
+          ) : (
+            <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto">
+          <div className="rounded-2xl bg-neutral-50 p-4">
             <h2 className="text-xl font-bold mb-4">Followers ({followers.length})</h2>
             <div className="relative mb-4">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
@@ -844,8 +917,74 @@ const UserProfileComponent: React.FC = () => {
               )}
             </div>
           </div>
+            </div>
+          )}
         </div>
       </div>
+
+      <MobileBottomSheet
+        open={!!selectedPost}
+        onClose={() => setSelectedPost(null)}
+        title="Post"
+      >
+        {selectedPost ? (
+          <PostDetailPanel
+            post={selectedPost}
+            onClose={() => setSelectedPost(null)}
+            onCopyLink={copyPostLink}
+            commentText={commentText}
+            onCommentTextChange={setCommentText}
+            onSubmitComment={() => void handleSubmitComment(String(selectedPost._id), 'sidebar')}
+            token={token}
+            commentSubmitting={commentSubmitting}
+            commentsLoading={commentsLoadingPostId === String(selectedPost._id)}
+            isCommentOwner={isCommentOwner}
+            openCommentMenu={openCommentMenu}
+            onCommentMenuToggle={(c, pid, rect, isOpen) => {
+              setOpenCommentMenu(
+                isOpen ? null : { commentId: c._id, postId: pid, content: c.content, rect },
+              );
+            }}
+          />
+        ) : null}
+      </MobileBottomSheet>
+
+      <FloatingMenu
+        open={!!openCommentMenu}
+        anchor={openCommentMenu ? { rect: openCommentMenu.rect } : null}
+        onClose={() => setOpenCommentMenu(null)}
+      >
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            if (!openCommentMenu) return;
+            setEditCommentTarget({
+              postId: openCommentMenu.postId,
+              commentId: openCommentMenu.commentId,
+              content: openCommentMenu.content,
+            });
+            setOpenCommentMenu(null);
+          }}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
+        >
+          <Pen size={14} />
+          Edit
+        </button>
+        <div className="my-1 h-px bg-neutral-100" />
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            if (!openCommentMenu) return;
+            void handleDeleteComment(openCommentMenu.postId, openCommentMenu.commentId);
+          }}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
+        >
+          <Trash size={14} />
+          Delete
+        </button>
+      </FloatingMenu>
 
       <EditTextModal
         isOpen={editPostTarget !== null}
@@ -860,6 +999,21 @@ const UserProfileComponent: React.FC = () => {
           if (!editPostSaving) setEditPostTarget(null);
         }}
         onSubmit={(value) => void submitEditPost(value)}
+      />
+
+      <EditTextModal
+        isOpen={editCommentTarget !== null}
+        title="Edit comment"
+        description="Update your comment. Changes are visible to everyone."
+        initialValue={editCommentTarget?.content ?? ''}
+        placeholder="Write your comment…"
+        maxLength={2000}
+        submitLabel="Save comment"
+        saving={editCommentSaving}
+        onClose={() => {
+          if (!editCommentSaving) setEditCommentTarget(null);
+        }}
+        onSubmit={(value) => void submitEditComment(value)}
       />
     </div>
   );

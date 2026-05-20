@@ -127,7 +127,7 @@ const CommunitySection: React.FC<CommunitySectionProps> = ({ title, communities,
         ))}
       </div>
       {hasMore && (
-        <div className="flex justify-center mt-8">
+        <div className="flex justify-center mt-4">
           <button
             type="button"
             onClick={() => setVisibleCount((n) => n + SECTION_PAGE_SIZE)}
