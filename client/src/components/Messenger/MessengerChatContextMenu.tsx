@@ -227,7 +227,7 @@ const MessengerChatContextMenu: React.FC<MessengerChatContextMenuProps> = ({
           />
 
           <motion.div
-            className="pointer-events-none absolute z-[201] overflow-hidden rounded-xl border border-neutral-200/90 bg-white shadow-lg"
+            className="pointer-events-none absolute z-[201] select-none overflow-hidden rounded-xl border border-neutral-200/90 bg-white shadow-lg [-webkit-touch-callout:none]"
             initial={{
               top: layout.sourceTop,
               left: layout.sourceLeft,
