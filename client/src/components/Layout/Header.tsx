@@ -5,6 +5,7 @@ import SearchBar from '../Common/SearchBar';
 import SearchModal from '../Common/SearchModal';
 import HeaderIconBadge from '../Common/HeaderIconBadge';
 import MnoonxLogo from './MnoonxLogo';
+import GoToDashboardMenu from './GoToDashboardMenu';
 import { useAuth } from '../../context/AuthContext';
 import { useAIChatPanel } from '../../context/AIChatPanelContext';
 import { useUnreads } from '../../context/UnreadsContext';
@@ -58,7 +59,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
             <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
 
-          <button
+          {/* <button
             type="button"
             onClick={togglePanel}
             className={`flex shrink-0 items-center justify-center rounded-full transition-all ${
@@ -68,7 +69,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
             aria-expanded={isAiOpen}
           >
             <MnoonxAISiriOrb size="42px" animationDuration={18} compact />
-          </button>
+          </button> */}
 
           {user ? (
             <div className="flex items-center gap-1 sm:gap-2">
@@ -80,12 +81,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
                   <MessageCircle className="h-5 w-5" />
                 </HeaderIconBadge>
               </span>
-              <button
-                type="button"
-                className="hidden rounded-full border px-4 py-2 font-simebold text-neutral-600 transition-all hover:bg-black/10 hover:text-neutral-700 active:scale-[0.95] md:inline-flex"
-              >
-                Go to Dashboard
-              </button>
+              <GoToDashboardMenu />
             </div>
           ) : (
             <button
