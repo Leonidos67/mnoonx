@@ -1,8 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { File, Image, Smile, X, type LucideIcon } from 'lucide-react';
+import { File, Image, Smile, Sticker, X, type LucideIcon } from 'lucide-react';
 
-export type AttachmentMenuAction = 'documents' | 'media' | 'animated-emoji' | 'close';
+export type AttachmentMenuAction = 'documents' | 'media' | 'animated-emoji' | 'stickers' | 'close';
 
 interface MessengerAttachmentMenuProps {
   onSelect: (action: AttachmentMenuAction) => void;
@@ -133,6 +133,19 @@ const MessengerAttachmentMenu: React.FC<MessengerAttachmentMenuProps> = ({
             bgClassName="bg-gradient-to-br from-fuchsia-400 to-violet-600"
           />
           Animated emoji
+        </motion.button>
+
+        <motion.button
+          type="button"
+          className={rowClass}
+          variants={itemVariants}
+          onClick={() => onSelect('stickers')}
+        >
+          <MenuIconBadge
+            icon={Sticker}
+            bgClassName="bg-gradient-to-br from-amber-400 to-orange-500"
+          />
+          Stickers
         </motion.button>
 
         <motion.button type="button" className={rowClass} variants={itemVariants} onClick={() => onSelect('close')}>

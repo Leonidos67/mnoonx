@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { MESSAGES_API } from '../config/api';
 import {
   getStoreItem,
   loadPurchasedStoreIds,
@@ -6,8 +7,21 @@ import {
   type ActivityStoreItemId,
 } from '../constants/activityStore';
 import { spendActivityPoints } from '../constants/activityPoints';
+import { useAuth } from '../context/AuthContext';
+
+async function installMessengerStickerPack(token: string, slug: string) {
+  try {
+    await fetch(`${MESSAGES_API}/sticker-packs/${slug}/install`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    /* ignore */
+  }
+}
 
 export function useActivityPurchases(onBalanceChange: () => void) {
+  const { token } = useAuth();
   const [purchasedIds, setPurchasedIds] = useState(() => loadPurchasedStoreIds());
 
   const purchaseItem = useCallback(
@@ -21,9 +35,12 @@ export function useActivityPurchases(onBalanceChange: () => void) {
 
       setPurchasedIds(markStoreItemPurchased(itemId));
       onBalanceChange();
+      if (itemId === 'sticker-ham-pack' && token) {
+        void installMessengerStickerPack(token, 'kawaii');
+      }
       return 'ok';
     },
-    [purchasedIds, onBalanceChange]
+    [purchasedIds, onBalanceChange, token]
   );
 
   return { purchasedIds, purchaseItem };

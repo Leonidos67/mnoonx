@@ -1,11 +1,35 @@
 import { MessengerEmojiItem } from '../constants/messengerEmojis';
+import { isStickerOnlyMessage, stickerPreviewLabel } from './messengerStickers';
 
 const ANIMOJI_TOKEN_RE =
   /\[\[animoji:id=([^;\]]+);emoji=([^;\]]+);(?:slug=([^;\]]+);)?url=([^\]]+)\]\]/g;
 
+const STICKER_TOKEN_RE = /\[\[sticker:([^\]]+)\]\]/g;
+
+const MESSAGE_TOKEN_RE =
+  /\[\[(animoji):id=([^;\]]+);emoji=([^;\]]+);(?:slug=([^;\]]+);)?url=([^\]]+)\]\]|\[\[(sticker):([^\]]+)\]\]/g;
+
 export type MessagePart =
   | { type: 'text'; value: string }
-  | { type: 'animoji'; id: string; emoji: string; lottieUrl: string; slug?: string };
+  | { type: 'animoji'; id: string; emoji: string; lottieUrl: string; slug?: string }
+  | { type: 'sticker'; packSlug: string; stickerId: string; imageUrl: string };
+
+function parseStickerParams(inner: string): { packSlug: string; stickerId: string; imageUrl: string } | null {
+  const params: Record<string, string> = {};
+  inner.split(';').forEach((segment) => {
+    const eq = segment.indexOf('=');
+    if (eq <= 0) return;
+    const key = segment.slice(0, eq).trim();
+    const raw = segment.slice(eq + 1);
+    try {
+      params[key] = decodeURIComponent(raw);
+    } catch {
+      params[key] = raw;
+    }
+  });
+  if (!params.pack || !params.id || !params.url) return null;
+  return { packSlug: params.pack, stickerId: params.id, imageUrl: params.url };
+}
 
 export function encodeAnimojiMessage(
   item: Pick<MessengerEmojiItem, 'id' | 'emoji' | 'lottieUrl' | 'slug'>
@@ -17,26 +41,38 @@ export function encodeAnimojiMessage(
 }
 
 export function formatMessagePreview(text: string): string {
-  return text.replace(ANIMOJI_TOKEN_RE, (_full, _id, emoji) => emoji);
+  let out = text.replace(ANIMOJI_TOKEN_RE, (_full, _id, emoji) => emoji);
+  out = out.replace(STICKER_TOKEN_RE, (_full, inner) => {
+    const parsed = parseStickerParams(inner);
+    return parsed ? stickerPreviewLabel(parsed.packSlug) : 'Sticker';
+  });
+  return out;
 }
 
 export function parseMessageParts(text: string): MessagePart[] {
   const parts: MessagePart[] = [];
   let lastIndex = 0;
-  const re = new RegExp(ANIMOJI_TOKEN_RE.source, 'g');
+  const re = new RegExp(MESSAGE_TOKEN_RE.source, 'g');
   let match: RegExpExecArray | null;
 
   while ((match = re.exec(text)) !== null) {
     if (match.index > lastIndex) {
       parts.push({ type: 'text', value: text.slice(lastIndex, match.index) });
     }
-    parts.push({
-      type: 'animoji',
-      id: match[1],
-      emoji: match[2],
-      slug: match[3] || undefined,
-      lottieUrl: decodeURIComponent(match[4]),
-    });
+    if (match[1] === 'animoji') {
+      parts.push({
+        type: 'animoji',
+        id: match[2],
+        emoji: match[3],
+        slug: match[4] || undefined,
+        lottieUrl: decodeURIComponent(match[5]),
+      });
+    } else if (match[6] === 'sticker') {
+      const sticker = parseStickerParams(match[7]);
+      if (sticker) {
+        parts.push({ type: 'sticker', ...sticker });
+      }
+    }
     lastIndex = match.index + match[0].length;
   }
 
@@ -51,6 +87,13 @@ export function isAnimojiOnlyMessage(text: string): boolean {
   const parts = parseMessageParts(text.trim());
   return parts.length === 1 && parts[0].type === 'animoji';
 }
+
+export function isAttachmentOnlyMessage(text: string): boolean {
+  const trimmed = text.trim();
+  return isAnimojiOnlyMessage(trimmed) || isStickerOnlyMessage(trimmed);
+}
+
+export { isStickerOnlyMessage } from './messengerStickers';
 
 /** Stored reply shape: `> quote…` block, blank line, then the sent message body. */
 export function splitReplyMessage(text: string): { quoteBlock: string | null; body: string } {

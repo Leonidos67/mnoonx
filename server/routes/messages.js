@@ -10,6 +10,10 @@ const {
   countUnreadMessages,
   getOrCreateDmConversation,
 } = require('../services/messaging');
+const {
+  getInstalledStickerPacksForUser,
+  installStickerPackForUser,
+} = require('../services/stickers');
 
 router.use(auth);
 router.use((req, res, next) => {
@@ -393,6 +397,28 @@ router.post('/dm/:username', async (req, res) => {
       name: peer.fullName || peer.username,
       avatar: avatarForKind('dm', peer),
     });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.get('/sticker-packs', async (req, res) => {
+  try {
+    const packs = await getInstalledStickerPacksForUser(req.userId);
+    res.json({ packs });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+router.post('/sticker-packs/:slug/install', async (req, res) => {
+  try {
+    const pack = await installStickerPackForUser(req.userId, req.params.slug);
+    if (!pack) return res.status(404).json({ message: 'Sticker pack not found' });
+    const packs = await getInstalledStickerPacksForUser(req.userId);
+    res.json({ packs });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

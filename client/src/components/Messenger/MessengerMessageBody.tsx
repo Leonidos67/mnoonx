@@ -4,6 +4,7 @@ import {
   formatMessagePreview,
   getMessageBody,
   isAnimojiOnlyMessage,
+  isStickerOnlyMessage,
   parseMessageParts,
   splitReplyMessage,
 } from '../../utils/messengerAnimoji';
@@ -23,6 +24,7 @@ const MessengerMessageBody: React.FC<MessengerMessageBodyProps> = ({
   const displayText = quoteBlock ? body : text;
   const parts = parseMessageParts(displayText);
   const animojiOnly = isAnimojiOnlyMessage(displayText);
+  const stickerOnly = isStickerOnlyMessage(displayText);
 
   const quoteLabel =
     quoteBlock &&
@@ -50,6 +52,23 @@ const MessengerMessageBody: React.FC<MessengerMessageBodyProps> = ({
     );
   }
 
+  if (stickerOnly && parts[0]?.type === 'sticker') {
+    const part = parts[0];
+    return (
+      <div className={className}>
+        {quoteLabel ? (
+          <p className={`line-clamp-2 ${quoteClassName}`}>{formatMessagePreview(quoteLabel)}</p>
+        ) : null}
+        <img
+          src={part.imageUrl}
+          alt=""
+          className="h-[120px] w-[120px] object-contain"
+          draggable={false}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={className}>
       {quoteLabel ? (
@@ -71,6 +90,17 @@ const MessengerMessageBody: React.FC<MessengerMessageBodyProps> = ({
                   size={32}
                 />
               </span>
+            );
+          }
+          if (part.type === 'sticker') {
+            return (
+              <img
+                key={`sticker-${index}`}
+                src={part.imageUrl}
+                alt=""
+                className="mx-0.5 inline-block h-16 w-16 align-middle object-contain"
+                draggable={false}
+              />
             );
           }
           if (!part.value) return null;

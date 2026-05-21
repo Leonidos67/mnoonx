@@ -22,6 +22,7 @@ import MessengerAttachmentMenu, {
 } from '../components/Messenger/MessengerAttachmentMenu';
 import MessengerEmojiPicker from '../components/Messenger/MessengerEmojiPicker';
 import MessengerAnimojiAttachPanel from '../components/Messenger/MessengerAnimojiAttachPanel';
+import MessengerStickersAttachPanel from '../components/Messenger/MessengerStickersAttachPanel';
 import MessengerMessageBody from '../components/Messenger/MessengerMessageBody';
 import MessengerChatContextMenu, {
   type ChatContextMenuAnchor,
@@ -47,9 +48,12 @@ import {
   getMessageBody,
   getReplyQuotePreview,
   isAnimojiOnlyMessage,
+  isAttachmentOnlyMessage,
   rebuildReplyMessage,
   splitReplyMessage,
 } from '../utils/messengerAnimoji';
+import { encodeStickerMessage } from '../utils/messengerStickers';
+import type { MessengerStickerItem, MessengerStickerPack } from '../types/messengerStickers';
 import {
   loadMessengerChatPrefs,
   saveMessengerChatPrefs,
@@ -148,7 +152,7 @@ const Messenger: React.FC = () => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
-  const [attachMenuView, setAttachMenuView] = useState<'main' | 'animoji'>('main');
+  const [attachMenuView, setAttachMenuView] = useState<'main' | 'animoji' | 'stickers'>('main');
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
@@ -513,6 +517,24 @@ const Messenger: React.FC = () => {
     sendAnimoji(item);
   };
 
+  const sendSticker = useCallback(
+    (pack: MessengerStickerPack, sticker: MessengerStickerItem) => {
+      void sendMessageWithBody(
+        encodeStickerMessage({
+          packSlug: pack.slug,
+          id: sticker.id,
+          imageUrl: sticker.imageUrl,
+        })
+      );
+    },
+    [sendMessageWithBody]
+  );
+
+  const handleAttachStickerSelect = (pack: MessengerStickerPack, sticker: MessengerStickerItem) => {
+    closeAttachMenu();
+    sendSticker(pack, sticker);
+  };
+
   const handleAttachmentAction = (action: AttachmentMenuAction) => {
     if (action === 'close') {
       closeAttachMenu();
@@ -520,6 +542,10 @@ const Messenger: React.FC = () => {
     }
     if (action === 'animated-emoji') {
       setAttachMenuView('animoji');
+      return;
+    }
+    if (action === 'stickers') {
+      setAttachMenuView('stickers');
       return;
     }
     setAttachMenuOpen(false);
@@ -1099,13 +1125,13 @@ const Messenger: React.FC = () => {
                     >
                       <div
                         className={`rounded-2xl ${
-                          isAnimojiOnlyMessage(message.text) ? 'px-1 py-1' : 'px-4 py-2'
+                          isAttachmentOnlyMessage(message.text) ? 'px-1 py-1' : 'px-4 py-2'
                         } ${
                           message.sender === 'user'
-                            ? isAnimojiOnlyMessage(message.text)
+                            ? isAttachmentOnlyMessage(message.text)
                               ? ''
                               : 'bg-black text-white'
-                            : isAnimojiOnlyMessage(message.text)
+                            : isAttachmentOnlyMessage(message.text)
                               ? ''
                               : 'bg-neutral-100 text-neutral-800'
                         }`}
@@ -1207,10 +1233,17 @@ const Messenger: React.FC = () => {
                     <AnimatePresence mode="wait">
                       {attachMenuView === 'main' ? (
                         <MessengerAttachmentMenu key="attach-menu" onSelect={handleAttachmentAction} />
-                      ) : (
+                      ) : attachMenuView === 'animoji' ? (
                         <MessengerAnimojiAttachPanel
                           key="attach-animoji"
                           onSelect={handleAttachAnimojiSelect}
+                          onBack={() => setAttachMenuView('main')}
+                          onClose={closeAttachMenu}
+                        />
+                      ) : (
+                        <MessengerStickersAttachPanel
+                          key="attach-stickers"
+                          onSelect={handleAttachStickerSelect}
                           onBack={() => setAttachMenuView('main')}
                           onClose={closeAttachMenu}
                         />
