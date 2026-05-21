@@ -19,6 +19,16 @@ const ConversationSchema = new mongoose.Schema({
   },
   lastMessageText: { type: String, default: '' },
   lastMessageAt: { type: Date, default: Date.now },
+  lastMessageSenderType: {
+    type: String,
+    enum: ['user', 'system'],
+    default: null,
+  },
+  lastMessageSenderUserId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
   createdAt: { type: Date, default: Date.now },
 });
 

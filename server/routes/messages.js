@@ -119,6 +119,38 @@ router.get('/conversations', async (req, res) => {
       dedupedConvs.map(async (c) => {
         const peer = c.peerUserId ? peerMap.get(c.peerUserId.toString()) : null;
         const unreadCount = await unreadCountForConversation(c, req.userId);
+
+        let senderType = c.lastMessageSenderType;
+        let senderUserId = c.lastMessageSenderUserId;
+        if (c.lastMessageText && !senderType) {
+          const lastMsg = await DirectMessage.findOne({ conversationId: c._id })
+            .sort({ createdAt: -1 })
+            .select('senderType senderUserId')
+            .lean();
+          if (lastMsg) {
+            senderType = lastMsg.senderType;
+            senderUserId = lastMsg.senderUserId;
+          }
+        }
+
+        const lastMessageFromMe =
+          senderType === 'user' &&
+          senderUserId?.toString() === req.userId.toString();
+
+        let lastMessageStatus = null;
+        if (lastMessageFromMe && c.lastMessageAt) {
+          if (c.kind === 'dm' && c.peerUserId) {
+            const peerLastReadAt = await getPeerLastReadAt(req.userId, c.peerUserId);
+            lastMessageStatus = resolveOutboundMessageStatus(
+              c,
+              peerLastReadAt,
+              c.lastMessageAt
+            );
+          } else {
+            lastMessageStatus = 'delivered';
+          }
+        }
+
         return {
           id: c._id.toString(),
           kind: c.kind,
@@ -131,6 +163,8 @@ router.get('/conversations', async (req, res) => {
           lastMessage: c.lastMessageText,
           lastMessageTime: c.lastMessageAt,
           unreadCount,
+          lastMessageFromMe,
+          lastMessageStatus,
           isReadOnly: c.kind === 'system_mnoonx',
           isOnline: c.kind !== 'dm',
           officialChannel: c.kind === 'system_mnoonx',
@@ -273,6 +307,8 @@ router.post('/conversations/:id/messages', async (req, res) => {
 
     conv.lastMessageText = text.slice(0, 200);
     conv.lastMessageAt = msg.createdAt;
+    conv.lastMessageSenderType = 'user';
+    conv.lastMessageSenderUserId = req.userId;
     await conv.save();
 
     if (conv.kind === 'dm' && conv.peerUserId) {
@@ -290,6 +326,8 @@ router.post('/conversations/:id/messages', async (req, res) => {
         });
         peerConv.lastMessageText = text.slice(0, 200);
         peerConv.lastMessageAt = msg.createdAt;
+        peerConv.lastMessageSenderType = 'user';
+        peerConv.lastMessageSenderUserId = req.userId;
         await peerConv.save();
       }
     }
@@ -318,6 +356,8 @@ router.post('/conversations/:id/messages', async (req, res) => {
           });
           conv.lastMessageText = reply.slice(0, 200);
           conv.lastMessageAt = auto.createdAt;
+          conv.lastMessageSenderType = 'system';
+          conv.lastMessageSenderUserId = null;
           await conv.save();
         } catch (e) {
           console.error('Support auto-reply error:', e);

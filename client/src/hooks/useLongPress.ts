@@ -34,7 +34,15 @@ export function useLongPress(onLongPress: () => void, delayMs = DEFAULT_MS) {
         onLongPress();
       }, delayMs);
     },
-    onTouchEnd: clearTimer,
+    onTouchEnd: (e: React.TouchEvent) => {
+      const didFire = firedRef.current;
+      clearTimer();
+      if (didFire) {
+        firedRef.current = false;
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    },
     onTouchMove: clearTimer,
     onTouchCancel: clearTimer,
   };

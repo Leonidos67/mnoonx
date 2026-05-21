@@ -51,3 +51,42 @@ export function isAnimojiOnlyMessage(text: string): boolean {
   const parts = parseMessageParts(text.trim());
   return parts.length === 1 && parts[0].type === 'animoji';
 }
+
+/** Stored reply shape: `> quote…` block, blank line, then the sent message body. */
+export function splitReplyMessage(text: string): { quoteBlock: string | null; body: string } {
+  if (!text.startsWith('> ')) {
+    return { quoteBlock: null, body: text };
+  }
+  const splitAt = text.indexOf('\n\n');
+  if (splitAt === -1) {
+    return { quoteBlock: null, body: text };
+  }
+  const quoteBlock = text.slice(0, splitAt);
+  const body = text.slice(splitAt + 2);
+  const isQuoteBlock = quoteBlock
+    .split('\n')
+    .every((line) => line.startsWith('> ') || line.trim() === '');
+  if (!isQuoteBlock) {
+    return { quoteBlock: null, body: text };
+  }
+  return { quoteBlock, body };
+}
+
+export function getMessageBody(text: string): string {
+  return splitReplyMessage(text).body;
+}
+
+/** One-line preview for the next reply (uses body only, never nested `> `). */
+export function getReplyQuotePreview(sourceText: string): string {
+  const body = getMessageBody(sourceText);
+  return formatMessagePreview(body).replace(/\n/g, ' ').trim().slice(0, 120);
+}
+
+export function buildReplyMessage(quotePreview: string, body: string): string {
+  const line = quotePreview.replace(/\n/g, ' ').trim();
+  return `> ${line}\n\n${body.trim()}`;
+}
+
+export function rebuildReplyMessage(quoteBlock: string, body: string): string {
+  return `${quoteBlock}\n\n${body.trim()}`;
+}

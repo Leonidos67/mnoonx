@@ -43,6 +43,8 @@ async function getOrCreateSystemConversation(userId, kind, welcomeBody) {
       kind,
       lastMessageText: welcomeBody.slice(0, 120),
       lastMessageAt: new Date(),
+      lastMessageSenderType: 'system',
+      lastMessageSenderUserId: null,
     });
     await DirectMessage.create({
       conversationId: conv._id,

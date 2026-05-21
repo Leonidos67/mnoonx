@@ -9,6 +9,7 @@ import {
   Video,
   Info,
   ArrowLeft,
+  X,
   Smile,
   Check,
   CheckCheck,
@@ -30,17 +31,40 @@ import MessengerChatContextMenu, {
   type ChatContextMenuAnchor,
   type MessengerChatActionId,
 } from '../components/Messenger/MessengerChatContextMenu';
+import MessengerChatDesktopMenu from '../components/Messenger/MessengerChatDesktopMenu';
 import MessengerChatListItem from '../components/Messenger/MessengerChatListItem';
+import type { MessengerChatListItemData } from '../components/Messenger/MessengerChatListItem';
+import MessengerMessageBubble from '../components/Messenger/MessengerMessageBubble';
+import MessengerPinnedMessagesBar from '../components/Messenger/MessengerPinnedMessagesBar';
+import MessengerMessageContextMenu, {
+  type MessageContextMenuAnchor,
+} from '../components/Messenger/MessengerMessageContextMenu';
+import type { MessengerMessageActionId } from '../components/Messenger/messengerMessageActionRows';
 import { MessengerEmojiItem } from '../constants/messengerEmojis';
 import { useConfirm } from '../context/ConfirmContext';
 import { useToast } from '../context/ToastContext';
 import { useTranslation } from '../i18n/useTranslation';
-import { encodeAnimojiMessage, formatMessagePreview, isAnimojiOnlyMessage } from '../utils/messengerAnimoji';
+import {
+  buildReplyMessage,
+  encodeAnimojiMessage,
+  formatMessagePreview,
+  getMessageBody,
+  getReplyQuotePreview,
+  isAnimojiOnlyMessage,
+  rebuildReplyMessage,
+  splitReplyMessage,
+} from '../utils/messengerAnimoji';
 import {
   loadMessengerChatPrefs,
   saveMessengerChatPrefs,
   type MessengerChatPrefs,
 } from '../utils/messengerChatPrefs';
+import {
+  getPinnedMessageIds,
+  loadMessengerMessagePins,
+  saveMessengerMessagePins,
+  type MessengerMessagePinsMap,
+} from '../utils/messengerMessagePrefs';
 
 import { MESSAGES_API as MSG_API, USERS_API as USERS_API } from '../config/api';
 
@@ -67,6 +91,8 @@ interface ApiConversation {
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
+  lastMessageFromMe?: boolean;
+  lastMessageStatus?: 'sent' | 'delivered' | 'read' | null;
   isReadOnly?: boolean;
   isOnline?: boolean;
   officialChannel?: boolean;
@@ -100,6 +126,14 @@ const Messenger: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [chatPrefs, setChatPrefs] = useState<MessengerChatPrefs>(() => loadMessengerChatPrefs());
   const [chatActionAnchor, setChatActionAnchor] = useState<ChatContextMenuAnchor | null>(null);
+  const [messagePins, setMessagePins] = useState<MessengerMessagePinsMap>(() =>
+    loadMessengerMessagePins()
+  );
+  const [messageActionAnchor, setMessageActionAnchor] = useState<MessageContextMenuAnchor | null>(
+    null
+  );
+  const [replyTo, setReplyTo] = useState<ApiMessage | null>(null);
+  const [editingMessage, setEditingMessage] = useState<ApiMessage | null>(null);
 
   const [chats, setChats] = useState<ApiConversation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -382,6 +416,12 @@ const Messenger: React.FC = () => {
   }, [selectedId, selectedMeta, loadingMessages]);
 
   useEffect(() => {
+    setMessageActionAnchor(null);
+    setReplyTo(null);
+    setEditingMessage(null);
+  }, [selectedId]);
+
+  useEffect(() => {
     if (!selectedId || !token || selectedMeta?.kind !== 'dm') return;
     const poll = window.setInterval(() => {
       void loadMessages(selectedId, { silent: true });
@@ -490,16 +530,189 @@ const Messenger: React.FC = () => {
     setAttachMenuView('main');
   };
 
+  const persistMessagePins = useCallback((next: MessengerMessagePinsMap) => {
+    setMessagePins(next);
+    saveMessengerMessagePins(next);
+  }, []);
+
+  const pinnedMessageIds = selectedId ? getPinnedMessageIds(messagePins, selectedId) : [];
+  const pinnedIdSet = useMemo(() => new Set(pinnedMessageIds), [pinnedMessageIds]);
+
+  const messageActionLabels = useMemo(
+    () => ({
+      menuTitle: t('messenger.messageActions.menuTitle'),
+      reply: t('messenger.messageActions.reply'),
+      edit: t('messenger.messageActions.edit'),
+      pin: t('messenger.messageActions.pin'),
+      unpin: t('messenger.messageActions.unpin'),
+      copy: t('messenger.messageActions.copy'),
+      delete: t('messenger.messageActions.delete'),
+    }),
+    [t]
+  );
+
+  const openMessageMenu = useCallback(
+    (message: ApiMessage, rect: DOMRect) => {
+      if (!selectedId) return;
+      const canCompose = !selectedMeta?.isReadOnly;
+      setMessageActionAnchor((prev) => {
+        if (prev?.messageId === message.id) return null;
+        return {
+          messageId: message.id,
+          rect,
+          isPinned: pinnedIdSet.has(message.id),
+          canReply: canCompose,
+          canEdit: canCompose && message.sender === 'user',
+          canDelete: canCompose && message.sender === 'user',
+        };
+      });
+    },
+    [selectedId, selectedMeta?.isReadOnly, pinnedIdSet]
+  );
+
+  const clearComposerMode = useCallback(() => {
+    setReplyTo(null);
+    setEditingMessage(null);
+  }, []);
+
+  const handleMessageAction = useCallback(
+    async (action: MessengerMessageActionId) => {
+      if (!messageActionAnchor || !selectedId) return;
+      const message = messages.find((m) => m.id === messageActionAnchor.messageId);
+      setMessageActionAnchor(null);
+      if (!message) return;
+
+      if (action === 'reply') {
+        setReplyTo(message);
+        setEditingMessage(null);
+        setNewMessage('');
+        messageInputRef.current?.focus();
+        return;
+      }
+
+      if (action === 'edit') {
+        setEditingMessage(message);
+        setReplyTo(null);
+        setNewMessage(getMessageBody(message.text));
+        messageInputRef.current?.focus();
+        return;
+      }
+
+      if (action === 'pin') {
+        const current = getPinnedMessageIds(messagePins, selectedId);
+        const next = new Set(current);
+        const wasPinned = next.has(message.id);
+        if (wasPinned) next.delete(message.id);
+        else next.add(message.id);
+        persistMessagePins({
+          ...messagePins,
+          [selectedId]: Array.from(next),
+        });
+        showToast(
+          wasPinned ? t('messenger.messageActions.unpinned') : t('messenger.messageActions.pinned')
+        );
+        return;
+      }
+
+      if (action === 'copy') {
+        try {
+          await navigator.clipboard.writeText(formatMessagePreview(getMessageBody(message.text)));
+          showToast(t('messenger.messageActions.copied'));
+        } catch {
+          showToast(t('messenger.messageActions.copied'), 'info');
+        }
+        return;
+      }
+
+      if (action === 'delete') {
+        const ok = await confirm({
+          title: t('messenger.messageActions.deleteTitle'),
+          message: t('messenger.messageActions.deleteMessage'),
+          confirmLabel: t('messenger.messageActions.deleteConfirm'),
+          variant: 'danger',
+        });
+        if (!ok) return;
+        setMessages((prev) => prev.filter((m) => m.id !== message.id));
+        if (pinnedIdSet.has(message.id)) {
+          const current = getPinnedMessageIds(messagePins, selectedId);
+          persistMessagePins({
+            ...messagePins,
+            [selectedId]: current.filter((id) => id !== message.id),
+          });
+        }
+        if (editingMessage?.id === message.id) {
+          setEditingMessage(null);
+          setNewMessage('');
+        }
+        if (replyTo?.id === message.id) setReplyTo(null);
+        showToast(t('messenger.messageActions.deleted'));
+      }
+    },
+    [
+      messageActionAnchor,
+      selectedId,
+      messages,
+      messagePins,
+      persistMessagePins,
+      pinnedIdSet,
+      editingMessage?.id,
+      replyTo?.id,
+      showToast,
+      t,
+      confirm,
+    ]
+  );
+
   const sendMessage = async () => {
     if (!newMessage.trim() || sending) return;
-    const text = newMessage.trim();
+    let text = newMessage.trim();
+
+    if (editingMessage) {
+      const { quoteBlock } = splitReplyMessage(editingMessage.text);
+      const nextText = quoteBlock ? rebuildReplyMessage(quoteBlock, text) : text;
+      setMessages((prev) =>
+        prev.map((m) => (m.id === editingMessage.id ? { ...m, text: nextText } : m))
+      );
+      setNewMessage('');
+      setEditingMessage(null);
+      showToast(t('messenger.messageActions.edited'));
+      messageInputRef.current?.focus();
+      return;
+    }
+
+    const savedReply = replyTo;
+    if (replyTo) {
+      text = buildReplyMessage(getReplyQuotePreview(replyTo.text), text);
+      setReplyTo(null);
+    }
+
     setNewMessage('');
     try {
       await sendMessageWithBody(text);
     } catch {
       setNewMessage(text);
+      if (savedReply) setReplyTo(savedReply);
     }
   };
+
+  const pinnedMessages = useMemo(
+    () =>
+      pinnedMessageIds
+        .map((id) => messages.find((m) => m.id === id))
+        .filter((m): m is ApiMessage => Boolean(m)),
+    [messages, pinnedMessageIds]
+  );
+
+  const scrollToMessage = useCallback((messageId: string) => {
+    requestAnimationFrame(() => {
+      const root = messagesScrollRef.current;
+      const el = root?.querySelector(`[data-message-id="${messageId}"]`) as HTMLElement | null;
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('messenger-message-jump-highlight');
+      window.setTimeout(() => el.classList.remove('messenger-message-jump-highlight'), 1200);
+    });
+  }, []);
 
   const filteredChats = chats.filter((chat) => {
     if (chatPrefs.hiddenIds.includes(chat.id)) return false;
@@ -540,6 +753,47 @@ const Messenger: React.FC = () => {
     }),
     [t]
   );
+
+  const messageStatusLabels = useMemo(
+    () => ({
+      sent: t('messenger.messageStatus.sent'),
+      delivered: t('messenger.messageStatus.delivered'),
+      read: t('messenger.messageStatus.read'),
+    }),
+    [t]
+  );
+
+  const toListChatItem = useCallback(
+    (chat: ApiConversation): MessengerChatListItemData => ({
+      id: chat.id,
+      name: chat.name,
+      avatar: chat.avatar,
+      lastMessage: chat.lastMessage,
+      lastMessageTime: chat.lastMessageTime,
+      unreadCount: chat.unreadCount,
+      isOnline: chat.isOnline,
+      lastMessageFromMe: chat.lastMessageFromMe,
+      lastMessageStatus: chat.lastMessageStatus ?? null,
+    }),
+    []
+  );
+
+  const openChatActionsMenu = useCallback((chat: ApiConversation, rect: DOMRect) => {
+    setChatActionAnchor((prev) => {
+      if (prev?.target.id === chat.id) return null;
+      return {
+        rect,
+        chat: toListChatItem(chat),
+        target: {
+          id: chat.id,
+          name: chat.name,
+          avatar: chat.avatar,
+          kind: chat.kind,
+          username: chat.username,
+        },
+      };
+    });
+  }, [toListChatItem]);
 
   const handleChatAction = useCallback(
     async (action: MessengerChatActionId) => {
@@ -758,26 +1012,17 @@ const Messenger: React.FC = () => {
             displayChats.map((chat) => (
               <MessengerChatListItem
                 key={chat.id}
-                chat={chat}
+                chat={toListChatItem(chat)}
                 selected={selectedId === chat.id}
                 isPinned={chatPrefs.pinnedIds.includes(chat.id)}
                 formatListTime={formatListTime}
                 noMessagesLabel={t('messenger.noMessagesYet')}
                 menuOpenForThisChat={chatActionAnchor?.target.id === chat.id}
+                actionsMenuLabel={chatActionLabels.sheetTitle}
+                statusLabels={messageStatusLabels}
                 onOpen={() => openChat(chat.id)}
-                onLongPress={(rect) =>
-                  setChatActionAnchor({
-                    rect,
-                    chat,
-                    target: {
-                      id: chat.id,
-                      name: chat.name,
-                      avatar: chat.avatar,
-                      kind: chat.kind,
-                      username: chat.username,
-                    },
-                  })
-                }
+                onLongPress={(rect) => openChatActionsMenu(chat, rect)}
+                onOpenActionsMenu={(rect) => openChatActionsMenu(chat, rect)}
               />
             ))
           )}
@@ -789,7 +1034,7 @@ const Messenger: React.FC = () => {
           ref={chatPanelRef}
           className="relative flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden max-lg:fixed max-lg:inset-0 max-lg:z-30 max-lg:bg-white lg:relative lg:z-auto"
         >
-          <div className="flex shrink-0 items-center justify-between gap-2 border-b border-neutral-200 px-2 py-3 sm:px-4 sm:py-4">
+          <div className="flex shrink-0 items-center justify-between gap-1 border-b border-neutral-200 p-2 sm:px-4 sm:py-2">
             <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
               <button
                 type="button"
@@ -799,13 +1044,13 @@ const Messenger: React.FC = () => {
               >
                 <ArrowLeft className="h-5 w-5" strokeWidth={2} aria-hidden />
               </button>
-              <img src={selectedMeta.avatar} alt="" className="h-10 w-10 shrink-0 rounded-full" />
+              <img src={selectedMeta.avatar} alt="" className="h-8 w-8 shrink-0 rounded-full" />
               <div className="min-w-0">
                 <h2 className="truncate font-semibold text-neutral-800">{selectedMeta.name}</h2>
                 {selectedMeta.isOnline && <p className="text-xs text-green-500">Online</p>}
               </div>
             </div>
-            <div className="hidden shrink-0 items-center gap-1 sm:flex sm:gap-2">
+            {/* <div className="hidden shrink-0 items-center gap-1 sm:flex sm:gap-2">
               <button type="button" className="rounded-full p-2 transition-colors hover:bg-black/5">
                 <Phone className="h-5 w-5 text-neutral-600" />
               </button>
@@ -818,8 +1063,15 @@ const Messenger: React.FC = () => {
               <button type="button" className="rounded-full p-2 transition-colors hover:bg-black/5">
                 <MoreVertical className="h-5 w-5 text-neutral-600" />
               </button>
-            </div>
+            </div> */}
           </div>
+
+          <MessengerPinnedMessagesBar
+            messages={pinnedMessages}
+            sectionLabel={t('messenger.messageActions.pinnedSection')}
+            formatTime={formatMessageTime}
+            onJumpTo={scrollToMessage}
+          />
 
           <div
             ref={messagesScrollRef}
@@ -832,52 +1084,57 @@ const Messenger: React.FC = () => {
               </div>
             ) : (
               messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  {message.sender !== 'user' && (
-                    <img
-                      src={selectedMeta.avatar}
-                      alt=""
-                      className="mr-2 h-8 w-8 flex-shrink-0 self-end rounded-full"
-                    />
-                  )}
-                  <div className={`max-w-[85%] sm:max-w-[70%] ${message.sender === 'user' ? 'order-1' : ''}`}>
-                    <div
-                      className={`rounded-2xl ${
-                        isAnimojiOnlyMessage(message.text) ? 'px-1 py-1' : 'px-4 py-2'
-                      } ${
-                        message.sender === 'user'
-                          ? isAnimojiOnlyMessage(message.text)
-                            ? ''
-                            : 'bg-black text-white'
-                          : isAnimojiOnlyMessage(message.text)
-                            ? ''
-                            : 'bg-neutral-100 text-neutral-800'
-                      }`}
+                  <div
+                    key={message.id}
+                    className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    {message.sender !== 'user' && (
+                      <img
+                        src={selectedMeta.avatar}
+                        alt=""
+                        className="mr-2 h-8 w-8 shrink-0 self-end rounded-full"
+                      />
+                    )}
+                    <MessengerMessageBubble
+                      messageId={message.id}
+                      align={message.sender === 'user' ? 'end' : 'start'}
+                      isMenuOpen={messageActionAnchor?.messageId === message.id}
+                      onOpenMenu={(rect) => openMessageMenu(message, rect)}
                     >
-                      {selectedMeta.kind === 'system_mnoonx' &&
-                      messages[0]?.id === message.id &&
-                      message.sender === 'mnoonx' ? (
-                        <div className="whitespace-pre-wrap break-words text-sm">
-                          {formatMessageText(message.text)}
-                        </div>
-                      ) : (
-                        <MessengerMessageBody text={message.text} />
-                      )}
-                    </div>
-                    <div
-                      className={`mt-1 flex items-center gap-1 text-xs text-neutral-400 ${
-                        message.sender === 'user' ? 'justify-end' : 'justify-start'
-                      }`}
-                    >
-                      <span>{formatMessageTime(message.timestamp)}</span>
-                      {message.sender === 'user' && getMessageStatusIcon(message.status)}
-                    </div>
+                      <div
+                        className={`rounded-2xl ${
+                          isAnimojiOnlyMessage(message.text) ? 'px-1 py-1' : 'px-4 py-2'
+                        } ${
+                          message.sender === 'user'
+                            ? isAnimojiOnlyMessage(message.text)
+                              ? ''
+                              : 'bg-black text-white'
+                            : isAnimojiOnlyMessage(message.text)
+                              ? ''
+                              : 'bg-neutral-100 text-neutral-800'
+                        }`}
+                      >
+                        {selectedMeta.kind === 'system_mnoonx' &&
+                        messages[0]?.id === message.id &&
+                        message.sender === 'mnoonx' ? (
+                          <div className="whitespace-pre-wrap break-words text-sm">
+                            {formatMessageText(message.text)}
+                          </div>
+                        ) : (
+                          <MessengerMessageBody text={message.text} />
+                        )}
+                      </div>
+                      <div
+                        className={`mt-1 flex items-center gap-1 text-xs text-neutral-400 ${
+                          message.sender === 'user' ? 'justify-end' : 'justify-start'
+                        }`}
+                      >
+                        <span>{formatMessageTime(message.timestamp)}</span>
+                        {message.sender === 'user' && getMessageStatusIcon(message.status)}
+                      </div>
+                    </MessengerMessageBubble>
                   </div>
-                </div>
-              ))
+                ))
             )}
             <div ref={messagesEndRef} />
           </div>
@@ -898,6 +1155,31 @@ const Messenger: React.FC = () => {
             </div>
           ) : (
             <div className="shrink-0 border-t border-neutral-200 p-0 pb-[env(safe-area-inset-bottom,0px)]">
+              {(replyTo || editingMessage) && (
+                <div className="flex items-start gap-2 border-b border-neutral-100 bg-neutral-50 px-3 py-2 sm:px-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-neutral-500">
+                      {editingMessage
+                        ? t('messenger.messageActions.editing')
+                        : t('messenger.messageActions.replyTo')}
+                    </p>
+                    <p className="mt-0.5 truncate text-sm text-neutral-800">
+                      {formatMessagePreview(getMessageBody((editingMessage ?? replyTo)!.text))}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    aria-label={t('messenger.messageActions.cancel')}
+                    onClick={() => {
+                      clearComposerMode();
+                      setNewMessage('');
+                    }}
+                    className="shrink-0 rounded-full p-1 text-neutral-500 hover:bg-neutral-200/80"
+                  >
+                    <X className="h-4 w-4" aria-hidden />
+                  </button>
+                </div>
+              )}
               <div className="relative min-w-0">
                 <input
                   ref={messageInputRef}
@@ -1021,6 +1303,21 @@ const Messenger: React.FC = () => {
         onClose={() => setChatActionAnchor(null)}
         onAction={(action) => void handleChatAction(action)}
         labels={chatActionLabels}
+      />
+      <MessengerChatDesktopMenu
+        anchor={chatActionAnchor}
+        isPinned={
+          chatActionAnchor ? chatPrefs.pinnedIds.includes(chatActionAnchor.target.id) : false
+        }
+        onClose={() => setChatActionAnchor(null)}
+        onAction={(action) => void handleChatAction(action)}
+        labels={chatActionLabels}
+      />
+      <MessengerMessageContextMenu
+        anchor={messageActionAnchor}
+        onClose={() => setMessageActionAnchor(null)}
+        onAction={(action) => void handleMessageAction(action)}
+        labels={messageActionLabels}
       />
     </div>
   );

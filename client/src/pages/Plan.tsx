@@ -117,8 +117,6 @@ const Plan: React.FC = () => {
       </header>
 
       <div className="mt-10 grid gap-5 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>
-
-      <p className="mt-10 text-center text-xs text-neutral-500">{t('plan.footerNote')}</p>
     </div>
   );
 };

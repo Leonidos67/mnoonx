@@ -1,8 +1,9 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Pin, PinOff, Sparkles, Flag, Ban, Trash2 } from 'lucide-react';
 import MessengerChatRow from './MessengerChatRow';
+import MessengerChatActionMenuList from './MessengerChatActionMenuList';
+import { buildMessengerChatActionRows } from './messengerChatActionRows';
 import type { MessengerChatListItemData } from './MessengerChatListItem';
 
 export interface MessengerChatActionTarget {
@@ -132,48 +133,10 @@ const MessengerChatContextMenu: React.FC<MessengerChatContextMenuProps> = ({
 
   const dismiss = () => onClose();
 
-  const rows = useMemo(() => {
-    const list: {
-      id: MessengerChatActionId;
-      label: string;
-      icon: React.ReactNode;
-      destructive?: boolean;
-    }[] = [
-      {
-        id: 'pin',
-        label: isPinned ? labels.unpin : labels.pin,
-        icon: isPinned ? (
-          <PinOff className="h-5 w-5 text-neutral-700" aria-hidden />
-        ) : (
-          <Pin className="h-5 w-5 text-neutral-700" aria-hidden />
-        ),
-      },
-      {
-        id: 'markNew',
-        label: labels.markNew,
-        icon: <Sparkles className="h-5 w-5 text-neutral-700" aria-hidden />,
-      },
-      {
-        id: 'report',
-        label: labels.report,
-        icon: <Flag className="h-5 w-5 text-neutral-700" aria-hidden />,
-      },
-      {
-        id: 'delete',
-        label: labels.deleteChat,
-        icon: <Trash2 className="h-5 w-5 text-red-600" aria-hidden />,
-        destructive: true,
-      },
-    ];
-    if (isDm) {
-      list.splice(3, 0, {
-        id: 'block',
-        label: labels.blockUser,
-        icon: <Ban className="h-5 w-5 text-neutral-700" aria-hidden />,
-      });
-    }
-    return list;
-  }, [isDm, isPinned, labels]);
+  const rows = useMemo(
+    () => buildMessengerChatActionRows(isPinned, Boolean(isDm), labels),
+    [isDm, isPinned, labels]
+  );
 
   useLayoutEffect(() => {
     if (!frozen || !menuRef.current) {
@@ -289,26 +252,7 @@ const MessengerChatContextMenu: React.FC<MessengerChatContextMenuProps> = ({
             }}
             transition={{ ...springSoft, delay: 0.04 }}
           >
-            <ul>
-              {rows.map((row, index) => (
-                <li key={row.id}>
-                  <motion.button
-                    type="button"
-                    role="menuitem"
-                    initial={{ opacity: 0, x: -6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.05 + index * 0.03, duration: 0.18 }}
-                    className={`flex w-full items-center gap-3 px-4 py-3.5 text-left text-[15px] font-medium transition-colors active:bg-neutral-100 ${
-                      row.destructive ? 'text-red-600' : 'text-neutral-900'
-                    }`}
-                    onClick={() => onAction(row.id)}
-                  >
-                    {row.icon}
-                    {row.label}
-                  </motion.button>
-                </li>
-              ))}
-            </ul>
+            <MessengerChatActionMenuList rows={rows} onAction={onAction} variant="mobile" />
           </motion.div>
         </motion.div>
       ) : null}

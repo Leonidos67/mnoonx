@@ -183,7 +183,6 @@ export const en = {
     popular: 'Popular',
     comingSoon: 'Billing will be available soon — stay tuned.',
     downgradeSoon: 'Plan downgrades will be available in billing settings.',
-    footerNote: 'Prices in USD. Community payouts and paid access include a 15% platform fee on Creator plans and above.',
     tiers: {
       free: {
         name: 'Free',
@@ -284,6 +283,32 @@ export const en = {
     officialChannel: 'Official MNOONX Channel',
     signInToMessage: 'Sign in to use Messenger.',
     noMessagesYet: 'No messages yet',
+    messageStatus: {
+      sent: 'Sent',
+      delivered: 'Delivered',
+      read: 'Read',
+    },
+    messageActions: {
+      menuTitle: 'Message options',
+      reply: 'Reply',
+      edit: 'Edit',
+      pin: 'Pin',
+      unpin: 'Unpin',
+      copy: 'Copy',
+      delete: 'Delete',
+      copied: 'Copied to clipboard',
+      pinned: 'Message pinned',
+      unpinned: 'Message unpinned',
+      edited: 'Message updated',
+      deleted: 'Message deleted',
+      deleteTitle: 'Delete message?',
+      deleteMessage: 'Remove this message from the chat?',
+      deleteConfirm: 'Delete',
+      replyTo: 'Reply to',
+      editing: 'Editing message',
+      cancel: 'Cancel',
+      pinnedSection: 'Pinned',
+    },
     chatActions: {
       sheetTitle: 'Chat options',
       pin: 'Pin',
@@ -376,6 +401,7 @@ export const en = {
     followers: 'Followers',
     joinedLine: 'Joined {date}',
     editProfile: 'Edit profile',
+    activity: 'Activity',
     follow: 'Follow',
     followingBtn: 'Following',
     followLoading: 'Loading...',
@@ -401,6 +427,64 @@ export const en = {
     editPostTitle: 'Edit post',
     editPostDescription: 'Update your post text. Media attachments are not changed here.',
     savePost: 'Save post',
+  },
+  activity: {
+    title: 'Activity & points',
+    backToProfile: 'Back to profile',
+    balanceLabel: 'Your points',
+    balanceHint: 'Earn points for real actions on MNOONX. Balance updates as features roll out.',
+    howItWorksTitle: 'How it works',
+    howStep1:
+      'Every meaningful action on the platform can earn points — posts, comments, follows, messages, and community participation.',
+    howStep2:
+      'Points are added automatically when the action is completed successfully. Spam and duplicate actions do not count.',
+    howStep3:
+      'Your total is shown on this page and on your profile. Later, points may unlock badges, visibility boosts, and plan perks.',
+    rulesTitle: 'What earns points',
+    rulesSubtitle: 'Exact values may be tuned over time. One-time actions count once per target.',
+    footerNote: 'Points are stored on your account. Full server-side tracking is coming soon.',
+    rules: {
+      post: {
+        title: 'Publish a post',
+        description: 'Create a new post on your profile or in a community feed (text or media).',
+      },
+      comment: {
+        title: 'Leave a comment',
+        description: 'Comment on someone else’s post or reply in a thread.',
+      },
+      likeReceived: {
+        title: 'Receive a like',
+        description: 'Another user likes your post — you earn when your content gets engagement.',
+      },
+      repost: {
+        title: 'Repost content',
+        description: 'Repost a post to your profile to spread it to your followers.',
+      },
+      follow: {
+        title: 'Follow someone',
+        description: 'Subscribe to another member’s profile.',
+      },
+      follower: {
+        title: 'Gain a follower',
+        description: 'A new user follows you — rewards growing your audience.',
+      },
+      message: {
+        title: 'Send a DM',
+        description: 'Send a direct message in Messenger (not system channels).',
+      },
+      communityJoin: {
+        title: 'Join a community',
+        description: 'Become a member of a public or private community.',
+      },
+      communityPost: {
+        title: 'Post in a community',
+        description: 'Publish a post inside a community you can post in.',
+      },
+      dailyVisit: {
+        title: 'Daily visit',
+        description: 'Open MNOONX once per day while signed in (counts once every 24 hours).',
+      },
+    },
   },
   createCommunity: {
     title: 'Create community',

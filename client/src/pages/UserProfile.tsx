@@ -17,6 +17,7 @@ import {
   Pen,
   Trash,
   Unlink2,
+  Zap,
 } from 'lucide-react';
 import MobileBottomSheet from '../components/Common/MobileBottomSheet';
 import FloatingMenu from '../components/Common/FloatingMenu';
@@ -745,7 +746,23 @@ const UserProfileComponent: React.FC = () => {
           </div>
           <div className="flex gap-2 mt-2">
             {isOwnProfile ? (
-              <button onClick={() => navigate('/settings')} className="px-5 py-2 border border-neutral-300 hover:bg-neutral-100 text-neutral-900 rounded-full font-semibold text-sm transition-colors">{t('userProfile.editProfile')}</button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => navigate('/settings')}
+                  className="px-5 py-2 border border-neutral-300 hover:bg-neutral-100 text-neutral-900 rounded-full font-semibold text-sm transition-colors"
+                >
+                  {t('userProfile.editProfile')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/activity')}
+                  className="inline-flex items-center gap-1.5 px-5 py-2 border border-neutral-300 hover:bg-neutral-100 text-neutral-900 rounded-full font-semibold text-sm transition-colors"
+                >
+                  <Zap className="h-4 w-4 text-amber-600" aria-hidden />
+                  {t('userProfile.activity')}
+                </button>
+              </>
             ) : (
               <>
                 <button onClick={handleFollow} disabled={followLoading}

@@ -37,6 +37,7 @@ import CommunityDashboardContent from './pages/community-dashboard/CommunityDash
 import CommunityDashboardAnalytics from './pages/community-dashboard/CommunityDashboardAnalytics';
 import CommunityDashboardInvites from './pages/community-dashboard/CommunityDashboardInvites';
 import Plan from './pages/Plan';
+import Activity from './pages/Activity';
 import ProfileRoute from './components/Routing/ProfileRoute';
 import RequireAuth from './components/Routing/RequireAuth';
 import RequireCommunityOwner from './components/Routing/RequireCommunityOwner';
@@ -132,6 +133,16 @@ function App() {
             }
           />
           <Route path="/plan" element={<AppLayout><Plan /></AppLayout>} />
+          <Route
+            path="/activity"
+            element={
+              <AppLayout>
+                <RequireAuth>
+                  <Activity />
+                </RequireAuth>
+              </AppLayout>
+            }
+          />
 
           <Route path="/post/:postId" element={<PostPage />} />
 
