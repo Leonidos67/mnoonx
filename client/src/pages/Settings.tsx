@@ -49,9 +49,9 @@ const Settings: React.FC = () => {
     name: user?.fullName || 'MakTraxer',
     username: user?.username || 'maktraxer',
     bio: '',
-    day: '04',
-    month: '09',
-    year: '2008',
+    day: '',
+    month: '',
+    year: '',
     location: '',
     website: '',
   });
@@ -169,7 +169,7 @@ const Settings: React.FC = () => {
                   onChange={(e) => handleInputChange('day', e.target.value)}
                   maxLength={2}
                   className="w-20 rounded-xl border border-neutral-200 px-4 py-3 text-center transition-all focus:outline-none focus:ring-2 focus:ring-black/10"
-                  placeholder="04"
+                  placeholder="DD"
                 />
                 <span className="text-2xl text-neutral-300">.</span>
                 <input
@@ -178,7 +178,7 @@ const Settings: React.FC = () => {
                   onChange={(e) => handleInputChange('month', e.target.value)}
                   maxLength={2}
                   className="w-20 rounded-xl border border-neutral-200 px-4 py-3 text-center transition-all focus:outline-none focus:ring-2 focus:ring-black/10"
-                  placeholder="09"
+                  placeholder="MM"
                 />
                 <span className="text-2xl text-neutral-300">.</span>
                 <input
@@ -187,7 +187,7 @@ const Settings: React.FC = () => {
                   onChange={(e) => handleInputChange('year', e.target.value)}
                   maxLength={4}
                   className="w-24 rounded-xl border border-neutral-200 px-4 py-3 text-center transition-all focus:outline-none focus:ring-2 focus:ring-black/10"
-                  placeholder="2008"
+                  placeholder="YYYY"
                 />
               </div>
             </div>

@@ -62,26 +62,26 @@ const MessengerPinnedMessagesBar: React.FC<MessengerPinnedMessagesBarProps> = ({
   };
 
   return (
-    <div className="shrink-0 border-b border-amber-200/70 bg-amber-50/60">
+    <div className="shrink-0 border-b bg-white">
       <button
         type="button"
         onClick={handleClick}
-        className="flex w-full items-stretch gap-2 px-3 py-2.5 text-left transition-colors hover:bg-amber-100/50 active:bg-amber-100/80 sm:px-4"
+        className="flex w-full items-stretch gap-2 p-2 text-left transition-colors hover:bg-black/5 active:bg-black/5"
         aria-label={sectionLabel}
       >
-        <Pin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-800/80" aria-hidden />
+        <Pin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-black" aria-hidden />
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wide text-amber-900/80">
+            <span className="text-xs font-semibold uppercase tracking-wide text-black">
               {sectionLabel}
             </span>
             {hasMultiple ? (
-              <span className="text-[11px] tabular-nums text-amber-800/60">
+              <span className="text-[11px] tabular-nums text-black">
                 {activeIndex + 1}/{messages.length}
               </span>
             ) : null}
           </div>
-          <div className="relative mt-1 min-h-[2.5rem]">
+          <div className="relative mt-1 ">
             <AnimatePresence mode="wait" custom={slideDirection}>
               <motion.div
                 key={active.id}
@@ -94,14 +94,10 @@ const MessengerPinnedMessagesBar: React.FC<MessengerPinnedMessagesBarProps> = ({
                 className="min-w-0"
               >
                 <p className="line-clamp-2 text-sm leading-snug text-neutral-800">{preview || '…'}</p>
-                <p className="mt-0.5 text-[11px] text-neutral-400">{formatTime(active.timestamp)}</p>
               </motion.div>
             </AnimatePresence>
           </div>
         </div>
-        {hasMultiple ? (
-          <ChevronRight className="h-4 w-4 shrink-0 self-center text-amber-800/50" aria-hidden />
-        ) : null}
       </button>
     </div>
   );

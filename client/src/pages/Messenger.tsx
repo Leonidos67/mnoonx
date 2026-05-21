@@ -4,10 +4,6 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
   Send,
-  MoreVertical,
-  Phone,
-  Video,
-  Info,
   ArrowLeft,
   X,
   Smile,

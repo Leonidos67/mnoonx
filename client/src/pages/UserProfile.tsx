@@ -29,6 +29,7 @@ import PostMediaGallery from '../components/Posts/PostMediaGallery';
 import PostComposer from '../components/Posts/PostComposer';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
+import { tryAwardActivity } from '../utils/awardActivity';
 
 import { USERS_API as API_URL, POSTS_API as POSTS_API_URL } from '../config/api';
 import { useTranslation } from '../i18n/useTranslation';
@@ -465,6 +466,7 @@ const UserProfileComponent: React.FC = () => {
       setNewPostMedia([]);
       closeComposer();
       showToast(t('common.postPublished'));
+      tryAwardActivity('post');
     } catch (err: unknown) {
       console.error('Create post error:', err);
       showToast(err instanceof Error ? err.message : t('common.failedToCreatePost'), 'error');
