@@ -78,13 +78,29 @@ async function parseLinkAttachmentInput(raw, userId) {
   return { title: title.slice(0, 120), url: url.slice(0, 500) };
 }
 
+function isAllowedPostMediaUrl(url) {
+  if (url.startsWith('/uploads/post-media/')) return true;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function sanitizePostMediaUrls(media) {
   if (!Array.isArray(media)) return [];
-  return media
-    .filter((u) => typeof u === 'string')
-    .map((u) => u.trim())
-    .filter((u) => u.startsWith('/uploads/post-media/'))
-    .slice(0, MAX_POST_MEDIA);
+  const seen = new Set();
+  const out = [];
+  for (const raw of media) {
+    if (typeof raw !== 'string') continue;
+    const u = raw.trim();
+    if (!u || !isAllowedPostMediaUrl(u) || seen.has(u)) continue;
+    seen.add(u);
+    out.push(u);
+    if (out.length >= MAX_POST_MEDIA) break;
+  }
+  return out;
 }
 
 function isCommunityMember(community, userId) {

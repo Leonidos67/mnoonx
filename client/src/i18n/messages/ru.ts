@@ -271,6 +271,7 @@ export const ru = {
     addLink: 'Прикрепить ссылку',
     editLink: 'Изменить ссылку',
     removeLink: 'Убрать ссылку',
+    addImageUrl: 'Картинка по ссылке',
   },
   postLink: {
     modalTitle: 'Прикрепить ссылку',
@@ -295,6 +296,15 @@ export const ru = {
     maxImages: 'Не более {count} изображений',
     removeImage: 'Удалить изображение',
     uploadFailed: 'Ошибка загрузки',
+    urlModalTitle: 'Картинка по ссылке',
+    urlLabel: 'Ссылка на изображение',
+    urlPlaceholder: 'https://example.com/photo.jpg',
+    urlHint: 'Вставьте прямую ссылку на картинку (JPG, PNG, WebP, GIF).',
+    urlInvalid: 'Введите корректную ссылку на изображение',
+    urlNotImage: 'Не удалось загрузить изображение. Проверьте ссылку.',
+    urlChecking: 'Проверка…',
+    urlPreviewFailed: 'Превью недоступно — можно попробовать добавить ссылку.',
+    urlAdd: 'Добавить',
   },
   messenger: {
     title: 'Сообщения',

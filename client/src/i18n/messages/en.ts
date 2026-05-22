@@ -271,6 +271,7 @@ export const en = {
     addLink: 'Add link',
     editLink: 'Edit link',
     removeLink: 'Remove link',
+    addImageUrl: 'Image from URL',
   },
   postLink: {
     modalTitle: 'Attach link',
@@ -295,6 +296,15 @@ export const en = {
     maxImages: 'Maximum {count} images',
     removeImage: 'Remove image',
     uploadFailed: 'Upload failed',
+    urlModalTitle: 'Add image by URL',
+    urlLabel: 'Image URL',
+    urlPlaceholder: 'https://example.com/photo.jpg',
+    urlHint: 'Paste a direct link to an image (JPG, PNG, WebP, GIF).',
+    urlInvalid: 'Enter a valid image URL',
+    urlNotImage: 'Could not load this image. Check the link.',
+    urlChecking: 'Checking image…',
+    urlPreviewFailed: 'Preview unavailable — you can still try to add the link.',
+    urlAdd: 'Add image',
   },
   messenger: {
     title: 'Messages',

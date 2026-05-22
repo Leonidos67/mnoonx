@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Image, Link2, Loader2, X } from 'lucide-react';
 import PostMediaUpload, { PostMediaUploadHandle } from './PostMediaUpload';
 import PostLinkAttachmentModal from './PostLinkAttachmentModal';
+import PostMediaUrlModal from './PostMediaUrlModal';
 import type { PostLinkAttachment } from '../../types/postLink';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -51,6 +52,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
   const mediaUploadRef = useRef<PostMediaUploadHandle>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [mediaUrlModalOpen, setMediaUrlModalOpen] = useState(false);
 
   const hasLink = Boolean(linkAttachment?.title?.trim() && linkAttachment?.url?.trim());
   const canSubmit =
@@ -199,19 +201,36 @@ const PostComposer: React.FC<PostComposerProps> = ({
       <div className={`mt-3 flex shrink-0 items-center justify-between border-t pt-3 ${toolbarBorderClass}`}>
         <div className="flex flex-wrap items-center gap-1">
           {media.length < MAX_POST_MEDIA ? (
-            <button
-              type="button"
-              onClick={handleAddPhotos}
-              disabled={mediaUploading}
-              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50"
-            >
-              {mediaUploading ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <Image size={18} />
-              )}
-              <span>{mediaUploading ? t('postComposer.uploading') : t('postComposer.addPhotos')}</span>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={handleAddPhotos}
+                disabled={mediaUploading}
+                className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50"
+              >
+                {mediaUploading ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <Image size={18} />
+                )}
+                <span>{mediaUploading ? t('postComposer.uploading') : t('postComposer.addPhotos')}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!token) {
+                    window.dispatchEvent(new CustomEvent('openLogin'));
+                    return;
+                  }
+                  setMediaUrlModalOpen(true);
+                }}
+                disabled={mediaUploading}
+                className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50"
+              >
+                <Link2 size={18} aria-hidden />
+                <span>{t('postComposer.addImageUrl')}</span>
+              </button>
+            </>
           ) : null}
           {onLinkAttachmentChange ? (
             <button
@@ -270,6 +289,15 @@ const PostComposer: React.FC<PostComposerProps> = ({
           token={token}
         />
       ) : null}
+      <PostMediaUrlModal
+        open={mediaUrlModalOpen}
+        onClose={() => setMediaUrlModalOpen(false)}
+        onAdd={(url) => {
+          if (media.includes(url)) return;
+          if (media.length >= MAX_POST_MEDIA) return;
+          onMediaChange([...media, url]);
+        }}
+      />
     </>
   );
 };
