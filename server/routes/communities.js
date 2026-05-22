@@ -615,6 +615,21 @@ router.patch('/:handle', auth, async (req, res) => {
       if (key === 'isPublic' && typeof req.body.isPublic !== 'boolean') {
         return res.status(400).json({ message: 'isPublic must be boolean' });
       }
+      if (key === 'banner' || key === 'avatar') {
+        const val = req.body[key] == null ? '' : String(req.body[key]).trim();
+        if (val && !val.startsWith('/uploads/')) {
+          try {
+            const parsed = new URL(val);
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+              return res.status(400).json({ message: `Invalid ${key} URL` });
+            }
+          } catch {
+            return res.status(400).json({ message: `Invalid ${key} URL` });
+          }
+        }
+        community[key] = val;
+        continue;
+      }
       if (key === 'joinCode') {
         if (req.body.joinCode !== null && req.body.joinCode !== undefined && typeof req.body.joinCode !== 'string') {
           return res.status(400).json({ message: 'joinCode must be a string' });
@@ -2214,24 +2229,10 @@ router.get('/:handle/posts', auth, async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(20);
 
-    const postsWithAuthors = await Promise.all(posts.map(async (post) => {
-      const author = await User.findById(post.author).select('username fullName avatar');
-      return {
-        ...post.toObject(),
-        author: {
-          _id: author._id,
-          username: author.username,
-          fullName: author.fullName,
-          avatar: author.avatar,
-        },
-        isLiked: req.userId
-          ? post.likes.some((id) => String(id) === String(req.userId))
-          : false,
-        isReposted: req.userId
-          ? post.reposts.some((id) => String(id) === String(req.userId))
-          : false,
-      };
-    }));
+    const { serializeFeedPost } = require('../services/postSerialize');
+    const postsWithAuthors = await Promise.all(
+      posts.map((post) => serializeFeedPost(post, req.userId)),
+    );
 
     res.json(postsWithAuthors);
   } catch (err) {

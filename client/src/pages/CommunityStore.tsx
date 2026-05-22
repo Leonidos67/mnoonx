@@ -317,7 +317,7 @@ const CommunityStore: React.FC = () => {
           <h1 className="text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl">
             {t('communityStore.pageTitle')}
           </h1>
-          <div className="flex w-full flex-col gap-3 sm:flex-row lg:min-w-[420px] lg:w-auto">
+          <div className="flex w-full flex-col gap-3 sm:flex-row lg:min-w-[320px] lg:w-auto">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
               <input
@@ -328,13 +328,13 @@ const CommunityStore: React.FC = () => {
                 className="w-full rounded-full border border-neutral-200 bg-neutral-50/80 py-2.5 pl-10 pr-4 text-sm text-neutral-900 placeholder:text-neutral-400 transition-shadow focus:border-[#315efb] focus:outline-none focus:ring-2 focus:ring-[#315efb]/25"
               />
             </div>
-            <button
+            {/* <button
               type="button"
               className="flex min-w-[200px] items-center justify-between gap-2 rounded-full border border-neutral-200 bg-white px-4 py-2.5 text-sm font-medium text-neutral-800 hover:bg-neutral-50 sm:min-w-[220px]"
             >
               <span className="truncate">{t('communityStore.sortMostWeekly')}</span>
               <ChevronDown className="h-4 w-4 shrink-0 text-neutral-500" />
-            </button>
+            </button> */}
           </div>
         </div>
 

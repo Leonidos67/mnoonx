@@ -19,6 +19,8 @@ import {
   Unlink2,
   Zap,
   Sparkles,
+  Globe,
+  Lock,
 } from 'lucide-react';
 import ProfileBgEmojiDecor from '../components/Profile/ProfileBgEmojiDecor';
 import {
@@ -42,6 +44,7 @@ import PostContentBody from '../components/Posts/PostContentBody';
 import type { PostLinkAttachment } from '../types/postLink';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
+import { getPostDisplayMeta } from '../utils/postDisplay';
 import { tryAwardActivity } from '../utils/awardActivity';
 
 import { USERS_API as API_URL, POSTS_API as POSTS_API_URL } from '../config/api';
@@ -85,6 +88,9 @@ const UserProfileComponent: React.FC = () => {
   const navigate = useNavigate();
   const { t, locale } = useTranslation();
   const menuRef = useRef<HTMLDivElement>(null);
+  const profileScrollRef = useRef<HTMLDivElement>(null);
+  const profileHeaderEndRef = useRef<HTMLDivElement>(null);
+  const [compactProfileBar, setCompactProfileBar] = useState(false);
   const isLgUp = useMediaQuery('(min-width: 1024px)');
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -167,6 +173,19 @@ const UserProfileComponent: React.FC = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    const root = profileScrollRef.current;
+    const target = profileHeaderEndRef.current;
+    if (!root || !target) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setCompactProfileBar(!entry.isIntersecting),
+      { root, threshold: 0 },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [profile?.username]);
 
   useEffect(() => {
     const syncPlan = () => setHasProPlan(hasProSubscription());
@@ -598,6 +617,8 @@ const UserProfileComponent: React.FC = () => {
   const renderPostCard = (post: Post, options?: { showRepostBanner?: boolean }) => {
     const postId = String(post._id);
     const showRepostBanner = options?.showRepostBanner ?? false;
+    const { displayAsCommunity, displayName, displayUsername, displayAvatar, profileLink, communityMeta } =
+      getPostDisplayMeta(post);
 
     return (
       <article
@@ -616,21 +637,33 @@ const UserProfileComponent: React.FC = () => {
           </div>
         )}
         <div className="flex space-x-3">
-          <Link to={`/@${post.author.username}`} onClick={(e) => e.stopPropagation()}>
+          <Link to={profileLink} onClick={(e) => e.stopPropagation()}>
             <img
-              src={post.author.avatar || `https://ui-avatars.com/api/?name=${post.author.fullName}&background=000&color=fff&size=40&bold=true`}
-              alt={post.author.fullName}
+              src={displayAvatar}
+              alt={displayName}
               className="h-6 w-6 rounded-full object-cover transition-opacity hover:opacity-90"
             />
           </Link>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1 flex-wrap">
-              <Link to={`/@${post.author.username}`} className="font-bold hover:underline truncate" onClick={(e) => e.stopPropagation()}>
-                {post.author.fullName}
+              <Link to={profileLink} className="font-bold hover:underline truncate" onClick={(e) => e.stopPropagation()}>
+                {displayName}
               </Link>
-              <span className="text-neutral-500 truncate">@{post.author.username}</span>
+              <span className="text-neutral-500 truncate">{displayUsername}</span>
               <span className="text-neutral-500">·</span>
               <span className="text-neutral-500 whitespace-nowrap">{formatPostDate(post.createdAt)}</span>
+              {post.isPrivate && (
+                <span className="ml-2 flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                  <Lock size={10} />
+                  {t('home.private')}
+                </span>
+              )}
+              {!displayAsCommunity && communityMeta && (
+                <span className="ml-2 flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">
+                  <Globe size={10} />
+                  {t('common.via')} {communityMeta.name}
+                </span>
+              )}
 
               <div className="ml-auto relative" ref={menuOpenPostId === postId ? menuRef : null}>
                 <button
@@ -831,8 +864,92 @@ const UserProfileComponent: React.FC = () => {
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-[1200px] gap-6">
       <div className="flex h-full min-h-0 max-w-[600px] flex-1 flex-col overflow-hidden border-x border-neutral-200 bg-white">
-        <div className="shrink-0">
-        {/* Profile Info */}
+        <div
+          ref={profileScrollRef}
+          className={`min-h-0 flex-1 ${mobileComposerFull ? 'overflow-hidden' : 'overflow-y-auto'}`}
+        >
+        {/* Compact bar — after scrolling past full profile header */}
+        <div
+          className={`sticky top-0 z-20 border-b border-neutral-200 bg-white/95 backdrop-blur-md transition-all duration-200 ${
+            compactProfileBar
+              ? 'opacity-100'
+              : 'pointer-events-none h-0 overflow-hidden border-transparent opacity-0 py-0'
+          }`}
+          aria-hidden={!compactProfileBar}
+        >
+          <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+              <span
+                className="truncate text-base font-bold text-neutral-900"
+                style={nameColor ? { color: nameColor } : undefined}
+              >
+                {displayName}
+              </span>
+              {statusIconUrl ? (
+                <img
+                  src={statusIconUrl}
+                  alt=""
+                  className="h-8 w-8 shrink-0 object-contain"
+                  draggable={false}
+                />
+              ) : null}
+              {isOwnProfile ? (
+                <button
+                  type="button"
+                  onClick={() => setPremiumModalOpen(true)}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-2.5 py-0.5 text-[11px] font-semibold text-violet-800"
+                >
+                  <Sparkles className="h-3 w-3 shrink-0 text-violet-600" aria-hidden />
+                  {t('userProfile.premiumStatus')}
+                </button>
+              ) : null}
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              {isOwnProfile ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/settings')}
+                    className="whitespace-nowrap rounded-full border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-900 transition-colors hover:bg-neutral-100"
+                  >
+                    {t('userProfile.editProfile')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/activity')}
+                    className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-neutral-300 px-3 py-1.5 text-xs font-semibold text-neutral-900 transition-colors hover:bg-neutral-100"
+                  >
+                    <Zap className="h-3.5 w-3.5 text-amber-600" aria-hidden />
+                    {t('userProfile.activity')}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={handleFollow}
+                    disabled={followLoading}
+                    className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+                      isFollowing
+                        ? 'border border-neutral-300 bg-white text-neutral-900 hover:border-red-300 hover:bg-red-50 hover:text-red-600'
+                        : 'bg-black text-white hover:bg-neutral-800'
+                    } ${followLoading ? 'cursor-not-allowed opacity-50' : ''}`}
+                  >
+                    {followLoading ? t('userProfile.followLoading') : isFollowing ? t('userProfile.followingBtn') : t('userProfile.follow')}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-full border border-neutral-300 p-1.5 transition-colors hover:bg-neutral-100"
+                    aria-label={t('messenger.title')}
+                  >
+                    <MessageCircle size={16} />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Profile Info — scrolls with feed */}
         <div className="relative -mx-px mt-4 overflow-hidden px-4 pb-4 pt-3">
           {profile.profileBgEmoji ? (
             <ProfileBgEmojiDecor emoji={profile.profileBgEmoji} />
@@ -917,6 +1034,7 @@ const UserProfileComponent: React.FC = () => {
           <div className="flex text-sm items-center gap-1"><Calendar size={14} /><span>{t('userProfile.joinedLine', { date: formatDate(profile.createdAt) })}</span></div>
           </div>
         </div>
+        <div ref={profileHeaderEndRef} className="h-px w-full shrink-0" aria-hidden />
 
         <ProfilePremiumStyleModal
           open={premiumModalOpen}
@@ -928,7 +1046,7 @@ const UserProfileComponent: React.FC = () => {
         />
 
         {/* Tabs */}
-        <div className="flex border-b border-neutral-200">
+        <div className="flex border-b border-neutral-200 bg-white">
           {[
             { id: 'posts', label: t('userProfile.posts') },
             { id: 'reposts', label: t('userProfile.reposts') },
@@ -941,8 +1059,6 @@ const UserProfileComponent: React.FC = () => {
               {activeTab === tab.id && <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-14 h-0.5 bg-black rounded-full" />}
             </button>
           ))}
-        </div>
-
         </div>
 
         {isOwnProfile && activeTab === 'posts' && (
@@ -965,10 +1081,10 @@ const UserProfileComponent: React.FC = () => {
           />
         )}
 
-        <div className={`min-h-0 flex-1 ${mobileComposerFull ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+        <div className={mobileComposerFull ? 'hidden' : ''}>
         {/* Posts */}
         {activeTab === 'posts' && (
-          <div className={mobileComposerFull ? 'hidden' : ''}>
+          <div>
             {posts.length > 0 ? (
               posts.map((post) => renderPostCard(post))
             ) : (
@@ -1005,6 +1121,7 @@ const UserProfileComponent: React.FC = () => {
             <p className="text-neutral-500">{t('userProfile.noTabHint', { name: profile.username, tab: activeTabTitle })}</p>
           </div>
         )}
+        </div>
         </div>
 
       </div>

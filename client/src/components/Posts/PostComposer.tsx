@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, Link2, Loader2, X } from 'lucide-react';
+import { Image, Link2, Loader2, PlusCircle, SquareArrowOutUpRight, X } from 'lucide-react';
 import PostMediaUpload, { PostMediaUploadHandle } from './PostMediaUpload';
 import PostLinkAttachmentModal from './PostLinkAttachmentModal';
 import PostMediaUrlModal from './PostMediaUrlModal';
@@ -135,7 +135,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
         }}
       >
         <div className={closedInnerClass}>
-          <img src={avatarSrc} alt="" className="h-10 w-10 rounded-full" />
+          <PlusCircle size={28} className="text-neutral-500" aria-hidden />
           <div className="flex-1">
             <p className="text-base text-neutral-500">{t('postComposer.whatsOnMind')}</p>
           </div>
@@ -199,21 +199,21 @@ const PostComposer: React.FC<PostComposerProps> = ({
         </div>
       </div>
       <div className={`mt-3 flex shrink-0 items-center justify-between border-t pt-3 ${toolbarBorderClass}`}>
-        <div className="flex flex-wrap items-center gap-1">
+        <div className="flex flex-wrap items-center">
           {media.length < MAX_POST_MEDIA ? (
             <>
               <button
                 type="button"
                 onClick={handleAddPhotos}
                 disabled={mediaUploading}
-                className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-full p-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50"
               >
                 {mediaUploading ? (
                   <Loader2 size={18} className="animate-spin" />
                 ) : (
                   <Image size={18} />
                 )}
-                <span>{mediaUploading ? t('postComposer.uploading') : t('postComposer.addPhotos')}</span>
+                <span className="hidden lg:block">{mediaUploading ? t('postComposer.uploading') : t('postComposer.addPhotos')}</span>
               </button>
               <button
                 type="button"
@@ -225,10 +225,11 @@ const PostComposer: React.FC<PostComposerProps> = ({
                   setMediaUrlModalOpen(true);
                 }}
                 disabled={mediaUploading}
-                className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-full p-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50"
               >
                 <Link2 size={18} aria-hidden />
-                <span>{t('postComposer.addImageUrl')}</span>
+                <span className="hidden lg:block">{t('postComposer.addImageUrl')}</span>
+                <span className="block lg:hidden">Img</span>
               </button>
             </>
           ) : null}
@@ -242,10 +243,11 @@ const PostComposer: React.FC<PostComposerProps> = ({
                 }
                 setLinkModalOpen(true);
               }}
-              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+              className="inline-flex items-center gap-2 rounded-full p-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
             >
-              <Link2 size={18} aria-hidden />
-              <span>{hasLink ? t('postComposer.editLink') : t('postComposer.addLink')}</span>
+              <SquareArrowOutUpRight size={18} aria-hidden />
+              <span className="hidden lg:block">{hasLink ? t('postComposer.editLink') : t('postComposer.addLink')}</span>
+              <span className="block lg:hidden">{hasLink ? t('postComposer.editLink') : t('postComposer.addLink')}</span>
             </button>
           ) : null}
         </div>

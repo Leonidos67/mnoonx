@@ -215,27 +215,10 @@ router.post('/', auth, async (req, res) => {
     await post.save();
     console.log('✅ Post created successfully, ID:', post._id);
 
-    const postData = {
-      _id: post._id,
-      content: post.content,
-      author: {
-        _id: author._id.toString(),
-        username: author.username,
-        fullName: author.fullName || author.username,
-        avatar: author.avatar || ''
-      },
-      media: post.media || [],
-      linkAttachment: serializeLinkAttachment(post.linkAttachment),
-      likesCount: 0,
-      commentsCount: 0,
-      repostsCount: 0,
-      viewsCount: 0,
-      createdAt: post.createdAt,
-      isLiked: false,
-      isReposted: false,
-      community: post.community,
-      isPrivate: post.isPrivate
-    };
+    const { serializeFeedPost } = require('../services/postSerialize');
+    const postData = await serializeFeedPost(post, req.userId);
+    postData.linkAttachment = serializeLinkAttachment(post.linkAttachment);
+    postData.isBookmarked = false;
 
     res.status(201).json(postData);
   } catch (error) {

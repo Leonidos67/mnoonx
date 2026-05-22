@@ -7,13 +7,9 @@ import { PostCommentsSection } from './PostCommentsSection';
 import { buildPostLightboxMeta } from '../../utils/buildPostLightboxMeta';
 import type { FeedPost } from '../../types/postFeed';
 import { useTranslation } from '../../i18n/useTranslation';
+import { getPostDisplayMeta, type PostCommunityMeta } from '../../utils/postDisplay';
 
-export interface PostFeedCardCommunityContext {
-  _id: string;
-  name: string;
-  handle: string;
-  avatar: string;
-}
+export type PostFeedCardCommunityContext = PostCommunityMeta;
 
 export interface PostFeedCardProps {
   post: FeedPost;
@@ -84,30 +80,8 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
   const { t } = useTranslation();
   const postId = String(post._id);
 
-  const communityMeta =
-    post.community ??
-    (communityContext
-      ? {
-          _id: communityContext._id,
-          name: communityContext.name,
-          handle: communityContext.handle,
-          avatar: communityContext.avatar,
-        }
-      : null);
-
-  const displayAsCommunity = Boolean(communityMeta && !post.isPrivate);
-  const displayName = displayAsCommunity ? communityMeta!.name : post.author.fullName;
-  const displayUsername = displayAsCommunity
-    ? `@${communityMeta!.handle}`
-    : `@${post.author.username}`;
-  const displayAvatar = displayAsCommunity
-    ? communityMeta!.avatar ||
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(communityMeta!.name)}&background=315efb&color=fff&size=40&bold=true`
-    : post.author.avatar ||
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(post.author.fullName)}&background=000&color=fff&size=40&bold=true`;
-  const profileLink = displayAsCommunity
-    ? `/community/${communityMeta!.handle}`
-    : `/@${post.author.username}`;
+  const { communityMeta, displayAsCommunity, displayName, displayUsername, displayAvatar, profileLink } =
+    getPostDisplayMeta(post, communityContext);
 
   const lightboxMeta = buildPostLightboxMeta(
     { ...post, community: communityMeta },

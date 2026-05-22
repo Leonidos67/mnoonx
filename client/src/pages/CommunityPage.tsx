@@ -59,7 +59,9 @@ import MobileBottomSheet from '../components/Common/MobileBottomSheet';
 import { usePostDetail } from '../hooks/usePostDetail';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import AddCommunityAdminModal from '../components/Community/AddCommunityAdminModal';
+import CommunityBannerModal from '../components/Community/CommunityBannerModal';
 import { canAccessCommunityDashboard } from '../utils/communityRoles';
+import { isPopulatedCommunity } from '../utils/postDisplay';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { useTranslation } from '../i18n/useTranslation';
@@ -161,9 +163,9 @@ const CommunityPage: React.FC = () => {
   const [appInstanceMenuId, setAppInstanceMenuId] = useState<string | null>(null);
   const [appInstanceMenuPanel, setAppInstanceMenuPanel] = useState<'main' | 'visibility'>('main');
   const appInstanceMenuRef = useRef<HTMLDivElement | null>(null);
-  const bannerFileRef = useRef<HTMLInputElement | null>(null);
   const avatarFileRef = useRef<HTMLInputElement | null>(null);
   const [brandingFieldBusy, setBrandingFieldBusy] = useState<'banner' | 'avatar' | null>(null);
+  const [bannerModalOpen, setBannerModalOpen] = useState(false);
   const [unreadByInstance, setUnreadByInstance] = useState<Record<string, number>>({});
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
@@ -278,7 +280,10 @@ const CommunityPage: React.FC = () => {
         handle: community.handle,
         avatar: community.avatar,
       };
-      return items.map((p) => ({ ...p, community: p.community ?? ctx }));
+      return items.map((p) => ({
+        ...p,
+        community: isPopulatedCommunity(p.community) ? p.community : ctx,
+      }));
     },
     [community],
   );
@@ -328,15 +333,50 @@ const CommunityPage: React.FC = () => {
         }
         const data = await res.json();
         setCommunity((prev) => (prev ? { ...prev, ...data } : prev));
+        if (field === 'banner') {
+          showToast(t('brandingBanner.updated'));
+          setBannerModalOpen(false);
+        }
       } catch (e) {
         console.error('Branding upload error:', e);
+        showToast(e instanceof Error ? e.message : t('upload.uploading'), 'error');
       } finally {
         setBrandingFieldBusy(null);
-        if (field === 'banner' && bannerFileRef.current) bannerFileRef.current.value = '';
         if (field === 'avatar' && avatarFileRef.current) avatarFileRef.current.value = '';
       }
     },
-    [handle, token]
+    [handle, token, showToast, t]
+  );
+
+  const patchCommunityBanner = useCallback(
+    async (banner: string) => {
+      if (!handle || !token) return;
+      setBrandingFieldBusy('banner');
+      try {
+        const res = await fetch(`${API_URL}/${encodeURIComponent(handle)}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ banner }),
+        });
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error((errBody as { message?: string }).message || 'Update failed');
+        }
+        const data = await res.json();
+        setCommunity((prev) => (prev ? { ...prev, banner: data.banner ?? banner } : prev));
+        showToast(banner ? t('brandingBanner.updated') : t('brandingBanner.removed'));
+        setBannerModalOpen(false);
+      } catch (e) {
+        console.error('Banner patch error:', e);
+        showToast(e instanceof Error ? e.message : t('brandingBanner.updateFailed'), 'error');
+      } finally {
+        setBrandingFieldBusy(null);
+      }
+    },
+    [handle, token, showToast, t]
   );
 
   useEffect(() => {
@@ -1488,21 +1528,11 @@ const CommunityPage: React.FC = () => {
               {community.banner && (
                 <img src={community.banner} alt="" className="h-full w-full object-cover" />
               )}
-              <input
-                ref={bannerFileRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void uploadCommunityBranding('banner', f);
-                }}
-              />
               {isOwner && (
                 <button
                   type="button"
                   disabled={brandingFieldBusy === 'banner'}
-                  onClick={() => bannerFileRef.current?.click()}
+                  onClick={() => setBannerModalOpen(true)}
                   className="absolute top-5 right-5 flex h-11 items-center gap-2 rounded-2xl border border-white bg-white/90 px-5 font-medium backdrop-blur transition-all hover:bg-white disabled:opacity-60"
                 >
                   <Camera size={18} />
@@ -1626,7 +1656,7 @@ const CommunityPage: React.FC = () => {
             {/* TAB PANELS — same card */}
             <div className={`border-t border-[#ececec] py-0 ${mobileComposerFull ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
               {mainTab === 'home' && (
-                <div className={mobileComposerFull ? 'mx-auto mt-4 flex min-h-0 max-w-2xl flex-1 flex-col px-4' : 'mx-auto mt-4 max-w-2xl px-4'}>
+                <div className={mobileComposerFull ? 'mx-auto mt-4 flex min-h-0 max-w-2xl flex-1 flex-col' : 'mx-auto mt-2 max-w-2xl'}>
                   {canPost && (
                     <PostComposer
                       variant="community"
@@ -2129,6 +2159,20 @@ const CommunityPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {community && isOwner && (
+        <CommunityBannerModal
+          open={bannerModalOpen}
+          onClose={() => {
+            if (brandingFieldBusy !== 'banner') setBannerModalOpen(false);
+          }}
+          bannerUrl={community.banner || ''}
+          busy={brandingFieldBusy === 'banner'}
+          onUploadFile={(file) => uploadCommunityBranding('banner', file)}
+          onSaveUrl={(url) => patchCommunityBanner(url)}
+          onRemove={() => patchCommunityBanner('')}
+        />
+      )}
 
       {community && handle && (
         <AddCommunityAdminModal
