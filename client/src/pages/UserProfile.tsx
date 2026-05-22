@@ -38,6 +38,8 @@ import { usePostDetail } from '../hooks/usePostDetail';
 import type { FeedPost } from '../types/postFeed';
 import PostMediaGallery from '../components/Posts/PostMediaGallery';
 import PostComposer from '../components/Posts/PostComposer';
+import PostContentBody from '../components/Posts/PostContentBody';
+import type { PostLinkAttachment } from '../types/postLink';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 import { tryAwardActivity } from '../utils/awardActivity';
@@ -103,6 +105,7 @@ const UserProfileComponent: React.FC = () => {
 
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
+  const [newPostLink, setNewPostLink] = useState<PostLinkAttachment | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [showPostCreator, setShowPostCreator] = useState(false);
   const mobileComposerFull = showPostCreator && !isLgUp && activeTab === 'posts';
@@ -465,10 +468,12 @@ const UserProfileComponent: React.FC = () => {
     setShowPostCreator(false);
     setNewPostContent('');
     setNewPostMedia([]);
+    setNewPostLink(null);
   }, []);
 
   const handleCreatePost = async () => {
-    if ((!newPostContent.trim() && newPostMedia.length === 0) || !token || isPosting) return;
+    const hasLink = Boolean(newPostLink?.title?.trim() && newPostLink?.url?.trim());
+    if ((!newPostContent.trim() && newPostMedia.length === 0 && !hasLink) || !token || isPosting) return;
     try {
       setIsPosting(true);
       const res = await fetch(POSTS_API_URL, {
@@ -477,7 +482,11 @@ const UserProfileComponent: React.FC = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ content: newPostContent, media: newPostMedia })
+        body: JSON.stringify({
+          content: newPostContent,
+          media: newPostMedia,
+          linkAttachment: hasLink ? newPostLink : undefined,
+        })
       });
       if (!res.ok) {
         const data = await res.json();
@@ -491,6 +500,7 @@ const UserProfileComponent: React.FC = () => {
       setProfile(prev => prev ? { ...prev, postsCount: (prev.postsCount || 0) + 1 } : null);
       setNewPostContent('');
       setNewPostMedia([]);
+      setNewPostLink(null);
       closeComposer();
       showToast(t('common.postPublished'));
       tryAwardActivity('post');
@@ -667,11 +677,13 @@ const UserProfileComponent: React.FC = () => {
                 )}
               </div>
             </div>
-            {post.content?.trim() ? (
-              <p className="mt-1 text-neutral-900 leading-relaxed whitespace-pre-wrap break-words text-[15px]">
-                {post.content}
-              </p>
-            ) : null}
+            <div className="mt-1">
+              <PostContentBody
+                content={post.content}
+                linkAttachment={post.linkAttachment}
+                contentClassName="text-neutral-900 leading-relaxed whitespace-pre-wrap break-words text-[15px]"
+              />
+            </div>
             {post.media && post.media.length > 0 && (
               <PostMediaGallery media={post.media} meta={buildPostLightboxMeta(post)} />
             )}
@@ -942,6 +954,8 @@ const UserProfileComponent: React.FC = () => {
             onContentChange={setNewPostContent}
             media={newPostMedia}
             onMediaChange={setNewPostMedia}
+            linkAttachment={newPostLink}
+            onLinkAttachmentChange={setNewPostLink}
             onCancel={closeComposer}
             onSubmit={() => void handleCreatePost()}
             isPosting={isPosting}

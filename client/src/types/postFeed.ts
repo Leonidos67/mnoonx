@@ -11,6 +11,8 @@ export interface PostComment {
   };
 }
 
+import type { PostLinkAttachment } from './postLink';
+
 export interface FeedPost {
   _id: string;
   content: string;
@@ -32,6 +34,7 @@ export interface FeedPost {
   repostsCount: number;
   viewsCount?: number;
   media: string[];
+  linkAttachment?: PostLinkAttachment | null;
   createdAt: string;
   isLiked?: boolean;
   isReposted?: boolean;

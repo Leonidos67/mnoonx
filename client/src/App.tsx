@@ -40,6 +40,7 @@ import Plan from './pages/Plan';
 import Activity from './pages/Activity';
 import ProfileRoute from './components/Routing/ProfileRoute';
 import RequireAuth from './components/Routing/RequireAuth';
+import { RequireUsersDirectoryAccess } from './components/Routing/RequireUsername';
 import RequireCommunityOwner from './components/Routing/RequireCommunityOwner';
 import { COMMUNITY_SETTINGS_SEGMENT, COMMUNITY_STORE_SEGMENT } from './constants/communityRoutes';
 
@@ -121,7 +122,16 @@ function App() {
           <Route path="/new/business" element={<AppLayout><NewBusiness /></AppLayout>} />
           <Route path="/messenger" element={<AppLayout><Messenger /></AppLayout>} />
           <Route path="/notifications" element={<AppLayout><Notifications /></AppLayout>} />
-          <Route path="/users" element={<AppLayout><Users /></AppLayout>} />
+          <Route
+            path="/users"
+            element={
+              <AppLayout>
+                <RequireUsersDirectoryAccess>
+                  <Users />
+                </RequireUsersDirectoryAccess>
+              </AppLayout>
+            }
+          />
           <Route
             path="/settings"
             element={

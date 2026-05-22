@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import PostMediaGallery from '../components/Posts/PostMediaGallery';
 import PostComposer from '../components/Posts/PostComposer';
+import PostContentBody from '../components/Posts/PostContentBody';
+import type { PostLinkAttachment } from '../types/postLink';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 import HomeSidebarPromoCarousel from '../components/Home/HomeSidebarPromoCarousel';
 import FloatingMenu from '../components/Common/FloatingMenu';
@@ -56,6 +58,7 @@ interface Post {
   repostsCount: number;
   viewsCount: number;
   media: string[];
+  linkAttachment?: import('../types/postLink').PostLinkAttachment | null;
   createdAt: string;
   isLiked?: boolean;
   isReposted?: boolean;
@@ -103,6 +106,7 @@ const Home: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
+  const [newPostLink, setNewPostLink] = useState<PostLinkAttachment | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [suggestedUsers, setSuggestedUsers] = useState<SuggestedUser[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -220,6 +224,7 @@ const Home: React.FC = () => {
     setIsCreateOpen(false);
     setNewPostContent('');
     setNewPostMedia([]);
+    setNewPostLink(null);
   }, []);
 
   const handleLike = async (postId: string) => {
@@ -480,7 +485,8 @@ const Home: React.FC = () => {
   };
 
   const handleCreatePost = async () => {
-    if ((!newPostContent.trim() && newPostMedia.length === 0) || !token || isPosting) return;
+    const hasLink = Boolean(newPostLink?.title?.trim() && newPostLink?.url?.trim());
+    if ((!newPostContent.trim() && newPostMedia.length === 0 && !hasLink) || !token || isPosting) return;
     try {
       setIsPosting(true);
       const res = await fetch(API_URL, {
@@ -489,7 +495,11 @@ const Home: React.FC = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ content: newPostContent, media: newPostMedia })
+        body: JSON.stringify({
+          content: newPostContent,
+          media: newPostMedia,
+          linkAttachment: hasLink ? newPostLink : undefined,
+        })
       });
       if (!res.ok) throw new Error(t('common.failedToCreatePost'));
       
@@ -497,6 +507,7 @@ const Home: React.FC = () => {
       setPosts(prev => [newPost, ...prev]);
       setNewPostContent('');
       setNewPostMedia([]);
+      setNewPostLink(null);
       setIsCreateOpen(false);
       showToast(t('common.postPublished'));
     } catch (err: unknown) {
@@ -772,11 +783,7 @@ const Home: React.FC = () => {
               </div>
             </div>
 
-            {post.content?.trim() ? (
-              <p className="whitespace-pre-wrap break-words text-base leading-relaxed text-neutral-900">
-                {post.content}
-              </p>
-            ) : null}
+            <PostContentBody content={post.content} linkAttachment={post.linkAttachment} />
 
             {post.media && post.media.length > 0 && (
               <div className="mt-3">
@@ -849,6 +856,8 @@ const Home: React.FC = () => {
           onContentChange={setNewPostContent}
           media={newPostMedia}
           onMediaChange={setNewPostMedia}
+          linkAttachment={newPostLink}
+          onLinkAttachmentChange={setNewPostLink}
           onCancel={closeComposer}
           onSubmit={() => void handleCreatePost()}
           isPosting={isPosting}
@@ -956,11 +965,13 @@ const Home: React.FC = () => {
                       </div>
                     </div>
 
-                    {post.content?.trim() ? (
-                      <p className="mt-1 text-neutral-900 leading-relaxed whitespace-pre-wrap break-words text-[15px]">
-                        {post.content}
-                      </p>
-                    ) : null}
+                    <div className="mt-1">
+                      <PostContentBody
+                        content={post.content}
+                        linkAttachment={post.linkAttachment}
+                        contentClassName="text-neutral-900 leading-relaxed whitespace-pre-wrap break-words text-[15px]"
+                      />
+                    </div>
 
                     {post.media && post.media.length > 0 && (
                       <PostMediaGallery

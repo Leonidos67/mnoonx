@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Image, Loader2 } from 'lucide-react';
+import { Image, Link2, Loader2, X } from 'lucide-react';
 import PostMediaUpload, { PostMediaUploadHandle } from './PostMediaUpload';
+import PostLinkAttachmentModal from './PostLinkAttachmentModal';
+import type { PostLinkAttachment } from '../../types/postLink';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useTranslation } from '../../i18n/useTranslation';
 import { MAX_POST_MEDIA } from '../../utils/postMedia';
@@ -14,6 +16,8 @@ interface PostComposerProps {
   onContentChange: (value: string) => void;
   media: string[];
   onMediaChange: (urls: string[]) => void;
+  linkAttachment?: PostLinkAttachment | null;
+  onLinkAttachmentChange?: (link: PostLinkAttachment | null) => void;
   onCancel: () => void;
   onSubmit: () => void;
   isPosting: boolean;
@@ -30,6 +34,8 @@ const PostComposer: React.FC<PostComposerProps> = ({
   onContentChange,
   media,
   onMediaChange,
+  linkAttachment = null,
+  onLinkAttachmentChange,
   onCancel,
   onSubmit,
   isPosting,
@@ -44,6 +50,11 @@ const PostComposer: React.FC<PostComposerProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mediaUploadRef = useRef<PostMediaUploadHandle>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+
+  const hasLink = Boolean(linkAttachment?.title?.trim() && linkAttachment?.url?.trim());
+  const canSubmit =
+    Boolean(content.trim()) || media.length > 0 || hasLink;
 
   const avatarSrc =
     userAvatar ||
@@ -161,26 +172,64 @@ const PostComposer: React.FC<PostComposerProps> = ({
             hideAddButton
             onUploadingChange={setMediaUploading}
           />
+          {hasLink ? (
+            <div className="mt-2 flex items-center gap-2 rounded-lg border border-[#dbeafe] bg-[#eef2ff] px-3 py-2 text-sm">
+              <Link2 className="h-4 w-4 shrink-0 text-[#315efb]" aria-hidden />
+              <button
+                type="button"
+                onClick={() => setLinkModalOpen(true)}
+                className="min-w-0 flex-1 truncate text-left font-medium text-[#315efb] underline underline-offset-2"
+              >
+                {linkAttachment!.title}
+              </button>
+              {onLinkAttachmentChange ? (
+                <button
+                  type="button"
+                  onClick={() => onLinkAttachmentChange(null)}
+                  className="rounded-full p-1 text-neutral-500 hover:bg-white/80"
+                  aria-label={t('postComposer.removeLink')}
+                >
+                  <X size={16} aria-hidden />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
       <div className={`mt-3 flex shrink-0 items-center justify-between border-t pt-3 ${toolbarBorderClass}`}>
-        {media.length < MAX_POST_MEDIA ? (
-          <button
-            type="button"
-            onClick={handleAddPhotos}
-            disabled={mediaUploading}
-            className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50"
-          >
-            {mediaUploading ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              <Image size={18} />
-            )}
-            <span>{mediaUploading ? t('postComposer.uploading') : t('postComposer.addPhotos')}</span>
-          </button>
-        ) : (
-          <span />
-        )}
+        <div className="flex flex-wrap items-center gap-1">
+          {media.length < MAX_POST_MEDIA ? (
+            <button
+              type="button"
+              onClick={handleAddPhotos}
+              disabled={mediaUploading}
+              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50"
+            >
+              {mediaUploading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Image size={18} />
+              )}
+              <span>{mediaUploading ? t('postComposer.uploading') : t('postComposer.addPhotos')}</span>
+            </button>
+          ) : null}
+          {onLinkAttachmentChange ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (!token) {
+                  window.dispatchEvent(new CustomEvent('openLogin'));
+                  return;
+                }
+                setLinkModalOpen(true);
+              }}
+              className="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+            >
+              <Link2 size={18} aria-hidden />
+              <span>{hasLink ? t('postComposer.editLink') : t('postComposer.addLink')}</span>
+            </button>
+          ) : null}
+        </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -192,7 +241,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
           <button
             type="button"
             onClick={onSubmit}
-            disabled={(!content.trim() && media.length === 0) || isPosting}
+            disabled={!canSubmit || isPosting}
             className="flex items-center gap-2 rounded-full bg-black px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-neutral-800 disabled:opacity-50"
           >
             {isPosting ? (
@@ -209,7 +258,20 @@ const PostComposer: React.FC<PostComposerProps> = ({
     </>
   );
 
-  return <div className={openWrapperClass}>{composerInner}</div>;
+  return (
+    <>
+      <div className={openWrapperClass}>{composerInner}</div>
+      {onLinkAttachmentChange ? (
+        <PostLinkAttachmentModal
+          open={linkModalOpen}
+          onClose={() => setLinkModalOpen(false)}
+          onSave={onLinkAttachmentChange}
+          initialValue={linkAttachment}
+          token={token}
+        />
+      ) : null}
+    </>
+  );
 };
 
 export default PostComposer;

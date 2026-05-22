@@ -27,6 +27,13 @@ async function serializePostWithAuthor(post, viewerUserId) {
           avatar: '',
         },
     media: post.media || [],
+    linkAttachment:
+      post.linkAttachment?.title?.trim() && post.linkAttachment?.url?.trim()
+        ? {
+            title: String(post.linkAttachment.title).trim(),
+            url: String(post.linkAttachment.url).trim(),
+          }
+        : null,
     likesCount: post.likesCount || 0,
     commentsCount: post.commentsCount || 0,
     repostsCount: post.repostsCount || 0,

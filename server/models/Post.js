@@ -14,6 +14,11 @@ const postSchema = new mongoose.Schema({
   media: [{
     type: String
   }],
+  /** Optional link card: title + url (community path or external) */
+  linkAttachment: {
+    title: { type: String, default: '', maxlength: 120 },
+    url: { type: String, default: '', maxlength: 500 },
+  },
   likes: [{
     type: String // ID пользователей которые лайкнули
   }],

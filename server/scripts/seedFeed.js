@@ -14,6 +14,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Post = require('../models/Post');
+const { generateMay21Posts } = require('./generateMay21Posts');
 
 const SEED_PASSWORD = 'SeedDemo2024!';
 
@@ -67,7 +68,7 @@ const USERS = [
 ];
 
 /** @type {{ username: string; content: string; publishedAt: string; likes?: number; reposts?: number; comments?: { by: string; text: string; publishedAt: string }[] }[]} */
-const POSTS = [
+const POSTS_BASE = [
   {
     username: 'cryptoalpha',
     publishedAt: '19.05.2026 21:02',
@@ -757,6 +758,10 @@ const POSTS = [
   },
 ];
 
+/** +200 posts on 21.05.2026 (humor, life, crypto communities, advice + CTA) */
+const POSTS_MAY21 = generateMay21Posts(200);
+const POSTS = [...POSTS_BASE, ...POSTS_MAY21];
+
 function buildComments(specComments, userMap) {
   if (!specComments?.length) return [];
   return specComments
@@ -821,19 +826,50 @@ async function refreshPostTimestamps(authorId, spec, userMap) {
   );
 }
 
+function buildEngagementIds(userMap, authorId, count, existing = []) {
+  const author = String(authorId);
+  const out = [...existing.map(String)];
+  const pool = [...userMap.values()]
+    .map((u) => u._id.toString())
+    .filter((id) => id !== author);
+  let i = 0;
+  while (out.length < count && pool.length > 0) {
+    const id = pool[i % pool.length];
+    out.push(id);
+    i += 1;
+  }
+  while (out.length < count) {
+    out.push(`seed-like-${author}-${out.length}`);
+  }
+  return out.slice(0, count);
+}
+
 async function createPost(authorId, spec, userMap) {
   const createdAt = createdAtFromPublished(spec.publishedAt);
   const commentDocs = buildComments(spec.comments, userMap);
   const commentsCount = commentDocs.length;
+  const likesTarget = spec.likes ?? 0;
+  const repostsTarget = spec.reposts ?? 0;
+  const likes = buildEngagementIds(userMap, authorId, likesTarget);
+  const reposts = buildEngagementIds(userMap, authorId, repostsTarget);
+
+  const linkAttachment =
+    spec.linkAttachment?.title?.trim() && spec.linkAttachment?.url?.trim()
+      ? {
+          title: String(spec.linkAttachment.title).trim().slice(0, 120),
+          url: String(spec.linkAttachment.url).trim().slice(0, 500),
+        }
+      : undefined;
 
   const post = new Post({
     author: authorId.toString(),
     content: spec.content,
+    linkAttachment,
     media: [],
-    likes: [],
-    likesCount: spec.likes ?? 0,
-    reposts: [],
-    repostsCount: spec.reposts ?? 0,
+    likes,
+    likesCount: likes.length,
+    reposts,
+    repostsCount: reposts.length,
     comments: commentDocs,
     commentsCount,
     viewsCount: Math.floor((spec.likes ?? 0) * 3 + commentsCount * 2 + 8),
@@ -903,6 +939,7 @@ async function main() {
   console.log('\nDone.');
   console.log(`  Users: ${userMap.size}`);
   console.log(`  Posts created: ${created}`);
+  console.log(`  Posts in template: ${POSTS.length} (incl. ${POSTS_MAY21.length} on 21.05.2026)`);
   console.log(`  Posts timestamps refreshed: ${refreshed}`);
   console.log(`  Template comments: ${totalComments}`);
   console.log(`\n  Password: ${SEED_PASSWORD}`);

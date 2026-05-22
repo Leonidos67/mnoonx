@@ -14,9 +14,6 @@ import CommunityFilesPanel from '../components/Community/CommunityFilesPanel';
 import CommunityAnnouncementsPanel from '../components/Community/CommunityAnnouncementsPanel';
 import CommunityEventsPanel from '../components/Community/CommunityEventsPanel';
 import {
-  MessageCircle,
-  Repeat2,
-  Heart,
   Plus,
   UserPlus,
   Copy,
@@ -47,11 +44,20 @@ import {
   EyeOff,
   X,
   LayoutDashboard,
+  Pen,
+  Trash,
+  Unlink2,
 } from 'lucide-react';
-import PostMediaGallery from '../components/Posts/PostMediaGallery';
 import PostComposer from '../components/Posts/PostComposer';
+import PostFeedCard from '../components/Posts/PostFeedCard';
+import PostDetailPanel from '../components/Posts/PostDetailPanel';
+import type { PostLinkAttachment } from '../types/postLink';
+import type { FeedPost } from '../types/postFeed';
+import EditTextModal from '../components/Common/EditTextModal';
+import FloatingMenu from '../components/Common/FloatingMenu';
+import MobileBottomSheet from '../components/Common/MobileBottomSheet';
+import { usePostDetail } from '../hooks/usePostDetail';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 import AddCommunityAdminModal from '../components/Community/AddCommunityAdminModal';
 import { canAccessCommunityDashboard } from '../utils/communityRoles';
 import { useToast } from '../context/ToastContext';
@@ -121,24 +127,7 @@ interface CommunityAccessPreview {
   requiresJoinCode?: boolean;
 }
 
-interface Post {
-  _id: string;
-  content: string;
-  author: {
-    _id: string;
-    username: string;
-    fullName: string;
-    avatar: string;
-  };
-  likesCount: number;
-  commentsCount: number;
-  repostsCount: number;
-  media: string[];
-  createdAt: string;
-  isLiked?: boolean;
-  isReposted?: boolean;
-  isPrivate?: boolean;
-}
+type Post = FeedPost;
 
 const CommunityPage: React.FC = () => {
   const { handle } = useParams<{ handle: string }>();
@@ -178,6 +167,7 @@ const CommunityPage: React.FC = () => {
   const [unreadByInstance, setUnreadByInstance] = useState<Record<string, number>>({});
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
+  const [newPostLink, setNewPostLink] = useState<PostLinkAttachment | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const isLgUp = useMediaQuery('(min-width: 1024px)');
@@ -185,6 +175,35 @@ const CommunityPage: React.FC = () => {
   const [ownerOnlyPostNoticeDismissed, setOwnerOnlyPostNoticeDismissed] = useState(false);
   const [addAdminModalOpen, setAddAdminModalOpen] = useState(false);
   const [adminActionBusy, setAdminActionBusy] = useState<string | null>(null);
+  const [menuOpenPostId, setMenuOpenPostId] = useState<string | null>(null);
+  const [editPostTarget, setEditPostTarget] = useState<{ postId: string; content: string } | null>(null);
+  const [editPostSaving, setEditPostSaving] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const postDetail = usePostDetail(posts, [], setPosts);
+  const {
+    selectedPost,
+    setSelectedPost,
+    commentText,
+    setCommentText,
+    inlineCommentText,
+    setInlineCommentText,
+    commentSubmitting,
+    commentsLoadingPostId,
+    expandedCommentsPostId,
+    openCommentMenu,
+    setOpenCommentMenu,
+    editCommentTarget,
+    setEditCommentTarget,
+    editCommentSaving,
+    handleSubmitComment,
+    toggleFeedComments,
+    isCommentOwner,
+    submitEditComment,
+    handleDeleteComment,
+    onPostDeleted,
+    patchPostInLists,
+  } = postDetail;
 
   useEffect(() => {
     if (!handle) {
@@ -195,6 +214,16 @@ const CommunityPage: React.FC = () => {
       localStorage.getItem(`${OWNER_ONLY_POST_NOTICE_KEY}:${handle}`) === '1'
     );
   }, [handle]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpenPostId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const dismissOwnerOnlyPostNotice = useCallback(() => {
     if (handle) {
@@ -240,6 +269,20 @@ const CommunityPage: React.FC = () => {
     }
   }, [handle, token, user, navigate]);
 
+  const attachCommunityToPosts = useCallback(
+    (items: Post[]): Post[] => {
+      if (!community) return items;
+      const ctx = {
+        _id: community._id,
+        name: community.name,
+        handle: community.handle,
+        avatar: community.avatar,
+      };
+      return items.map((p) => ({ ...p, community: p.community ?? ctx }));
+    },
+    [community],
+  );
+
   // Загрузка постов сообщества
   const fetchPosts = useCallback(async () => {
     if (!handle) return;
@@ -250,7 +293,7 @@ const CommunityPage: React.FC = () => {
       const res = await fetch(`${API_URL}/${handle}/posts`, { headers });
       if (res.ok) {
         const data = await res.json();
-        setPosts(data);
+        setPosts(attachCommunityToPosts(data));
         
         const likedIds = new Set<string>();
         const repostedIds = new Set<string>();
@@ -265,7 +308,7 @@ const CommunityPage: React.FC = () => {
     } catch (err) {
       console.error('Fetch posts error:', err);
     }
-  }, [handle, token]);
+  }, [handle, token, attachCommunityToPosts]);
 
   const uploadCommunityBranding = useCallback(
     async (field: 'banner' | 'avatar', file: File) => {
@@ -567,7 +610,8 @@ const CommunityPage: React.FC = () => {
 
   // ЕДИНСТВЕННАЯ функция handleCreatePost (удалите дубликат ниже)
   const handleCreatePost = async () => {
-    if ((!newPostContent.trim() && newPostMedia.length === 0) || !token || !canPost || isPosting) return;
+    const hasLink = Boolean(newPostLink?.title?.trim() && newPostLink?.url?.trim());
+    if ((!newPostContent.trim() && newPostMedia.length === 0 && !hasLink) || !token || !canPost || isPosting) return;
     
     try {
       setIsPosting(true);
@@ -580,6 +624,7 @@ const CommunityPage: React.FC = () => {
         body: JSON.stringify({ 
           content: newPostContent, 
           media: newPostMedia,
+          linkAttachment: hasLink ? newPostLink : undefined,
           community: community?._id,
           isPrivate: postVisibility === 'private'
         })
@@ -587,7 +632,7 @@ const CommunityPage: React.FC = () => {
       
       if (res.ok) {
         const newPost = await res.json();
-        setPosts(prev => [newPost, ...prev]);
+        setPosts((prev) => attachCommunityToPosts([newPost, ...prev]));
         closeComposer();
       }
     } catch (err) {
@@ -615,9 +660,7 @@ const CommunityPage: React.FC = () => {
           data.liked ? newSet.add(id) : newSet.delete(id);
           return newSet;
         });
-        setPosts(prev => prev.map(post => 
-          String(post._id) === id ? { ...post, likesCount: data.likesCount } : post
-        ));
+        patchPostInLists(id, { likesCount: data.likesCount, isLiked: data.liked });
       }
     } catch (err) {
       console.error('Like error:', err);
@@ -642,12 +685,91 @@ const CommunityPage: React.FC = () => {
           data.reposted ? newSet.add(id) : newSet.delete(id);
           return newSet;
         });
-        setPosts(prev => prev.map(post => 
-          String(post._id) === id ? { ...post, repostsCount: data.repostsCount } : post
-        ));
+        patchPostInLists(id, { repostsCount: data.repostsCount, isReposted: data.reposted });
       }
     } catch (err) {
       console.error('Repost error:', err);
+    }
+  };
+
+  const copyPostLink = (postId: string) => {
+    const link = `${window.location.origin}/post/${postId}`;
+    navigator.clipboard
+      .writeText(link)
+      .then(() => showToast(t('common.linkCopied')))
+      .catch(() => showToast(t('common.copyLinkFailed'), 'error'));
+  };
+
+  const isPostOwner = (post: Post) => {
+    if (!user) return false;
+    if (user.username === post.author.username) return true;
+    if (user.id && post.author._id && String(user.id) === String(post.author._id)) return true;
+    if ((user as { _id?: string })._id && String((user as { _id?: string })._id) === String(post.author._id)) {
+      return true;
+    }
+    return false;
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    setMenuOpenPostId(null);
+    if (!token) return;
+    const confirmed = await confirm({
+      title: t('common.deletePostTitle'),
+      message: t('common.deletePostMessage'),
+      confirmLabel: t('common.delete'),
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${POSTS_API_URL}/${postId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { message?: string }).message || t('common.failedToDeletePost'));
+      }
+      setPosts((prev) => prev.filter((p) => String(p._id) !== postId));
+      onPostDeleted(postId);
+      showToast(t('common.postDeleted'));
+    } catch (err: unknown) {
+      console.error('Delete post error:', err);
+      showToast(err instanceof Error ? err.message : t('common.failedToDeletePost'), 'error');
+    }
+  };
+
+  const openEditPost = (postId: string, content: string) => {
+    setMenuOpenPostId(null);
+    setEditPostTarget({ postId, content });
+  };
+
+  const submitEditPost = async (newContent: string) => {
+    if (!editPostTarget || !token) return;
+    const { postId } = editPostTarget;
+    setEditPostSaving(true);
+    try {
+      const res = await fetch(`${POSTS_API_URL}/${postId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content: newContent }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { message?: string }).message || t('common.failedToUpdatePost'));
+      }
+      const updatedPost = await res.json();
+      patchPostInLists(postId, updatedPost);
+      setEditPostTarget(null);
+      showToast(t('common.postUpdated'));
+    } catch (err: unknown) {
+      console.error('Edit post error:', err);
+      showToast(err instanceof Error ? err.message : t('common.failedToUpdatePost'), 'error');
+    } finally {
+      setEditPostSaving(false);
     }
   };
 
@@ -721,6 +843,7 @@ const CommunityPage: React.FC = () => {
     setIsCreateOpen(false);
     setNewPostContent('');
     setNewPostMedia([]);
+    setNewPostLink(null);
   }, []);
   const chatInstances =
     community?.installedAppInstances?.filter((i) => i.appId === COMMUNITY_APP_IDS.CHAT) ?? [];
@@ -927,96 +1050,110 @@ const CommunityPage: React.FC = () => {
   if (privateGatePreview && !community) {
     const preview = privateGatePreview;
     return (
-      <div className="flex h-full min-h-full flex-col overflow-hidden">
-        <div className="mx-auto flex h-full min-h-full w-full max-w-[1600px] flex-1 p-2">
-          <div className="flex min-h-0 w-full flex-1 flex-col overflow-y-auto">
-            <div className="overflow-hidden rounded-xl border border-[#e7e7e7] bg-white">
-            <div className="relative h-[250px] bg-gradient-to-r from-gray-800 to-gray-900">
-              {preview.banner ? (
-                <img src={preview.banner} alt="" className="h-full w-full object-cover" />
-              ) : null}
-            </div>
-            <div className="relative px-7 pb-8">
-              <div className="relative mx-auto max-w-3xl">
-                <div className="absolute -top-14 left-1/2 z-10 -translate-x-1/2">
+      <div className="flex h-full min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="mx-auto w-full max-w-[720px] px-4 py-6 pb-10 sm:px-6">
+            <article className="overflow-hidden rounded-2xl border border-[#e7e7e7] bg-white shadow-sm">
+              <div className="relative h-40 shrink-0 bg-gradient-to-br from-neutral-800 via-neutral-900 to-neutral-950 sm:h-[200px]">
+                {preview.banner ? (
+                  <img src={preview.banner} alt="" className="h-full w-full object-cover" />
+                ) : null}
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+              </div>
+
+              <div className="relative px-4 pb-8 pt-0 sm:px-8 sm:pb-10">
+                <div className="-mt-12 flex justify-center sm:-mt-14">
                   <img
                     src={
                       preview.avatar ||
-                      `https://ui-avatars.com/api/?name=${encodeURIComponent(preview.name)}&background=000&color=fff&size=120&bold=true`
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(preview.name)}&background=111827&color=fff&size=120&bold=true`
                     }
                     alt=""
-                    className="h-[120px] w-[120px] rounded-2xl border-4 border-white object-cover shadow-sm"
+                    className="h-24 w-24 rounded-2xl border-4 border-white object-cover shadow-md sm:h-[120px] sm:w-[120px]"
                   />
                 </div>
-                <div className="flex flex-col items-center pt-[72px] text-center">
-                  <div className="flex h-[40px] items-center justify-center rounded-full bg-white px-6">
-                    <h1 className="text-2xl font-semibold leading-none tracking-[-0.05em]">{preview.name}</h1>
-                  </div>
-                  <p className="mt-1 font-mono text-sm text-[#888]">@{preview.handle}</p>
-                  <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-700">
-                    <Lock size={12} />
+
+                <header className="mt-4 text-center">
+                  <h1 className="text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl">
+                    {preview.name}
+                  </h1>
+                  <p className="mt-1 font-mono text-sm text-neutral-500">@{preview.handle}</p>
+                  <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-medium text-neutral-700">
+                    <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden />
                     {t('community.privateCommunityBadge')}
                   </span>
-                  <p className="mt-4 max-w-xl text-[18px] text-[#888]">
-                    {preview.description || t('community.noDescriptionYet')}
-                  </p>
-                  <p className="mt-2 text-[15px] text-[#666]">
-                    {t(
-                      preview.memberCount === 1
-                        ? 'community.memberCountLineOne'
-                        : 'community.memberCountLineMany',
-                      { count: formatCount(preview.memberCount) }
-                    )}
-                  </p>
-                  <div className="mx-auto mt-10 w-full max-w-md rounded-2xl border border-[#ececec] bg-[#fafafa] px-6 py-8 text-center">
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#315efb]">
-                      <Lock size={22} />
-                    </div>
-                <p className="text-[17px] font-semibold text-neutral-900">{t('community.membersOnlyTitle')}</p>
-                <p className="mt-2 text-sm leading-relaxed text-[#666]">
-                  {t('community.membersOnlySubtitle')}
+                </header>
+
+                <p className="mx-auto mt-4 max-w-lg text-center text-[15px] leading-relaxed text-neutral-600 sm:text-base">
+                  {preview.description || t('community.noDescriptionYet')}
                 </p>
-                {preview.requiresJoinCode && (
-                  <div className="mt-6 text-left">
-                    <label htmlFor="community-join-code" className="mb-2 block text-sm font-medium text-neutral-700">
-                      {t('community.joinPassphraseLabel')}
-                    </label>
-                    <input
-                      id="community-join-code"
-                      type="password"
-                      autoComplete="off"
-                      value={joinCodeInput}
-                      onChange={(e) => {
-                        setJoinCodeInput(e.target.value);
-                        setJoinError(null);
-                      }}
-                      placeholder={t('community.joinPassphrasePlaceholder')}
-                      className="w-full rounded-xl border border-[#e7e7e7] bg-white px-4 py-3 text-[15px] outline-none focus:ring-2 focus:ring-[#315efb]/25"
-                    />
+                <p className="mt-2 text-center text-sm text-neutral-500">
+                  {t(
+                    preview.memberCount === 1
+                      ? 'community.memberCountLineOne'
+                      : 'community.memberCountLineMany',
+                    { count: formatCount(preview.memberCount) }
+                  )}
+                </p>
+
+                <section className="mx-auto mt-8 w-full max-w-md rounded-2xl border border-[#e8ecf4] bg-gradient-to-b from-[#f8faff] to-white p-6 shadow-sm sm:p-8">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#315efb]">
+                    <Lock className="h-6 w-6" aria-hidden />
                   </div>
-                )}
-                {joinError && (
-                  <p className="mt-3 text-left text-sm text-red-600" role="alert">
-                    {joinError}
+                  <h2 className="mt-5 text-center text-lg font-semibold text-neutral-900">
+                    {t('community.membersOnlyTitle')}
+                  </h2>
+                  <p className="mt-2 text-center text-sm leading-relaxed text-neutral-600">
+                    {t('community.membersOnlySubtitle')}
                   </p>
-                )}
-                <button
-                  type="button"
-                  onClick={handleJoin}
-                  disabled={joinLoading}
-                  className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#315efb] px-6 font-medium text-white transition-colors hover:bg-[#2547c4] disabled:opacity-60"
-                >
-                  <Plus size={18} />
-                  {joinLoading ? t('community.joining') : t('community.joinCommunity')}
-                </button>
-                {!token && (
-                  <p className="mt-3 text-xs text-[#888]">{t('community.signInToJoin')}</p>
-                )}
-                  </div>
-                </div>
+
+                  {preview.requiresJoinCode ? (
+                    <div className="mt-6">
+                      <label
+                        htmlFor="community-join-code"
+                        className="mb-2 block text-sm font-medium text-neutral-800"
+                      >
+                        {t('community.joinPassphraseLabel')}
+                      </label>
+                      <input
+                        id="community-join-code"
+                        type="password"
+                        autoComplete="off"
+                        value={joinCodeInput}
+                        onChange={(e) => {
+                          setJoinCodeInput(e.target.value);
+                          setJoinError(null);
+                        }}
+                        placeholder={t('community.joinPassphrasePlaceholder')}
+                        className="w-full rounded-xl border border-[#e0e4ec] bg-white px-4 py-3 text-[15px] outline-none transition-shadow focus:border-[#315efb]/40 focus:ring-2 focus:ring-[#315efb]/20"
+                      />
+                    </div>
+                  ) : null}
+
+                  {joinError ? (
+                    <p className="mt-3 text-sm text-red-600" role="alert">
+                      {joinError}
+                    </p>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={handleJoin}
+                    disabled={joinLoading}
+                    className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#315efb] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#2547c4] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Plus className="h-[18px] w-[18px]" aria-hidden />
+                    {joinLoading ? t('community.joining') : t('community.joinCommunity')}
+                  </button>
+
+                  {!token ? (
+                    <p className="mt-4 text-center text-xs text-neutral-500">
+                      {t('community.signInToJoin')}
+                    </p>
+                  ) : null}
+                </section>
               </div>
-            </div>
-            </div>
+            </article>
           </div>
         </div>
       </div>
@@ -1499,6 +1636,8 @@ const CommunityPage: React.FC = () => {
                       onContentChange={setNewPostContent}
                       media={newPostMedia}
                       onMediaChange={setNewPostMedia}
+                      linkAttachment={newPostLink}
+                      onLinkAttachmentChange={setNewPostLink}
                       onCancel={closeComposer}
                       onSubmit={() => void handleCreatePost()}
                       isPosting={isPosting}
@@ -1523,90 +1662,66 @@ const CommunityPage: React.FC = () => {
                     </div>
                   )}
 
-                  <div className={`space-y-0 ${mobileComposerFull ? 'hidden' : ''}`}>
+                  <div className={`border-t border-neutral-200 ${mobileComposerFull ? 'hidden' : ''}`}>
                   {posts.length > 0 ? (
-                    posts.map((post, idx) => (
-                      <div
+                    posts.map((post) => (
+                      <PostFeedCard
                         key={post._id}
-                        className={`border-t border-[#ececec] py-6 ${idx === 0 ? 'border-t-0 pt-0' : ''}`}
-                      >
-                        <div className="flex gap-4">
-                          <Link to={`/@${post.author.username}`}>
-                            <img
-                              src={
-                                post.author.avatar ||
-                                `https://ui-avatars.com/api/?name=${post.author.fullName}&background=000&color=fff&size=48&bold=true`
+                        post={post}
+                        communityContext={
+                          community
+                            ? {
+                                _id: community._id,
+                                name: community.name,
+                                handle: community.handle,
+                                avatar: community.avatar,
                               }
-                              alt=""
-                              className="h-6 w-6 rounded-full object-cover"
-                            />
-                          </Link>
-                          <div className="flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Link to={`/@${post.author.username}`} className="font-semibold hover:underline">
-                                {post.author.fullName}
-                              </Link>
-                              <span className="text-gray-500">@{post.author.username}</span>
-                              <span className="text-gray-400">·</span>
-                              <span className="text-gray-400">{formatPostDate(post.createdAt)}</span>
-                              {post.isPrivate ? (
-                                <span className="ml-2 flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
-                                  <Lock size={10} />
-                                  {t('common.private')}
-                                </span>
-                              ) : (
-                                <span className="ml-2 flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-600">
-                                  <Globe size={10} />
-                                  {t('common.public')}
-                                </span>
-                              )}
-                            </div>
-                            {post.content?.trim() ? (
-                              <p className="mt-3 text-[15.5px] leading-relaxed text-gray-800">{post.content}</p>
-                            ) : null}
-                            {post.media && post.media.length > 0 && (
-                              <PostMediaGallery
-                                media={post.media}
-                                meta={buildPostLightboxMeta(
-                                  post,
-                                  post.isPrivate || !community
-                                    ? null
-                                    : {
-                                        name: community.name,
-                                        handle: community.handle,
-                                        avatar: community.avatar,
-                                      }
-                                )}
-                              />
-                            )}
-                            <div className="mt-6 flex gap-8 text-gray-500">
-                              <button
-                                type="button"
-                                onClick={() => handleLike(String(post._id))}
-                                className={`flex items-center gap-2 transition-colors ${likedPosts.has(String(post._id)) ? 'text-red-500' : 'hover:text-red-500'}`}
-                              >
-                                <Heart size={20} fill={likedPosts.has(String(post._id)) ? 'currentColor' : 'none'} />
-                                <span>{formatCount(post.likesCount)}</span>
-                              </button>
-                              <button type="button" className="flex items-center gap-2 transition-colors hover:text-blue-500">
-                                <MessageCircle size={20} />
-                                <span>{formatCount(post.commentsCount)}</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRepost(String(post._id))}
-                                className={`flex items-center gap-2 transition-colors ${repostedPosts.has(String(post._id)) ? 'text-green-500' : 'hover:text-green-500'}`}
-                              >
-                                <Repeat2 size={20} fill={repostedPosts.has(String(post._id)) ? 'currentColor' : 'none'} />
-                                <span>{formatCount(post.repostsCount)}</span>
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
+                            : null
+                        }
+                        isSelected={selectedPost?._id === post._id}
+                        onSelect={setSelectedPost}
+                        formatPostDate={formatPostDate}
+                        formatCount={formatCount}
+                        likedPosts={likedPosts}
+                        repostedPosts={repostedPosts}
+                        onLike={handleLike}
+                        onRepost={handleRepost}
+                        onToggleComments={toggleFeedComments}
+                        expandedCommentsPostId={expandedCommentsPostId}
+                        menuOpenPostId={menuOpenPostId}
+                        onMenuToggle={(postId, e) => {
+                          e.stopPropagation();
+                          setMenuOpenPostId(menuOpenPostId === postId ? null : postId);
+                        }}
+                        menuRef={menuRef}
+                        onCopyLink={(postId) => {
+                          copyPostLink(postId);
+                          setMenuOpenPostId(null);
+                        }}
+                        onEdit={openEditPost}
+                        onDelete={handleDeletePost}
+                        canManagePost={isPostOwner(post)}
+                        inlineCommentText={inlineCommentText}
+                        onInlineCommentTextChange={setInlineCommentText}
+                        onSubmitInlineComment={() =>
+                          void handleSubmitComment(String(post._id), 'inline')
+                        }
+                        token={token}
+                        commentSubmitting={commentSubmitting}
+                        commentsLoading={commentsLoadingPostId === String(post._id)}
+                        isCommentOwner={isCommentOwner}
+                        openCommentMenu={openCommentMenu}
+                        onCommentMenuToggle={(c, pid, rect, isOpen) => {
+                          setOpenCommentMenu(
+                            isOpen
+                              ? null
+                              : { commentId: c._id, postId: pid, content: c.content, rect },
+                          );
+                        }}
+                      />
                     ))
                   ) : (
-                    <div className="flex min-h-[200px] items-center justify-center text-[17px] text-[#999]">
+                    <div className="flex min-h-[200px] items-center justify-center px-4 py-12 text-[17px] text-[#999]">
                       {canViewFeed
                         ? t('community.feedEmpty')
                         : t('community.joinToSeePosts')}
@@ -2025,6 +2140,100 @@ const CommunityPage: React.FC = () => {
           onAdded={() => void fetchCommunity()}
         />
       )}
+
+      <MobileBottomSheet
+        open={!!selectedPost}
+        onClose={() => setSelectedPost(null)}
+        title={t('postPage.title')}
+      >
+        {selectedPost ? (
+          <PostDetailPanel
+            post={selectedPost}
+            onClose={() => setSelectedPost(null)}
+            onCopyLink={copyPostLink}
+            commentText={commentText}
+            onCommentTextChange={setCommentText}
+            onSubmitComment={() => void handleSubmitComment(String(selectedPost._id), 'sidebar')}
+            token={token}
+            commentSubmitting={commentSubmitting}
+            commentsLoading={commentsLoadingPostId === String(selectedPost._id)}
+            isCommentOwner={isCommentOwner}
+            openCommentMenu={openCommentMenu}
+            onCommentMenuToggle={(c, pid, rect, isOpen) => {
+              setOpenCommentMenu(
+                isOpen ? null : { commentId: c._id, postId: pid, content: c.content, rect },
+              );
+            }}
+          />
+        ) : null}
+      </MobileBottomSheet>
+
+      <FloatingMenu
+        open={!!openCommentMenu}
+        anchor={openCommentMenu ? { rect: openCommentMenu.rect } : null}
+        onClose={() => setOpenCommentMenu(null)}
+      >
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            if (!openCommentMenu) return;
+            setEditCommentTarget({
+              postId: openCommentMenu.postId,
+              commentId: openCommentMenu.commentId,
+              content: openCommentMenu.content,
+            });
+            setOpenCommentMenu(null);
+          }}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
+        >
+          <Pen size={14} />
+          {t('common.edit')}
+        </button>
+        <div className="my-1 h-px bg-neutral-100" />
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            if (!openCommentMenu) return;
+            void handleDeleteComment(openCommentMenu.postId, openCommentMenu.commentId);
+          }}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
+        >
+          <Trash size={14} />
+          {t('common.delete')}
+        </button>
+      </FloatingMenu>
+
+      <EditTextModal
+        isOpen={editPostTarget !== null}
+        title={t('userProfile.editPostTitle')}
+        description={t('userProfile.editPostDescription')}
+        initialValue={editPostTarget?.content ?? ''}
+        placeholder={t('postComposer.whatsOnMind')}
+        maxLength={5000}
+        submitLabel={t('userProfile.savePost')}
+        saving={editPostSaving}
+        onClose={() => {
+          if (!editPostSaving) setEditPostTarget(null);
+        }}
+        onSubmit={(value) => void submitEditPost(value)}
+      />
+
+      <EditTextModal
+        isOpen={editCommentTarget !== null}
+        title={t('home.editCommentTitle')}
+        description={t('home.editCommentDescription')}
+        initialValue={editCommentTarget?.content ?? ''}
+        placeholder={t('home.editCommentPlaceholder')}
+        maxLength={2000}
+        submitLabel={t('home.saveComment')}
+        saving={editCommentSaving}
+        onClose={() => {
+          if (!editCommentSaving) setEditCommentTarget(null);
+        }}
+        onSubmit={(value) => void submitEditComment(value)}
+      />
     </div>
   );
 };

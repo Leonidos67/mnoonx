@@ -4,7 +4,13 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "seed:feed": "node scripts/seedFeed.js"
+    "seed:feed": "node scripts/seedFeed.js",
+    "migrate:post-links": "node scripts/migratePostLinksFromContent.js",
+    "migrate:post-links:dry": "node scripts/migratePostLinksFromContent.js --dry-run",
+    "seed:communities": "node scripts/seedPromoCommunities.js",
+    "fix:post-likes": "node scripts/fixSeedPostEngagement.js",
+    "seed:mnoonx-members": "node scripts/seedMnoonxBulkMembers.js",
+    "seed:post-engagement": "node scripts/seedPostEngagement.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

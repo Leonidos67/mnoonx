@@ -4,6 +4,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ArrowLeft } from 'lucide-react';
 import PostMediaGallery from '../components/Posts/PostMediaGallery';
+import PostContentBody from '../components/Posts/PostContentBody';
+import type { PostLinkAttachment } from '../types/postLink';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 
 import { POSTS_API as API_URL, USERS_API } from '../config/api';
@@ -23,6 +25,7 @@ interface Post {
   repostsCount: number;
   viewsCount: number;
   media: string[];
+  linkAttachment?: PostLinkAttachment | null;
   createdAt: string;
   isLiked: boolean;
   isReposted: boolean;
@@ -199,11 +202,13 @@ const PostPage: React.FC = () => {
             </div>
 
             {/* Content */}
-            {post.content?.trim() ? (
-              <p className="mt-2 text-neutral-900 leading-relaxed whitespace-pre-wrap break-words text-[15px]">
-                {post.content}
-              </p>
-            ) : null}
+            <div className="mt-2">
+              <PostContentBody
+                content={post.content}
+                linkAttachment={post.linkAttachment}
+                contentClassName="text-neutral-900 leading-relaxed whitespace-pre-wrap break-words text-[15px]"
+              />
+            </div>
 
             {post.media && post.media.length > 0 && (
               <PostMediaGallery media={post.media} meta={buildPostLightboxMeta(post)} />

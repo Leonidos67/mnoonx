@@ -38,6 +38,46 @@ const postMediaUpload = multer({
 
 const MAX_POST_MEDIA = 10;
 
+function serializeLinkAttachment(linkAttachment) {
+  if (!linkAttachment?.title?.trim() || !linkAttachment?.url?.trim()) return null;
+  return {
+    title: String(linkAttachment.title).trim().slice(0, 120),
+    url: String(linkAttachment.url).trim().slice(0, 500),
+  };
+}
+
+async function parseLinkAttachmentInput(raw, userId) {
+  if (!raw || typeof raw !== 'object') return null;
+  const title = String(raw.title || '').trim();
+  let url = String(raw.url || '').trim();
+  if (!title || !url) return { error: 'Link title and URL are required' };
+
+  if (url.startsWith('/')) {
+    const match = url.match(/^\/community\/([a-z0-9_-]+)\/?$/i);
+    if (!match) return { error: 'Invalid community link' };
+    const handle = match[1].toLowerCase();
+    const comm = await Community.findOne({ handle });
+    if (!comm) return { error: 'Community not found' };
+    if (!isCommunityOwner(comm, userId)) {
+      return { error: 'You can only link communities you own' };
+    }
+    url = `/community/${handle}`;
+  } else {
+    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+    try {
+      const parsed = new URL(url);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return { error: 'Invalid link URL' };
+      }
+      url = parsed.href;
+    } catch {
+      return { error: 'Invalid link URL' };
+    }
+  }
+
+  return { title: title.slice(0, 120), url: url.slice(0, 500) };
+}
+
 function sanitizePostMediaUrls(media) {
   if (!Array.isArray(media)) return [];
   return media
@@ -105,7 +145,7 @@ async function serializePostComments(comments) {
 // POST /api/posts - Создать пост
 router.post('/', auth, async (req, res) => {
   try {
-    const { content, media, community, isPrivate } = req.body;
+    const { content, media, community, isPrivate, linkAttachment: linkRaw } = req.body;
     const authorId = req.userId.toString();
 
     console.log('\n📝 CREATE POST');
@@ -117,8 +157,13 @@ router.post('/', auth, async (req, res) => {
     const trimmedContent = (content || '').trim();
     const mediaList = sanitizePostMediaUrls(media);
 
-    if (!trimmedContent && mediaList.length === 0) {
-      return res.status(400).json({ message: 'Add text or at least one image' });
+    const linkParsed = await parseLinkAttachmentInput(linkRaw, req.userId);
+    if (linkParsed?.error) {
+      return res.status(400).json({ message: linkParsed.error });
+    }
+
+    if (!trimmedContent && mediaList.length === 0 && !linkParsed) {
+      return res.status(400).json({ message: 'Add text, a link, or at least one image' });
     }
 
     if (community) {
@@ -147,7 +192,8 @@ router.post('/', auth, async (req, res) => {
       content: trimmedContent,
       media: mediaList,
       community: community || null,
-      isPrivate: isPrivate || false
+      isPrivate: isPrivate || false,
+      linkAttachment: linkParsed || undefined,
     });
 
     await post.save();
@@ -163,6 +209,7 @@ router.post('/', auth, async (req, res) => {
         avatar: author.avatar || ''
       },
       media: post.media || [],
+      linkAttachment: serializeLinkAttachment(post.linkAttachment),
       likesCount: 0,
       commentsCount: 0,
       repostsCount: 0,
@@ -249,6 +296,7 @@ router.get('/', auth, async (req, res) => {
         } : null,
         community: communityInfo,
         media: post.media || [],
+        linkAttachment: serializeLinkAttachment(post.linkAttachment),
         likesCount: post.likesCount || 0,
         commentsCount: post.commentsCount || 0,
         repostsCount: post.repostsCount || 0,
@@ -318,6 +366,7 @@ router.get('/:id', auth, async (req, res) => {
       },
       community: communityInfo,
       media: post.media || [],
+      linkAttachment: serializeLinkAttachment(post.linkAttachment),
       likesCount: post.likesCount || 0,
       commentsCount: post.commentsCount || 0,
       comments,

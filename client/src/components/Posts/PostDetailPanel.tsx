@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Unlink2 } from 'lucide-react';
 import PostMediaGallery from './PostMediaGallery';
+import PostContentBody from './PostContentBody';
 import { buildPostLightboxMeta } from '../../utils/buildPostLightboxMeta';
 import { PostCommentsSection } from './PostCommentsSection';
 import { formatCount } from './postFeedUtils';
@@ -94,11 +95,7 @@ const PostDetailPanel: React.FC<PostDetailPanelProps> = ({
               </p>
             </div>
           </div>
-          {post.content?.trim() ? (
-            <p className="whitespace-pre-wrap break-words text-base leading-relaxed text-neutral-900">
-              {post.content}
-            </p>
-          ) : null}
+          <PostContentBody content={post.content} linkAttachment={post.linkAttachment} />
           {post.media && post.media.length > 0 && (
             <div className="mt-3">
               <PostMediaGallery media={post.media} meta={buildPostLightboxMeta(post)} className="!mt-0" />
