@@ -62,7 +62,7 @@ const MessengerMessageBody: React.FC<MessengerMessageBodyProps> = ({
         <img
           src={part.imageUrl}
           alt=""
-          className="h-[120px] w-[120px] object-contain"
+          className="block h-[200px] w-[200px] object-contain"
           draggable={false}
         />
       </div>
@@ -98,7 +98,7 @@ const MessengerMessageBody: React.FC<MessengerMessageBodyProps> = ({
                 key={`sticker-${index}`}
                 src={part.imageUrl}
                 alt=""
-                className="mx-0.5 inline-block h-16 w-16 align-middle object-contain"
+                className="inline-block h-24 w-24 align-middle object-contain"
                 draggable={false}
               />
             );

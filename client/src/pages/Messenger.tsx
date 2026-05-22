@@ -52,7 +52,7 @@ import {
   rebuildReplyMessage,
   splitReplyMessage,
 } from '../utils/messengerAnimoji';
-import { encodeStickerMessage } from '../utils/messengerStickers';
+import { encodeStickerMessage, isStickerOnlyMessage } from '../utils/messengerStickers';
 import type { MessengerStickerItem, MessengerStickerPack } from '../types/messengerStickers';
 import {
   loadMessengerChatPrefs,
@@ -1125,7 +1125,11 @@ const Messenger: React.FC = () => {
                     >
                       <div
                         className={`rounded-2xl ${
-                          isAttachmentOnlyMessage(message.text) ? 'px-1 py-1' : 'px-4 py-2'
+                          isStickerOnlyMessage(message.text)
+                            ? 'p-0'
+                            : isAttachmentOnlyMessage(message.text)
+                              ? 'px-1 py-1'
+                              : 'px-4 py-2'
                         } ${
                           message.sender === 'user'
                             ? isAttachmentOnlyMessage(message.text)

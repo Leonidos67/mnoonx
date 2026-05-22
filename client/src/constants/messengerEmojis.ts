@@ -7,14 +7,20 @@ export interface MessengerEmojiItem {
   lottieUrl?: string;
 }
 
-export const MAX_LOTTIE_PICKER_BASE = 'https://st.max.ru/lottie_old';
-
+/** Bundled in client/public/lottie/ — same-origin, works on production (no CORS). */
 export function maxPickerLottieUrl(slug: string): string {
-  return `${MAX_LOTTIE_PICKER_BASE}/picker_${slug}.json`;
+  return `/lottie/picker_${slug}.json`;
 }
 
+/** @deprecated alias for maxPickerLottieUrl */
 export function maxPickerLottieFallback(slug: string): string {
-  return `/lottie/picker_${slug}.json`;
+  return maxPickerLottieUrl(slug);
+}
+
+export const MAX_LOTTIE_PICKER_CDN = 'https://st.max.ru/lottie_old';
+
+export function maxPickerLottieCdnUrl(slug: string): string {
+  return `${MAX_LOTTIE_PICKER_CDN}/picker_${slug}.json`;
 }
 
 /** @deprecated use maxPickerLottieUrl('kiss') */

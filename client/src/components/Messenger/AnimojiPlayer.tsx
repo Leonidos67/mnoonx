@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import lottie, { AnimationItem } from 'lottie-web';
-import { maxPickerLottieFallback } from '../../constants/messengerEmojis';
+import { maxPickerLottieCdnUrl, maxPickerLottieUrl } from '../../constants/messengerEmojis';
 
 const PLACEHOLDER_IMG =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
@@ -15,8 +15,13 @@ interface AnimojiPlayerProps {
 }
 
 function lottieSourceUrls(lottieUrl: string, slug?: string): string[] {
-  const urls = [lottieUrl];
-  if (slug) urls.push(maxPickerLottieFallback(slug));
+  const urls: string[] = [];
+  if (slug) urls.push(maxPickerLottieUrl(slug));
+  if (lottieUrl && !urls.includes(lottieUrl)) urls.push(lottieUrl);
+  if (slug) {
+    const cdn = maxPickerLottieCdnUrl(slug);
+    if (!urls.includes(cdn)) urls.push(cdn);
+  }
   return urls;
 }
 
