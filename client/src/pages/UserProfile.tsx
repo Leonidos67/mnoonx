@@ -18,7 +18,18 @@ import {
   Trash,
   Unlink2,
   Zap,
+  Sparkles,
 } from 'lucide-react';
+import ProfileBgEmojiDecor from '../components/Profile/ProfileBgEmojiDecor';
+import {
+  PROFILE_HEADER_BG_DISABLED,
+  getProfileStatusIconUrl,
+  normalizeProfileStatusIcon,
+} from '../constants/profileCustomization';
+import ProfilePremiumStyleModal, {
+  type ProfileCustomizationDraft,
+} from '../components/Profile/ProfilePremiumStyleModal';
+import { hasProSubscription } from '../utils/userPlan';
 import MobileBottomSheet from '../components/Common/MobileBottomSheet';
 import FloatingMenu from '../components/Common/FloatingMenu';
 import PostDetailPanel from '../components/Posts/PostDetailPanel';
@@ -50,6 +61,9 @@ interface UserProfile {
   postsCount: number;
   createdAt: string;
   isFollowing: boolean;
+  profileStatusIcon?: string;
+  profileNameColor?: string;
+  profileBgEmoji?: string;
 }
 
 interface FollowerUser {
@@ -83,6 +97,9 @@ const UserProfileComponent: React.FC = () => {
   const [reposts, setReposts] = useState<FeedPost[]>([]);
   const [repostsLoading, setRepostsLoading] = useState(false);
   const [searchFollower, setSearchFollower] = useState('');
+  const [premiumModalOpen, setPremiumModalOpen] = useState(false);
+  const [styleSaving, setStyleSaving] = useState(false);
+  const [hasProPlan, setHasProPlan] = useState(hasProSubscription);
 
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
@@ -146,6 +163,16 @@ const UserProfileComponent: React.FC = () => {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const syncPlan = () => setHasProPlan(hasProSubscription());
+    window.addEventListener('planTierChanged', syncPlan);
+    window.addEventListener('storage', syncPlan);
+    return () => {
+      window.removeEventListener('planTierChanged', syncPlan);
+      window.removeEventListener('storage', syncPlan);
+    };
   }, []);
 
   const handleLike = async (postId: string) => {
@@ -726,26 +753,116 @@ const UserProfileComponent: React.FC = () => {
 
   const isOwnProfile = user?.username === profile.username;
 
+  const displayName = (() => {
+    const fromProfile = (profile.fullName || '').trim();
+    if (fromProfile) return fromProfile;
+    if (isOwnProfile && (user?.fullName || '').trim()) return (user!.fullName || '').trim();
+    return profile.username;
+  })();
+
+  const nameColor =
+    profile.profileNameColor && profile.profileNameColor.length > 0
+      ? profile.profileNameColor
+      : undefined;
+
+  const statusIconId = normalizeProfileStatusIcon(profile.profileStatusIcon);
+  const statusIconUrl = getProfileStatusIconUrl(statusIconId);
+
+  const customizationDraft: ProfileCustomizationDraft = {
+    profileStatusIcon: statusIconId,
+    profileNameColor: profile.profileNameColor || '',
+    profileBgEmoji: profile.profileBgEmoji || '',
+  };
+
+  const saveProfileCustomization = async (draft: ProfileCustomizationDraft) => {
+    if (!token || !hasProPlan) return;
+    setStyleSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/me/profile-customization`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ ...draft, ...PROFILE_HEADER_BG_DISABLED }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || t('userProfile.premiumModal.saveFailed'));
+      }
+      const data = await res.json();
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              profileStatusIcon: data.profileStatusIcon || '',
+              profileNameColor: data.profileNameColor || '',
+              profileBgEmoji: data.profileBgEmoji || '',
+              profileBgMode: data.profileBgMode || 'none',
+              profileBgColor: data.profileBgColor || '',
+              profileBgColor2: data.profileBgColor2 || '',
+            }
+          : null
+      );
+      setPremiumModalOpen(false);
+      showToast(t('userProfile.premiumModal.saved'));
+    } catch (err: unknown) {
+      showToast(
+        err instanceof Error ? err.message : t('userProfile.premiumModal.saveFailed'),
+        'error'
+      );
+    } finally {
+      setStyleSaving(false);
+    }
+  };
+
   return (
     <div className="mx-auto flex h-full min-h-0 w-full max-w-[1200px] gap-6">
       <div className="flex h-full min-h-0 max-w-[600px] flex-1 flex-col overflow-hidden border-x border-neutral-200 bg-white">
         <div className="shrink-0">
         {/* Profile Info */}
-        <div className="px-4 pb-4 mt-4">
+        <div className="relative -mx-px mt-4 overflow-hidden px-4 pb-4 pt-3">
+          {profile.profileBgEmoji ? (
+            <ProfileBgEmojiDecor emoji={profile.profileBgEmoji} />
+          ) : null}
+          <div className="relative z-10">
           <div className="flex justify-between items-start">
             <div className="relative">
               <img 
-                src={profile.avatar || `https://ui-avatars.com/api/?name=${profile.fullName}&background=000&color=fff&size=140&bold=true`}
-                alt={profile.fullName}
+                src={profile.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=000&color=fff&size=140&bold=true`}
+                alt={displayName}
                 className="w-[80px] h-[80px] rounded-full border-4 border-white bg-white"
-                onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${profile.fullName}&background=000&color=fff&size=140&bold=true`; }}
+                onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=000&color=fff&size=140&bold=true`; }}
               />
             </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold">{profile.fullName}</h1>
-            <p className="text-neutral-500">@{profile.username}</p>
+          <div className="mt-3 flex flex-wrap items-center">
+            <h1
+              className="text-xl font-bold text-neutral-900"
+              style={nameColor ? { color: nameColor } : undefined}
+            >
+              {displayName}
+            </h1>
+            {statusIconUrl ? (
+              <img
+                src={statusIconUrl}
+                alt=""
+                className="h-11 w-11 shrink-0 object-contain sm:h-12 sm:w-12"
+                draggable={false}
+              />
+            ) : null}
+            {isOwnProfile ? (
+              <button
+                type="button"
+                onClick={() => setPremiumModalOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-3 py-1 text-xs font-semibold text-violet-800 shadow-sm transition-colors hover:from-violet-100 hover:to-fuchsia-100"
+              >
+                <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-600" aria-hidden />
+                {t('userProfile.premiumStatus')}
+              </button>
+            ) : null}
           </div>
+          <p className="text-neutral-500">@{profile.username}</p>
           <div className="flex gap-2 mt-2">
             {isOwnProfile ? (
               <>
@@ -786,7 +903,17 @@ const UserProfileComponent: React.FC = () => {
             <button className="hover:underline"><span className="font-bold text-neutral-900">{formatCount(profile.followersCount || 0)}</span><span className="text-neutral-500 ml-1">{t('userProfile.followers')}</span></button>
           </div>
           <div className="flex text-sm items-center gap-1"><Calendar size={14} /><span>{t('userProfile.joinedLine', { date: formatDate(profile.createdAt) })}</span></div>
+          </div>
         </div>
+
+        <ProfilePremiumStyleModal
+          open={premiumModalOpen}
+          initial={customizationDraft}
+          saving={styleSaving}
+          onClose={() => setPremiumModalOpen(false)}
+          onSave={saveProfileCustomization}
+          t={t}
+        />
 
         {/* Tabs */}
         <div className="flex border-b border-neutral-200">

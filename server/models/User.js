@@ -76,7 +76,41 @@ const userSchema = new mongoose.Schema({
   lastSeen: {
     type: Date,
     default: Date.now
-  }
+  },
+  /** Premium profile: status badge icon id/url (future) */
+  profileStatusIcon: {
+    type: String,
+    default: '',
+    maxlength: 200,
+  },
+  /** Hex color for display name, e.g. #7c3aed */
+  profileNameColor: {
+    type: String,
+    default: '',
+    maxlength: 32,
+  },
+  /** Single emoji repeated as profile header background decor */
+  profileBgEmoji: {
+    type: String,
+    default: '',
+    maxlength: 16,
+  },
+  /** none | solid | gradient — header fill bottom-left → top-right */
+  profileBgMode: {
+    type: String,
+    enum: ['none', 'solid', 'gradient'],
+    default: 'none',
+  },
+  profileBgColor: {
+    type: String,
+    default: '',
+    maxlength: 32,
+  },
+  profileBgColor2: {
+    type: String,
+    default: '',
+    maxlength: 32,
+  },
 }, {
   timestamps: true // createdAt и updatedAt
 });

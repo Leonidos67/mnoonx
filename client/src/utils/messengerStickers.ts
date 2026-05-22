@@ -54,5 +54,6 @@ export function isStickerOnlyMessage(text: string): boolean {
 
 export function stickerPreviewLabel(packSlug?: string): string {
   if (packSlug === 'kawaii') return 'Kawaii';
+  if (packSlug === 'hands') return 'Hands';
   return 'Sticker';
 }

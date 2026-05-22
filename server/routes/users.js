@@ -71,6 +71,136 @@ router.get('/list', auth, async (req, res) => {
   }
 });
 
+const ALLOWED_PROFILE_NAME_COLORS = new Set([
+  '',
+  '#7c3aed',
+  '#e11d48',
+  '#0284c7',
+  '#059669',
+  '#d97706',
+  '#c026d3',
+]);
+
+const ALLOWED_PROFILE_BG_MODES = new Set(['none', 'solid', 'gradient']);
+
+const ALLOWED_PROFILE_BG_HEX = new Set([
+  '#7c3aed',
+  '#0ea5e9',
+  '#e11d48',
+  '#38bdf8',
+  '#fbbf24',
+  '#059669',
+  '#14b8a6',
+  '#4f46e5',
+  '#d946ef',
+  '#64748b',
+]);
+
+const ALLOWED_PROFILE_STATUS_ICONS = new Set([
+  '',
+  'status-metallic-star',
+  'status-gloss-a',
+  'status-gloss-b',
+  'status-gloss-c',
+  'status-gloss-d',
+  'status-gloss-e',
+  'status-gloss-f',
+  'status-filled-star',
+  'status-eyes',
+  'status-particles',
+  'status-bomb',
+  'status-alien',
+  'status-sparkle',
+  // legacy ids
+  'status-star',
+]);
+
+const ALLOWED_PROFILE_BG_EMOJIS = new Set([
+  '✨',
+  '🔥',
+  '💜',
+  '🌸',
+  '⭐',
+  '🎉',
+  '💖',
+  '🦋',
+  '🌙',
+  '☀️',
+  '👋',
+  '🫶',
+  '💫',
+  '🌟',
+  '🎀',
+  '🍀',
+  '💎',
+  '🌈',
+  '⚡',
+  '🎵',
+  '🌺',
+  '🍭',
+  '👑',
+  '🪩',
+  '🧸',
+  '🐾',
+]);
+
+// PATCH /api/users/me/profile-customization
+router.patch('/me/profile-customization', auth, async (req, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const { profileStatusIcon, profileNameColor, profileBgEmoji } = req.body || {};
+
+    if (profileStatusIcon !== undefined) {
+      const statusId =
+        typeof profileStatusIcon === 'string' ? profileStatusIcon.trim().slice(0, 64) : '';
+      if (!ALLOWED_PROFILE_STATUS_ICONS.has(statusId)) {
+        return res.status(400).json({ message: 'Invalid profile status icon' });
+      }
+      user.profileStatusIcon = statusId;
+    }
+    if (profileNameColor !== undefined) {
+      const color = typeof profileNameColor === 'string' ? profileNameColor.trim() : '';
+      if (!ALLOWED_PROFILE_NAME_COLORS.has(color)) {
+        return res.status(400).json({ message: 'Invalid profile name color' });
+      }
+      user.profileNameColor = color;
+    }
+    if (profileBgEmoji !== undefined) {
+      const emoji = typeof profileBgEmoji === 'string' ? profileBgEmoji.trim() : '';
+      if (emoji && !ALLOWED_PROFILE_BG_EMOJIS.has(emoji)) {
+        return res.status(400).json({ message: 'Invalid profile background emoji' });
+      }
+      user.profileBgEmoji = emoji;
+    }
+    // Profile header fill temporarily disabled — always cleared
+    user.profileBgMode = 'none';
+    user.profileBgColor = '';
+    user.profileBgColor2 = '';
+
+    await user.save();
+
+    res.json({
+      profileStatusIcon: user.profileStatusIcon || '',
+      profileNameColor: user.profileNameColor || '',
+      profileBgEmoji: user.profileBgEmoji || '',
+      profileBgMode: user.profileBgMode || 'none',
+      profileBgColor: user.profileBgColor || '',
+      profileBgColor2: user.profileBgColor2 || '',
+    });
+  } catch (error) {
+    console.error('Profile customization error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // GET /api/users/:username
 router.get('/:username', auth, async (req, res) => {
   try {

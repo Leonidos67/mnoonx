@@ -8,6 +8,11 @@ import {
   type ActivityStoreItem,
   type ActivityStoreItemId,
 } from '../../constants/activityStore';
+import { getStickerStoreMeta } from '../../constants/activityStoreStickers';
+import {
+  resolveStorePromoForItem,
+  type ActivityStorePromoDefinition,
+} from '../../constants/activityStorePromos';
 import ActivityCoinBadge from './ActivityCoinBadge';
 
 type StoreView = 'home' | ActivityStoreCategory | 'detail';
@@ -15,7 +20,7 @@ type StoreView = 'home' | ActivityStoreCategory | 'detail';
 interface ActivityStorePanelProps {
   balance: number;
   purchasedIds: Set<ActivityStoreItemId>;
-  onPurchase: (id: ActivityStoreItemId) => 'ok' | 'owned' | 'insufficient';
+  onPurchase: (id: ActivityStoreItemId, promoCode?: string) => 'ok' | 'owned' | 'insufficient';
   t: (key: string, params?: Record<string, string | number>) => string;
 }
 
@@ -25,7 +30,23 @@ const categoryGradients: Record<ActivityStoreCategory, string> = {
   stickers: 'from-orange-300 via-amber-400 to-orange-500',
 };
 
-function StorePreviewArt({ preview }: { preview: ActivityStoreItem['preview'] }) {
+function StorePreviewArt({
+  item,
+}: {
+  item: ActivityStoreItem;
+}) {
+  const stickerMeta = getStickerStoreMeta(item.id);
+  if (stickerMeta) {
+    return (
+      <img
+        src={stickerMeta.cardImageUrl}
+        alt=""
+        className="h-[72%] w-[72%] max-h-32 max-w-32 object-contain drop-shadow-md sm:max-h-40 sm:max-w-40"
+        draggable={false}
+      />
+    );
+  }
+
   const map: Record<ActivityStoreItem['preview'], string> = {
     'cat-coupon': '🐱',
     'level-80': '80',
@@ -34,8 +55,8 @@ function StorePreviewArt({ preview }: { preview: ActivityStoreItem['preview'] })
     coupon: '%',
     chameleon: '🦎',
   };
-  const label = map[preview];
-  if (preview === 'level-80') {
+  const label = map[item.preview];
+  if (item.preview === 'level-80') {
     return (
       <span className="bg-gradient-to-b from-amber-300 to-amber-600 bg-clip-text text-4xl font-black text-transparent sm:text-5xl">
         {label}
@@ -54,6 +75,9 @@ const ActivityStorePanel: React.FC<ActivityStorePanelProps> = ({
   const [view, setView] = useState<StoreView>('home');
   const [detailId, setDetailId] = useState<ActivityStoreItemId | null>(null);
   const [purchaseMsg, setPurchaseMsg] = useState<string | null>(null);
+  const [promoInput, setPromoInput] = useState('');
+  const [appliedPromo, setAppliedPromo] = useState<ActivityStorePromoDefinition | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
 
   const detailItem = detailId ? getStoreItem(detailId) : undefined;
 
@@ -67,6 +91,15 @@ const ActivityStorePanel: React.FC<ActivityStorePanelProps> = ({
     setDetailId(id);
     setView('detail');
     setPurchaseMsg(null);
+    setPromoInput('');
+    setAppliedPromo(null);
+    setPromoError(null);
+  };
+
+  const resetPromoState = () => {
+    setPromoInput('');
+    setAppliedPromo(null);
+    setPromoError(null);
   };
 
   const goBack = () => {
@@ -74,16 +107,36 @@ const ActivityStorePanel: React.FC<ActivityStorePanelProps> = ({
       const cat = detailItem?.category;
       setView(cat ?? 'home');
       setDetailId(null);
+      resetPromoState();
       return;
     }
     setView('home');
     setDetailId(null);
     setPurchaseMsg(null);
+    resetPromoState();
+  };
+
+  const handleApplyPromo = () => {
+    if (!detailItem) return;
+    const resolved = resolveStorePromoForItem(promoInput, detailItem);
+    if (!resolved.ok) {
+      setAppliedPromo(null);
+      setPromoError(
+        resolved.error === 'category'
+          ? t('activity.store.promo.categoryMismatch')
+          : t('activity.store.promo.invalid')
+      );
+      return;
+    }
+    setAppliedPromo(resolved.promo);
+    setPromoError(null);
+    setPurchaseMsg(null);
   };
 
   const handlePurchase = () => {
     if (!detailId) return;
-    const result = onPurchase(detailId);
+    const promoForPurchase = appliedPromo?.code ?? (promoInput.trim() || undefined);
+    const result = onPurchase(detailId, promoForPurchase);
     if (result === 'ok') setPurchaseMsg(t('activity.store.purchaseSuccess'));
     else if (result === 'owned') setPurchaseMsg(t('activity.store.alreadyOwned'));
     else setPurchaseMsg(t('activity.store.insufficient'));
@@ -132,7 +185,7 @@ const ActivityStorePanel: React.FC<ActivityStorePanelProps> = ({
             aria-hidden
           />
           <div className="relative flex h-full items-center justify-center p-4">
-            <StorePreviewArt preview={item.preview} />
+            <StorePreviewArt item={item} />
           </div>
         </div>
         <div className="mt-2 flex items-center gap-1">
@@ -150,7 +203,15 @@ const ActivityStorePanel: React.FC<ActivityStorePanelProps> = ({
 
   if (view === 'detail' && detailItem) {
     const owned = purchasedIds.has(detailItem.id);
-    const canBuy = !owned && balance >= detailItem.price;
+    const isStickerPack = detailItem.category === 'stickers';
+    const promoResolved =
+      appliedPromo && detailItem
+        ? resolveStorePromoForItem(appliedPromo.code, detailItem)
+        : null;
+    const finalPrice =
+      promoResolved?.ok === true ? promoResolved.finalPrice : detailItem.price;
+    const hasDiscount = finalPrice < detailItem.price;
+    const canBuy = !owned && (finalPrice === 0 || balance >= finalPrice);
     return (
       <div className="mx-auto w-full max-w-2xl">
         <div className="mb-6 flex items-center justify-between gap-3">
@@ -169,8 +230,8 @@ const ActivityStorePanel: React.FC<ActivityStorePanelProps> = ({
         <div
           className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${detailItem.bgClass} aspect-[16/10] sm:aspect-[2/1]`}
         >
-          <div className="flex h-full items-center justify-center">
-            <StorePreviewArt preview={detailItem.preview} />
+          <div className="flex h-full items-center justify-center p-6">
+            <StorePreviewArt item={detailItem} />
           </div>
         </div>
 
@@ -181,22 +242,69 @@ const ActivityStorePanel: React.FC<ActivityStorePanelProps> = ({
           {t(`activity.store.items.${detailItem.id}.description`)}
         </p>
 
-        {detailItem.category === 'stickers' ? (
-          <div className="mt-6 flex gap-2 overflow-x-auto pb-2 [scrollbar-width:none]">
-            {['starter', 'wave', 'hi', 'cool', 'love'].map((slot, i) => (
-              <div key={slot} className="shrink-0 text-center">
-                <div
-                  className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-neutral-100 text-2xl ${
-                    i > 1 ? 'opacity-40 grayscale' : ''
-                  }`}
-                >
-                  {i === 0 ? '🦎' : i === 1 ? '👋' : '🔒'}
-                </div>
-                <p className="mt-1 text-[10px] text-neutral-500">
-                  {t(`activity.store.stickerSlots.${slot}`)}
-                </p>
+        {detailItem.category === 'stickers' && getStickerStoreMeta(detailItem.id) ? (
+          <div className="mt-6 grid grid-cols-3 gap-2 sm:grid-cols-3 sm:gap-3">
+            {getStickerStoreMeta(detailItem.id)!.previewImageUrls.map((url, i) => (
+              <div
+                key={url}
+                className="flex aspect-square items-center justify-center rounded-2xl bg-neutral-100 p-2"
+              >
+                <img
+                  src={url}
+                  alt=""
+                  className="h-full w-full object-contain"
+                  draggable={false}
+                  loading={i < 3 ? 'eager' : 'lazy'}
+                />
               </div>
             ))}
+          </div>
+        ) : null}
+
+        {isStickerPack && !owned ? (
+          <div className="mt-6 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4">
+            <label className="text-sm font-medium text-neutral-800" htmlFor="store-promo-code">
+              {t('activity.store.promo.label')}
+            </label>
+            <div className="mt-2 flex gap-2">
+              <input
+                id="store-promo-code"
+                type="text"
+                value={promoInput}
+                onChange={(e) => {
+                  setPromoInput(e.target.value);
+                  setPromoError(null);
+                  if (appliedPromo) setAppliedPromo(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleApplyPromo();
+                  }
+                }}
+                placeholder={t('activity.store.promo.placeholder')}
+                className="min-w-0 flex-1 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-sm text-neutral-900 outline-none ring-violet-500/0 transition-shadow placeholder:text-neutral-400 focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button
+                type="button"
+                onClick={handleApplyPromo}
+                className="shrink-0 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm font-semibold text-neutral-800 transition-colors hover:bg-neutral-100"
+              >
+                {t('activity.store.promo.apply')}
+              </button>
+            </div>
+            {promoError ? (
+              <p className="mt-2 text-sm text-rose-600">{promoError}</p>
+            ) : appliedPromo ? (
+              <p className="mt-2 text-sm font-medium text-emerald-700">
+                {t('activity.store.promo.applied', {
+                  code: appliedPromo.code,
+                  percent: appliedPromo.discountPercent,
+                })}
+              </p>
+            ) : null}
           </div>
         ) : null}
 
@@ -205,13 +313,20 @@ const ActivityStorePanel: React.FC<ActivityStorePanelProps> = ({
         ) : null}
 
         <div className="mt-8 flex items-center justify-between gap-4 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold tabular-nums text-neutral-900">
-              {detailItem.price.toLocaleString()}
-            </span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-violet-500">
-              <span className="text-xs text-white">★</span>
-            </span>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              {hasDiscount ? (
+                <span className="text-base font-medium tabular-nums text-neutral-400 line-through">
+                  {detailItem.price.toLocaleString()}
+                </span>
+              ) : null}
+              <span className="text-2xl font-bold tabular-nums text-neutral-900">
+                {finalPrice === 0 ? t('activity.store.promo.free') : finalPrice.toLocaleString()}
+              </span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-rose-400 to-violet-500">
+                <span className="text-xs text-white">★</span>
+              </span>
+            </div>
           </div>
           {owned ? (
             <span className="rounded-xl bg-emerald-100 px-5 py-3 text-sm font-semibold text-emerald-800">

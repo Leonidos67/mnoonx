@@ -2,6 +2,20 @@ const StickerPack = require('../models/StickerPack');
 const Sticker = require('../models/Sticker');
 const UserStickerPack = require('../models/UserStickerPack');
 
+const HANDS_PACK = {
+  slug: 'hands',
+  name: 'Hands',
+  sortOrder: 1,
+  stickers: [
+    { slug: 'call-me-left', imageUrl: 'https://i.ibb.co/rG5qhNJj/Call-Me-Left-Hand.png', sortOrder: 0 },
+    { slug: 'pointing-down-left', imageUrl: 'https://i.ibb.co/XrCJQvj1/Pointing-Down-Left-Hand.png', sortOrder: 1 },
+    { slug: 'pointing-up-right', imageUrl: 'https://i.ibb.co/FkF16dfm/Pointing-Up-Right-Hand.png', sortOrder: 2 },
+    { slug: 'rock-on-left', imageUrl: 'https://i.ibb.co/k637QtCD/Rock-On-Left-Hand.png', sortOrder: 3 },
+    { slug: 'scrolling-phone-right', imageUrl: 'https://i.ibb.co/vxND3xrk/Scrolling-Phone-with-Right-Hand.png', sortOrder: 4 },
+    { slug: 'thumbs-up-right', imageUrl: 'https://i.ibb.co/PZNM1rM4/Thumbs-Up-Right-Hand.png', sortOrder: 5 },
+  ],
+};
+
 const KAWAII_PACK = {
   slug: 'kawaii',
   name: 'Kawaii',
@@ -17,6 +31,37 @@ const KAWAII_PACK = {
     { slug: 'ghost', imageUrl: 'https://i.ibb.co/mrZyN19r/image-Photoroom-1.png', sortOrder: 8 },
   ],
 };
+
+async function upsertStickerPackDefinition(definition) {
+  let pack = await StickerPack.findOne({ slug: definition.slug });
+  if (!pack) {
+    pack = await StickerPack.create({
+      slug: definition.slug,
+      name: definition.name,
+      isDefault: Boolean(definition.isDefault),
+      sortOrder: definition.sortOrder ?? 0,
+    });
+  } else {
+    pack.name = definition.name;
+    if (definition.sortOrder != null) pack.sortOrder = definition.sortOrder;
+    if (definition.isDefault != null) pack.isDefault = Boolean(definition.isDefault);
+    await pack.save();
+  }
+
+  for (const item of definition.stickers) {
+    await Sticker.findOneAndUpdate(
+      { packId: pack._id, slug: item.slug },
+      { $set: { imageUrl: item.imageUrl, sortOrder: item.sortOrder } },
+      { upsert: true, new: true }
+    );
+  }
+
+  return pack;
+}
+
+async function ensureHandsStickerPack() {
+  return upsertStickerPackDefinition(HANDS_PACK);
+}
 
 async function ensureKawaiiStickerPack() {
   let pack = await StickerPack.findOne({ slug: KAWAII_PACK.slug });
@@ -98,6 +143,7 @@ async function getInstalledStickerPacksForUser(userId) {
 
 module.exports = {
   ensureKawaiiStickerPack,
+  ensureHandsStickerPack,
   ensureUserDefaultStickerPacks,
   installStickerPackForUser,
   getInstalledStickerPacksForUser,

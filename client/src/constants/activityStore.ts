@@ -11,6 +11,7 @@ export const ACTIVITY_STORE_ITEM_IDS = [
   'coupon-welcome-10',
   'coupon-feed-boost',
   'sticker-ham-pack',
+  'sticker-hands-pack',
 ] as const;
 
 export type ActivityStoreItemId = (typeof ACTIVITY_STORE_ITEM_IDS)[number];
@@ -72,6 +73,13 @@ export const ACTIVITY_STORE_ITEMS: ActivityStoreItem[] = [
     price: 2800,
     preview: 'chameleon',
     bgClass: 'from-pink-50 via-rose-50 to-pink-100',
+  },
+  {
+    id: 'sticker-hands-pack',
+    category: 'stickers',
+    price: 2000,
+    preview: 'chameleon',
+    bgClass: 'from-amber-50 via-orange-50 to-yellow-100',
   },
 ];
 

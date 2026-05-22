@@ -6,6 +6,8 @@ import {
   markStoreItemPurchased,
   type ActivityStoreItemId,
 } from '../constants/activityStore';
+import { ACTIVITY_STORE_STICKER_INSTALL } from '../constants/activityStoreStickers';
+import { resolveStorePromoForItem } from '../constants/activityStorePromos';
 import { spendActivityPoints } from '../constants/activityPoints';
 import { useAuth } from '../context/AuthContext';
 
@@ -25,18 +27,25 @@ export function useActivityPurchases(onBalanceChange: () => void) {
   const [purchasedIds, setPurchasedIds] = useState(() => loadPurchasedStoreIds());
 
   const purchaseItem = useCallback(
-    (itemId: ActivityStoreItemId): 'ok' | 'owned' | 'insufficient' => {
+    (itemId: ActivityStoreItemId, promoCode?: string): 'ok' | 'owned' | 'insufficient' => {
       const item = getStoreItem(itemId);
       if (!item) return 'insufficient';
       if (purchasedIds.has(itemId)) return 'owned';
 
-      const spend = spendActivityPoints(item.price);
+      let price = item.price;
+      if (promoCode?.trim()) {
+        const resolved = resolveStorePromoForItem(promoCode, item);
+        if (resolved.ok) price = resolved.finalPrice;
+      }
+
+      const spend = spendActivityPoints(price);
       if (!spend.ok) return 'insufficient';
 
       setPurchasedIds(markStoreItemPurchased(itemId));
       onBalanceChange();
-      if (itemId === 'sticker-ham-pack' && token) {
-        void installMessengerStickerPack(token, 'kawaii');
+      const packSlug = ACTIVITY_STORE_STICKER_INSTALL[itemId];
+      if (packSlug && token) {
+        void installMessengerStickerPack(token, packSlug);
       }
       return 'ok';
     },
