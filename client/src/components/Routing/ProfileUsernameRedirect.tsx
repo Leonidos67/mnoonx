@@ -17,6 +17,7 @@ const RESERVED = new Set([
   'ai',
   'dashboard',
   'activity',
+  'admin',
 ]);
 
 /**

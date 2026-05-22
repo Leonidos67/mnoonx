@@ -39,6 +39,7 @@ app.use('/api/communities', require('./routes/communities'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/ai', require('./routes/ai'));
+app.use('/api/admin', require('./routes/admin'));
 
 // Test route
 app.get('/', (req, res) => {

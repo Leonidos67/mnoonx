@@ -43,6 +43,7 @@ import RequireAuth from './components/Routing/RequireAuth';
 import { RequireUsersDirectoryAccess } from './components/Routing/RequireUsername';
 import RequireCommunityOwner from './components/Routing/RequireCommunityOwner';
 import { COMMUNITY_SETTINGS_SEGMENT, COMMUNITY_STORE_SEGMENT } from './constants/communityRoutes';
+import AdminRoutes from './pages/admin/AdminRoutes';
 
 function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -67,6 +68,8 @@ function App() {
         }}
       >
         <Routes>
+          <Route path="/admin/*" element={<AdminRoutes />} />
+
           {/* Основные страницы */}
           <Route path="/" element={<AppLayout><Home /></AppLayout>} />
           <Route path="/discover" element={<AppLayout><Discover /></AppLayout>} />

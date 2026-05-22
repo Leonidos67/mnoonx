@@ -195,6 +195,9 @@ db.conversations.find({ ownerUserId: ObjectId("...") }).pretty()
 MONGO_URI=mongodb://127.0.0.1:27017/mnoonx
 JWT_SECRET=your_secret_here
 PORT=5000
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=your_secure_password
+ADMIN_JWT_SECRET=optional_separate_secret
 ```
 
 ## Правила для агентов
