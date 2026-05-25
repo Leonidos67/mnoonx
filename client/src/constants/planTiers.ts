@@ -20,7 +20,6 @@ export const PLAN_FEATURE_KEYS: Record<PlanTierId, string[]> = {
     'profilePosts',
     'publicCommunities',
     'basicFeed',
-    'oneCommunity',
     'aiBasic',
   ],
   pro: [

@@ -5,12 +5,14 @@
     "dev": "nodemon index.js",
     "start": "node index.js",
     "seed:feed": "node scripts/seedFeed.js",
+    "seed:may22-24": "node scripts/seedMay22_24Posts.js",
     "migrate:post-links": "node scripts/migratePostLinksFromContent.js",
     "migrate:post-links:dry": "node scripts/migratePostLinksFromContent.js --dry-run",
     "seed:communities": "node scripts/seedPromoCommunities.js",
     "fix:post-likes": "node scripts/fixSeedPostEngagement.js",
     "seed:mnoonx-members": "node scripts/seedMnoonxBulkMembers.js",
-    "seed:post-engagement": "node scripts/seedPostEngagement.js"
+    "seed:post-engagement": "node scripts/seedPostEngagement.js",
+    "restore:mnoonx-posts": "node scripts/restoreMnoonxPostsFromBackup.js --replace-wrong"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

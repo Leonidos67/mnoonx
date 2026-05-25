@@ -9,6 +9,14 @@ const Post = require('../models/Post');
 const User = require('../models/User');
 const Community = require('../models/Community');
 const auth = require('../middleware/auth');
+const {
+  loadFeedViewerContext,
+  buildRankedFeed,
+  clampInt,
+  DEFAULT_CANDIDATE_POOL,
+  DEFAULT_FEED_LIMIT,
+  MAX_FEED_LIMIT,
+} = require('../services/feedRanking');
 
 const UPLOADS_ROOT = path.join(__dirname, '../uploads');
 const POST_MEDIA_DIR = path.join(UPLOADS_ROOT, 'post-media');
@@ -247,18 +255,25 @@ router.post('/media/upload', auth, (req, res) => {
   });
 });
 
-// GET /api/posts - Получить все посты для главной ленты
+// GET /api/posts - Главная лента (ranked по умолчанию, ?feed=recent — хронология)
 router.get('/', auth, async (req, res) => {
   try {
-    console.log('\n🔍 GET /api/posts');
-    console.log('👤 User ID:', req.userId || 'Not authenticated');
-    
-    // Показываем все публичные посты (isPrivate = false)
-    const posts = await Post.find({ isPrivate: false })
+    const feedMode = String(req.query.feed || 'ranked').toLowerCase();
+    const limit = clampInt(req.query.limit, 1, MAX_FEED_LIMIT, DEFAULT_FEED_LIMIT);
+    const poolSize = clampInt(req.query.pool, limit, DEFAULT_CANDIDATE_POOL, DEFAULT_CANDIDATE_POOL);
+
+    const candidatePosts = await Post.find({ isPrivate: false })
       .sort({ createdAt: -1 })
-      .limit(50);
-    
-    console.log(`✅ Found ${posts.length} public posts`);
+      .limit(poolSize)
+      .lean(false);
+
+    let posts;
+    if (feedMode === 'recent') {
+      posts = candidatePosts.slice(0, limit);
+    } else {
+      const ctx = await loadFeedViewerContext(req.userId);
+      posts = buildRankedFeed(candidatePosts, limit, ctx);
+    }
 
     const postsData = await Promise.all(posts.map(async (post) => {
       const author = await User.findById(post.author).select('username fullName avatar');
@@ -281,8 +296,6 @@ router.get('/', auth, async (req, res) => {
       const uid = req.userId ? String(req.userId) : null;
       const isLiked = uid ? post.likes.some((id) => String(id) === uid) : false;
       const isReposted = uid ? post.reposts.some((id) => String(id) === uid) : false;
-      
-      console.log(`Post ${post._id}: isLiked=${isLiked}, userId=${req.userId}`);
       
       return {
         _id: post._id,

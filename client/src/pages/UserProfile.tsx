@@ -31,6 +31,11 @@ import {
 import ProfilePremiumStyleModal, {
   type ProfileCustomizationDraft,
 } from '../components/Profile/ProfilePremiumStyleModal';
+import ProfileUserActionsMenu, {
+  type ProfileUserActionId,
+} from '../components/Profile/ProfileUserActionsMenu';
+import ProfileFollowersSheet from '../components/Profile/ProfileFollowersSheet';
+import { profilePath } from '../constants/paths';
 import { hasProSubscription } from '../utils/userPlan';
 import MobileBottomSheet from '../components/Common/MobileBottomSheet';
 import FloatingMenu from '../components/Common/FloatingMenu';
@@ -47,7 +52,7 @@ import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 import { getPostDisplayMeta } from '../utils/postDisplay';
 import { tryAwardActivity } from '../utils/awardActivity';
 
-import { USERS_API as API_URL, POSTS_API as POSTS_API_URL } from '../config/api';
+import { USERS_API as API_URL, POSTS_API as POSTS_API_URL, MESSAGES_API } from '../config/api';
 import { useTranslation } from '../i18n/useTranslation';
 
 type Post = FeedPost;
@@ -105,6 +110,11 @@ const UserProfileComponent: React.FC = () => {
   const [reposts, setReposts] = useState<FeedPost[]>([]);
   const [repostsLoading, setRepostsLoading] = useState(false);
   const [searchFollower, setSearchFollower] = useState('');
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [profileMenuAnchor, setProfileMenuAnchor] = useState<{ rect: DOMRect } | null>(null);
+  const [followersSheetOpen, setFollowersSheetOpen] = useState(false);
+  const [followingSheetOpen, setFollowingSheetOpen] = useState(false);
+  const [messagingLoading, setMessagingLoading] = useState(false);
   const [premiumModalOpen, setPremiumModalOpen] = useState(false);
   const [styleSaving, setStyleSaving] = useState(false);
   const [hasProPlan, setHasProPlan] = useState(hasProSubscription);
@@ -614,6 +624,87 @@ const UserProfileComponent: React.FC = () => {
     f.username?.toLowerCase().includes(searchFollower.toLowerCase())
   );
 
+  const filteredFollowing = following.filter(
+    (f) =>
+      f.fullName?.toLowerCase().includes(searchFollower.toLowerCase()) ||
+      f.username?.toLowerCase().includes(searchFollower.toLowerCase())
+  );
+
+  const openProfileMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
+    setProfileMenuAnchor({ rect: e.currentTarget.getBoundingClientRect() });
+    setProfileMenuOpen(true);
+  };
+
+  const openMessengerWithUser = useCallback(
+    async (targetUsername: string) => {
+      if (!token) {
+        showToast(t('userProfile.menu.signInToMessage'), 'info');
+        window.dispatchEvent(new CustomEvent('openLogin'));
+        return;
+      }
+      if (messagingLoading) return;
+      setMessagingLoading(true);
+      try {
+        const res = await fetch(`${MESSAGES_API}/dm/${encodeURIComponent(targetUsername)}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showToast(
+            (data as { message?: string }).message || t('userProfile.menu.openChatFailed'),
+            'error'
+          );
+          return;
+        }
+        const conversationId = (data as { conversationId?: string }).conversationId;
+        if (!conversationId) {
+          showToast(t('userProfile.menu.openChatFailed'), 'error');
+          return;
+        }
+        navigate(`/messenger?chat=${encodeURIComponent(conversationId)}`);
+      } catch {
+        showToast(t('userProfile.menu.openChatFailed'), 'error');
+      } finally {
+        setMessagingLoading(false);
+      }
+    },
+    [token, navigate, showToast, t]
+  );
+
+  const copyProfileLink = useCallback(async () => {
+    if (!profile) return;
+    const url = `${window.location.origin}${profilePath(profile.username)}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast(t('userProfile.menu.linkCopied'));
+    } catch {
+      showToast(t('userProfile.menu.linkCopied'), 'info');
+    }
+  }, [profile, showToast, t]);
+
+  const handleProfileMenuAction = useCallback(
+    (action: ProfileUserActionId) => {
+      if (!profile) return;
+      if (action === 'message') {
+        void openMessengerWithUser(profile.username);
+        return;
+      }
+      if (action === 'copyLink') {
+        void copyProfileLink();
+        return;
+      }
+      if (action === 'report') {
+        showToast(t('userProfile.menu.reportSent'), 'info');
+        return;
+      }
+      if (action === 'block') {
+        showToast(t('userProfile.menu.blocked'), 'info');
+      }
+    },
+    [profile, openMessengerWithUser, copyProfileLink, showToast, t]
+  );
+
   const renderPostCard = (post: Post, options?: { showRepostBanner?: boolean }) => {
     const postId = String(post._id);
     const showRepostBanner = options?.showRepostBanner ?? false;
@@ -938,10 +1029,22 @@ const UserProfileComponent: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    className="rounded-full border border-neutral-300 p-1.5 transition-colors hover:bg-neutral-100"
-                    aria-label={t('messenger.title')}
+                    onClick={() => void openMessengerWithUser(profile.username)}
+                    disabled={messagingLoading}
+                    className="rounded-full border border-neutral-300 p-1.5 transition-colors hover:bg-neutral-100 disabled:opacity-50"
+                    aria-label={t('userProfile.menu.sendMessage')}
                   >
                     <MessageCircle size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openProfileMenu}
+                    className="rounded-full border border-neutral-300 p-1.5 transition-colors hover:bg-neutral-100"
+                    aria-label={t('userProfile.menu.title')}
+                    aria-haspopup="menu"
+                    aria-expanded={profileMenuOpen}
+                  >
+                    <MoreHorizontal size={16} />
                   </button>
                 </>
               )}
@@ -1017,8 +1120,25 @@ const UserProfileComponent: React.FC = () => {
                   className={`px-5 py-2 rounded-full font-semibold text-sm transition-all ${isFollowing ? 'bg-white border border-neutral-300 text-neutral-900 hover:border-red-300 hover:text-red-600 hover:bg-red-50' : 'bg-black text-white hover:bg-neutral-800'} ${followLoading ? 'opacity-50 cursor-not-allowed' : ''}`}>
                   {followLoading ? t('userProfile.followLoading') : isFollowing ? t('userProfile.followingBtn') : t('userProfile.follow')}
                 </button>
-                <button className="p-2 border border-neutral-300 hover:bg-neutral-100 rounded-full transition-colors"><MessageCircle size={18} /></button>
-                <button className="p-2 border border-neutral-300 hover:bg-neutral-100 rounded-full transition-colors"><MoreHorizontal size={18} /></button>
+                <button
+                  type="button"
+                  onClick={() => void openMessengerWithUser(profile.username)}
+                  disabled={messagingLoading}
+                  className="rounded-full border border-neutral-300 p-2 transition-colors hover:bg-neutral-100 disabled:opacity-50"
+                  aria-label={t('userProfile.menu.sendMessage')}
+                >
+                  <MessageCircle size={18} />
+                </button>
+                <button
+                  type="button"
+                  onClick={openProfileMenu}
+                  className="rounded-full border border-neutral-300 p-2 transition-colors hover:bg-neutral-100"
+                  aria-label={t('userProfile.menu.title')}
+                  aria-haspopup="menu"
+                  aria-expanded={profileMenuOpen}
+                >
+                  <MoreHorizontal size={18} />
+                </button>
               </>
             )}
           </div>
@@ -1027,9 +1147,27 @@ const UserProfileComponent: React.FC = () => {
             {profile.location && (<div className="flex items-center gap-1"><MapPin size={16} /><span>{profile.location}</span></div>)}
             {profile.website && (<div className="flex items-center gap-1"><LinkIcon size={16} /><a href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{profile.website.replace(/^https?:\/\//, '')}</a></div>)}
           </div>
-          <div className="flex gap-5 mb-2 text-md">
-            <button className="hover:underline"><span className="font-bold text-neutral-900">{formatCount(profile.followingCount || 0)}</span><span className="text-neutral-500 ml-1">{t('userProfile.following')}</span></button>
-            <button className="hover:underline"><span className="font-bold text-neutral-900">{formatCount(profile.followersCount || 0)}</span><span className="text-neutral-500 ml-1">{t('userProfile.followers')}</span></button>
+          <div className="mb-2 flex gap-5 text-md">
+            <button
+              type="button"
+              className="hover:underline"
+              onClick={() => {
+                if (!isLgUp) setFollowingSheetOpen(true);
+              }}
+            >
+              <span className="font-bold text-neutral-900">{formatCount(profile.followingCount || 0)}</span>
+              <span className="ml-1 text-neutral-500">{t('userProfile.following')}</span>
+            </button>
+            <button
+              type="button"
+              className="hover:underline"
+              onClick={() => {
+                if (!isLgUp) setFollowersSheetOpen(true);
+              }}
+            >
+              <span className="font-bold text-neutral-900">{formatCount(profile.followersCount || 0)}</span>
+              <span className="ml-1 text-neutral-500">{t('userProfile.followers')}</span>
+            </button>
           </div>
           <div className="flex text-sm items-center gap-1"><Calendar size={14} /><span>{t('userProfile.joinedLine', { date: formatDate(profile.createdAt) })}</span></div>
           </div>
@@ -1274,6 +1412,56 @@ const UserProfileComponent: React.FC = () => {
           if (!editPostSaving) setEditPostTarget(null);
         }}
         onSubmit={(value) => void submitEditPost(value)}
+      />
+
+      {!isOwnProfile ? (
+        <ProfileUserActionsMenu
+          open={profileMenuOpen}
+          onClose={() => {
+            setProfileMenuOpen(false);
+            setProfileMenuAnchor(null);
+          }}
+          anchor={profileMenuAnchor}
+          username={profile.username}
+          title={t('userProfile.menu.title')}
+          labels={{
+            sendMessage: t('userProfile.menu.sendMessage'),
+            copyLink: t('userProfile.menu.copyLink'),
+            report: t('userProfile.menu.report'),
+            block: t('userProfile.menu.block'),
+          }}
+          onAction={handleProfileMenuAction}
+        />
+      ) : null}
+
+      <ProfileFollowersSheet
+        open={followersSheetOpen}
+        onClose={() => {
+          setFollowersSheetOpen(false);
+          setSearchFollower('');
+        }}
+        title={t('userProfile.followersHeading', { count: followers.length })}
+        users={filteredFollowers}
+        search={searchFollower}
+        onSearchChange={setSearchFollower}
+        searchPlaceholder={t('userProfile.searchFollowersPlaceholder')}
+        emptySearch={t('userProfile.noFollowersFound')}
+        emptyList={t('userProfile.noFollowersYet')}
+      />
+
+      <ProfileFollowersSheet
+        open={followingSheetOpen}
+        onClose={() => {
+          setFollowingSheetOpen(false);
+          setSearchFollower('');
+        }}
+        title={t('userProfile.followingHeading', { count: following.length })}
+        users={filteredFollowing}
+        search={searchFollower}
+        onSearchChange={setSearchFollower}
+        searchPlaceholder={t('userProfile.searchFollowersPlaceholder')}
+        emptySearch={t('userProfile.noFollowersFound')}
+        emptyList={t('userProfile.notFollowingAnyone')}
       />
 
       <EditTextModal

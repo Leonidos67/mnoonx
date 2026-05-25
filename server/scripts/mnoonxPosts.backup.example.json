@@ -1,0 +1,20 @@
+[
+  {
+    "_id": "6a0675e5077a2470929eb722",
+    "content": "Вставьте сюда точный текст приветственного поста",
+    "media": [],
+    "linkAttachment": null,
+    "createdAt": "2026-05-20T11:20:00.000Z",
+    "likesCount": 120,
+    "repostsCount": 5
+  },
+  {
+    "_id": "6a0675e4077a2470929eb721",
+    "content": "Вставьте сюда точный текст поста про 2000 users",
+    "media": ["/uploads/post-media/ВАШ_ФАЙЛ.png"],
+    "linkAttachment": null,
+    "createdAt": "2026-05-21T12:00:00.000Z",
+    "likesCount": 6,
+    "repostsCount": 1
+  }
+]

@@ -172,7 +172,7 @@ const Home: React.FC = () => {
         headers['Authorization'] = `Bearer ${token}`;
       }
 
-      const res = await fetch(API_URL, { headers });
+      const res = await fetch(`${API_URL}?feed=ranked&limit=60`, { headers });
       if (!res.ok) throw new Error(t('common.failedToFetchPosts'));
 
       const data = await res.json();

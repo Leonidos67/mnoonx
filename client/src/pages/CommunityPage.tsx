@@ -1,11 +1,15 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   communityDashboardPath,
+  communityPath,
   communitySettingsPath,
   communityStorePath,
 } from '../constants/communityRoutes';
+import CommunityLeftSidebar, { type CommunityLeftNav } from '../components/Community/CommunityLeftSidebar';
+import CommunityRightSidebar from '../components/Community/CommunityRightSidebar';
+import CommunityMobileSideAccess from '../components/Community/CommunityMobileSideAccess';
 import { COMMUNITY_APP_IDS } from '../constants/communityApps';
 import CommunityChatPanel from '../components/Community/CommunityChatPanel';
 import CommunityCoursesPanel from '../components/Community/CommunityCoursesPanel';
@@ -160,9 +164,6 @@ const CommunityPage: React.FC = () => {
   const [mainTab, setMainTab] = useState<'home' | 'apps' | 'products' | 'about'>('home');
   const [productsView, setProductsView] = useState<'list' | 'grid'>('list');
   const [productsBundleOpen, setProductsBundleOpen] = useState(true);
-  const [appInstanceMenuId, setAppInstanceMenuId] = useState<string | null>(null);
-  const [appInstanceMenuPanel, setAppInstanceMenuPanel] = useState<'main' | 'visibility'>('main');
-  const appInstanceMenuRef = useRef<HTMLDivElement | null>(null);
   const avatarFileRef = useRef<HTMLInputElement | null>(null);
   const [brandingFieldBusy, setBrandingFieldBusy] = useState<'banner' | 'avatar' | null>(null);
   const [bannerModalOpen, setBannerModalOpen] = useState(false);
@@ -537,10 +538,6 @@ const CommunityPage: React.FC = () => {
   }, [community]);
 
   useEffect(() => {
-    if (!appInstanceMenuId) setAppInstanceMenuPanel('main');
-  }, [appInstanceMenuId]);
-
-  useEffect(() => {
     if (!token || !handle || !community) return;
     const fetchUnread = async () => {
       try {
@@ -560,17 +557,6 @@ const CommunityPage: React.FC = () => {
     const id = window.setInterval(fetchUnread, 3000);
     return () => clearInterval(id);
   }, [token, handle, community]);
-
-  useEffect(() => {
-    if (!appInstanceMenuId) return;
-    const onDown = (e: MouseEvent) => {
-      if (appInstanceMenuRef.current && !appInstanceMenuRef.current.contains(e.target as Node)) {
-        setAppInstanceMenuId(null);
-      }
-    };
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [appInstanceMenuId]);
 
   const canViewFeed =
     Boolean(community) &&
@@ -739,6 +725,15 @@ const CommunityPage: React.FC = () => {
       .then(() => showToast(t('common.linkCopied')))
       .catch(() => showToast(t('common.copyLinkFailed'), 'error'));
   };
+
+  const copyCommunityLink = useCallback(() => {
+    if (!community?.handle) return;
+    const link = `${window.location.origin}${communityPath(community.handle)}`;
+    navigator.clipboard
+      .writeText(link)
+      .then(() => showToast(t('common.linkCopied')))
+      .catch(() => showToast(t('common.copyLinkFailed'), 'error'));
+  }, [community?.handle, showToast, t]);
 
   const isPostOwner = (post: Post) => {
     if (!user) return false;
@@ -959,7 +954,6 @@ const CommunityPage: React.FC = () => {
         console.error(e);
         showToast(t('community.failedUpdateVisibility'), 'error');
       }
-      setAppInstanceMenuId(null);
     },
     [token, handle, showToast, t]
   );
@@ -1074,10 +1068,65 @@ const CommunityPage: React.FC = () => {
         console.error(e);
         showToast(t('community.failedRemoveApp'), 'error');
       }
-      setAppInstanceMenuId(null);
     },
     [token, handle, community, leftNav, confirm, showToast, t]
   );
+
+  const leftSidebarProps = useMemo(() => {
+    if (!community) return null;
+    return {
+      communityName: community.name,
+      communityAvatar: community.avatar,
+      memberCount: community.memberCount,
+      handle: community.handle,
+      leftNav: leftNav as CommunityLeftNav,
+      onGoHome: () => {
+        setLeftNav('home');
+        setMainTab('home');
+      },
+      apps: sidebarAppInstances,
+      onActivateApp: activateAppInstance,
+      activeChatInstanceId,
+      activeCoursesInstanceId,
+      activeContentInstanceId,
+      activeFilesInstanceId,
+      activeAnnouncementsInstanceId,
+      activeEventsInstanceId,
+      unreadByInstance,
+      isOwner,
+      formatCount,
+      onPatchVisibility: patchInstanceVisibility,
+      onDeleteApp: deleteAppInstance,
+    };
+  }, [
+    community,
+    leftNav,
+    sidebarAppInstances,
+    activateAppInstance,
+    activeChatInstanceId,
+    activeCoursesInstanceId,
+    activeContentInstanceId,
+    activeFilesInstanceId,
+    activeAnnouncementsInstanceId,
+    activeEventsInstanceId,
+    unreadByInstance,
+    isOwner,
+    patchInstanceVisibility,
+    deleteAppInstance,
+  ]);
+
+  const rightSidebarProps = useMemo(() => {
+    if (!community?.owner) return null;
+    return {
+      handle: community.handle,
+      memberCount: community.memberCount,
+      owner: community.owner,
+      canOpenDashboard,
+      isOwner,
+      formatCount,
+      onCopyLink: copyCommunityLink,
+    };
+  }, [community, canOpenDashboard, isOwner, copyCommunityLink]);
 
   if (loading) {
     return (
@@ -1217,240 +1266,14 @@ const CommunityPage: React.FC = () => {
           isAppNavActive ? 'grid-cols-1 lg:grid-cols-[280px_1fr]' : 'grid-cols-1 lg:grid-cols-[280px_1fr_340px]'
         }`}
       >
-        {/* LEFT SIDEBAR — desktop only */}
-        <div className="relative z-20 hidden h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-[#e7e7e7] bg-white lg:flex">
-          <div className="shrink-0 border-b border-[#ececec] p-2">
-            <div className="flex items-center gap-3">
-              <img 
-                src={community.avatar || `https://ui-avatars.com/api/?name=${community.name}&background=000&color=fff&size=44&bold=true`}
-                alt=""
-                className="h-8 w-8 rounded-md object-cover"
-              />
-              <div>
-                <h2 className="text-[14px] font-semibold leading-none">
-                  {community.name}
-                </h2>
-                <div className="mt-1 flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-green-500" />
-                  <span className="text-[10px] text-green-600">
-                    {t(
-                      community.memberCount === 1
-                        ? 'community.memberCountLineOne'
-                        : 'community.memberCountLineMany',
-                      { count: formatCount(community.memberCount) }
-                    )}
-                  </span>
-                </div>
-              </div>
-            </div>
+        {/* LEFT SIDEBAR — desktop */}
+        {leftSidebarProps && (
+          <div className="relative z-20 hidden h-full min-h-0 min-w-0 overflow-hidden rounded-xl border border-[#e7e7e7] lg:block">
+            <CommunityLeftSidebar {...leftSidebarProps} className="h-full" />
           </div>
+        )}
 
-          {/* NAVIGATION */}
-          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overflow-x-hidden p-1">
-            <button 
-              type="button"
-              onClick={() => {
-                setLeftNav('home');
-                setMainTab('home');
-              }}
-              className={`w-full h-8 rounded flex items-center gap-2 px-3 font-medium transition-all ${
-                leftNav === 'home' 
-                  ? 'bg-[#eef2ff] text-[#315efb]' 
-                  : 'hover:bg-[#f5f5f5] text-[#666]'
-              }`}
-            >
-              <HouseHeart size={18} />
-              {t('community.sidebarNavHome')}
-            </button>
-
-            {sidebarAppInstances.map((inst) => {
-              const appKind =
-                inst.appId === COMMUNITY_APP_IDS.CHAT
-                  ? 'chat'
-                  : inst.appId === COMMUNITY_APP_IDS.COURSES
-                    ? 'courses'
-                    : inst.appId === COMMUNITY_APP_IDS.CONTENT
-                      ? 'content'
-                      : inst.appId === COMMUNITY_APP_IDS.FILES
-                        ? 'files'
-                        : inst.appId === COMMUNITY_APP_IDS.ANNOUNCEMENTS
-                          ? 'announcements'
-                          : inst.appId === COMMUNITY_APP_IDS.EVENTS
-                            ? 'events'
-                            : 'other';
-              const rowActive =
-                (appKind === 'chat' && leftNav === 'chat' && activeChatInstanceId === inst.id) ||
-                (appKind === 'courses' && leftNav === 'courses' && activeCoursesInstanceId === inst.id) ||
-                (appKind === 'content' && leftNav === 'content' && activeContentInstanceId === inst.id) ||
-                (appKind === 'files' && leftNav === 'files' && activeFilesInstanceId === inst.id) ||
-                (appKind === 'announcements' &&
-                  leftNav === 'announcements' &&
-                  activeAnnouncementsInstanceId === inst.id) ||
-                (appKind === 'events' && leftNav === 'events' && activeEventsInstanceId === inst.id);
-              const menuOpen = appInstanceMenuId === inst.id;
-              const instVisible = inst.visibleToMembers;
-              return (
-                <div
-                  key={inst.id}
-                  className={`group/row relative flex w-full items-center rounded font-medium transition-all ${
-                    rowActive ? 'bg-[#eef2ff] text-[#315efb]' : 'hover:bg-[#f5f5f5] text-[#666]'
-                  }`}
-                >
-                  <button
-                    type="button"
-                    onClick={() => activateAppInstance(inst)}
-                    className="flex h-8 min-w-0 flex-1 items-center gap-2 px-3 text-left text-sm"
-                  >
-                    {appKind === 'chat' ? (
-                      <MessagesSquare size={18} />
-                    ) : appKind === 'courses' ? (
-                      <GraduationCap size={18} />
-                    ) : appKind === 'content' ? (
-                      <Quote size={18} />
-                    ) : appKind === 'files' ? (
-                      <CloudDownload size={18} />
-                    ) : appKind === 'events' ? (
-                      <Calendar size={18} />
-                    ) : (
-                      <Megaphone size={18} />
-                    )}
-                    <span className="min-w-0 flex-1 truncate">{inst.title}</span>
-                    {appKind === 'chat' &&
-                      typeof unreadByInstance[inst.id] === 'number' &&
-                      unreadByInstance[inst.id] > 0 &&
-                      !(leftNav === 'chat' && activeChatInstanceId === inst.id) && (
-                        <span className="shrink-0 rounded-full bg-[#e5484d] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white tabular-nums">
-                          {unreadByInstance[inst.id] > 99 ? '99+' : unreadByInstance[inst.id]}
-                        </span>
-                      )}
-                  </button>
-                  {isOwner && (
-                    <div className="relative h-6 w-6 shrink-0 pr-1" ref={menuOpen ? appInstanceMenuRef : undefined}>
-                      {!instVisible && (
-                        <span
-                          className={`pointer-events-none absolute inset-0 flex items-center justify-center rounded-md text-black transition-opacity ${
-                            menuOpen ? 'opacity-0' : 'opacity-100 group-hover/row:opacity-0'
-                          }`}
-                          title={t('community.hiddenFromMembersTitle')}
-                        >
-                          <EyeOff size={14} aria-hidden />
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        aria-label={t('community.appOptionsAria')}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setAppInstanceMenuId((v) => {
-                            if (v === inst.id) return null;
-                            setAppInstanceMenuPanel('main');
-                            return inst.id;
-                          });
-                        }}
-                        className={`flex h-6 w-6 items-center justify-center rounded-md text-black transition-opacity hover:bg-black/5 ${
-                          menuOpen
-                            ? 'pointer-events-auto opacity-100'
-                            : 'pointer-events-none opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100'
-                        }`}
-                      >
-                        <MoreVertical size={14} />
-                      </button>
-                      {menuOpen && (
-                        <div
-                          className="absolute right-0 top-full z-[500] mt-1 w-48 rounded-lg border border-neutral-200 bg-white p-1 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200"
-                          role="menu"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {appInstanceMenuPanel === 'main' ? (
-                            <>
-                              <Link
-                                to={communitySettingsPath(community.handle)}
-                                onClick={() => setAppInstanceMenuId(null)}
-                                className="flex w-full items-center gap-2 rounded px-3 py-1 text-left text-[14px] text-neutral-900 transition-colors hover:bg-black/5"
-                                role="menuitem"
-                              >
-                                <Pencil className="h-3 w-3 shrink-0" />
-                                {t('community.nestedMenuAdminSettings')}
-                              </Link>
-                              <button
-                                type="button"
-                                onClick={() => setAppInstanceMenuPanel('visibility')}
-                                className="flex w-full items-center gap-2 rounded px-3 py-1 text-left text-[14px] text-neutral-900 transition-colors hover:bg-black/5"
-                                role="menuitem"
-                              >
-                                <Globe className="h-3 w-3 shrink-0" />
-                                <span className="min-w-0 flex-1 truncate">{t('community.changeVisibility')}</span>
-                                <ChevronRight className="h-3 w-3 shrink-0 text-neutral-400" />
-                              </button>
-                              <div className="my-1 h-px bg-neutral-100" />
-                              <button
-                                type="button"
-                                onClick={() => void deleteAppInstance(inst.id)}
-                                className="flex w-full items-center gap-2 rounded px-3 py-1 text-left text-[14px] text-red-600 transition-colors hover:bg-red-50"
-                                role="menuitem"
-                              >
-                                <Trash2 className="h-3 w-3 shrink-0" />
-                                {t('community.deleteApp')}
-                              </button>
-                            </>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => setAppInstanceMenuPanel('main')}
-                                className="flex w-full items-center gap-2 rounded px-3 py-1 text-left text-[14px] text-neutral-900 transition-colors hover:bg-black/5"
-                              >
-                                <ArrowLeft className="h-3 w-3 shrink-0" aria-hidden />
-                                {t('common.back')}
-                              </button>
-                              <button
-                                type="button"
-                                className="flex w-full items-center justify-between gap-2 rounded px-3 py-1 text-left text-[14px] text-neutral-900 transition-colors hover:bg-black/5"
-                                onClick={() => void patchInstanceVisibility(inst.id, true)}
-                              >
-                                <span className="flex items-center gap-2">
-                                  <Globe className="h-3 w-3 shrink-0" aria-hidden />
-                                  {t('community.showToMembers')}
-                                </span>
-                                {instVisible && <Check className="h-3 w-3 shrink-0" aria-hidden />}
-                              </button>
-                              <button
-                                type="button"
-                                className="flex w-full items-center justify-between gap-2 rounded px-3 py-1 text-left text-[14px] text-neutral-900 transition-colors hover:bg-black/5"
-                                onClick={() => void patchInstanceVisibility(inst.id, false)}
-                              >
-                                <span className="flex items-center gap-2">
-                                  <Lock className="h-3 w-3 shrink-0" aria-hidden />
-                                  {t('community.hideFromMembers')}
-                                </span>
-                                {!instVisible && <Check className="h-3 w-3 shrink-0" aria-hidden />}
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Add app - только для владельца */}
-            {isOwner && handle && (
-              <button
-                type="button"
-                onClick={() => navigate(communityStorePath(handle))}
-                className="w-full h-8 rounded hover:bg-[#f5f5f5] flex items-center gap-2 px-3 text-[#666] font-medium transition-all"
-              >
-                <Plus size={18} />
-                {t('community.addApp')}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* CENTER — full width on mobile */}
+        {/* CENTER — full viewport height like side columns */}
         <div className="relative z-0 flex h-full min-h-0 min-w-0 flex-col overflow-hidden max-lg:min-h-0">
           {leftNav === 'chat' && hasChatApp && handle && activeChatInstanceId ? (
             <CommunityChatPanel
@@ -1520,29 +1343,62 @@ const CommunityPage: React.FC = () => {
               }}
             />
           ) : (
-            <div className={mobileComposerFull ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'min-h-0 flex-1 space-y-4 overflow-y-auto'}>
-          {/* HEADER */}
-          <div className="overflow-hidden rounded-xl border border-[#e7e7e7] bg-white max-lg:rounded-none max-lg:border-x-0">
+            <div
+              className={
+                mobileComposerFull
+                  ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+                  : 'flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain max-lg:pb-[calc(60px+env(safe-area-inset-bottom,0px))]'
+              }
+            >
+          <div
+            className={`flex flex-col rounded-xl border border-[#e7e7e7] bg-white max-lg:rounded-none max-lg:border-x-0 ${
+              mobileComposerFull ? 'min-h-0 flex-1 overflow-hidden' : ''
+            }`}
+          >
             {/* BANNER */}
-            <div className="relative h-[180px] bg-gradient-to-r from-gray-800 to-gray-900 sm:h-[220px] lg:h-[250px]">
+            <div className="relative h-[140px] bg-gradient-to-r from-gray-800 to-gray-900 sm:h-[200px] lg:h-[250px]">
               {community.banner && (
                 <img src={community.banner} alt="" className="h-full w-full object-cover" />
+              )}
+              {!isLgUp && !isAppNavActive && leftSidebarProps && rightSidebarProps && (
+                <CommunityMobileSideAccess
+                  unreadByInstance={unreadByInstance}
+                  leftSidebar={leftSidebarProps}
+                  rightSidebar={rightSidebarProps}
+                  bannerTrailing={
+                    isOwner ? (
+                      <button
+                        type="button"
+                        disabled={brandingFieldBusy === 'banner'}
+                        onClick={() => setBannerModalOpen(true)}
+                        className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/80 bg-white/90 text-neutral-800 shadow-sm backdrop-blur transition-colors hover:bg-white disabled:opacity-60"
+                        aria-label={
+                          brandingFieldBusy === 'banner' ? t('upload.uploading') : t('upload.changeBanner')
+                        }
+                      >
+                        <Camera size={18} aria-hidden />
+                      </button>
+                    ) : undefined
+                  }
+                />
               )}
               {isOwner && (
                 <button
                   type="button"
                   disabled={brandingFieldBusy === 'banner'}
                   onClick={() => setBannerModalOpen(true)}
-                  className="absolute top-5 right-5 flex h-11 items-center gap-2 rounded-2xl border border-white bg-white/90 px-5 font-medium backdrop-blur transition-all hover:bg-white disabled:opacity-60"
+                  className="absolute top-3 right-3 hidden h-10 items-center gap-2 rounded-2xl border border-white bg-white/90 px-3 text-sm font-medium backdrop-blur transition-all hover:bg-white disabled:opacity-60 sm:top-5 sm:right-5 sm:h-11 sm:px-5 lg:flex"
                 >
                   <Camera size={18} />
-                  {brandingFieldBusy === 'banner' ? t('upload.uploading') : t('upload.changeBanner')}
+                  <span className="hidden sm:inline">
+                    {brandingFieldBusy === 'banner' ? t('upload.uploading') : t('upload.changeBanner')}
+                  </span>
                 </button>
               )}
             </div>
 
             {/* COMMUNITY INFO — centered column */}
-            <div className="relative px-4 pb-6 sm:px-7">
+            <div className="relative px-3 pb-5 sm:px-7 sm:pb-6">
               <div className="relative mx-auto max-w-3xl">
                 <input
                   ref={avatarFileRef}
@@ -1554,14 +1410,14 @@ const CommunityPage: React.FC = () => {
                     if (f) void uploadCommunityBranding('avatar', f);
                   }}
                 />
-                <div className="px-6 absolute -top-4 left-1/2 z-10 flex h-[40px] -translate-x-1/2 items-center justify-center rounded-full bg-white">
-                  <h1 className="text-2xl font-semibold leading-none tracking-[-0.05em]">{community.name}</h1>
+                <div className="absolute -top-4 left-1/2 z-10 flex max-w-[min(100%,20rem)] -translate-x-1/2 items-center justify-center rounded-full bg-white px-4 py-2 sm:max-w-none sm:px-6">
+                  <h1 className="truncate text-lg font-semibold leading-none tracking-[-0.05em] sm:text-2xl">{community.name}</h1>
                 </div>
 
-                <div className="flex flex-col pt-4">
-                  <p className="mt-4 max-w-xl text-[18px] text-[#888]">{community.description || t('community.setDescriptionHint')}</p>
+                <div className="flex flex-col pt-3 sm:pt-4">
+                  <p className="mt-3 max-w-xl text-base text-[#888] sm:mt-4 sm:text-[18px]">{community.description || t('community.setDescriptionHint')}</p>
 
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-[15px] text-[#666]">
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-[#666] sm:gap-3 sm:text-[15px]">
                     <span>
                       {t(
                         community.memberCount === 1
@@ -1641,7 +1497,7 @@ const CommunityPage: React.FC = () => {
                     mainTab === tab ? 'bg-neutral-100 text-black' : 'text-[#777] hover:bg-neutral-100'
                   }`}
                 >
-                  <span className="pb-2 text-center text-[17px] font-medium">{tabLabel}</span>
+                  <span className="pb-2 text-center text-[13px] font-medium sm:text-[17px]">{tabLabel}</span>
                   <span
                     className={`mb-0 h-1 w-[38%] max-w-[96px] rounded-full ${
                       mainTab === tab ? 'bg-[#315efb]' : 'bg-transparent'
@@ -1653,10 +1509,20 @@ const CommunityPage: React.FC = () => {
               })}
             </div>
 
-            {/* TAB PANELS — same card */}
-            <div className={`border-t border-[#ececec] py-0 ${mobileComposerFull ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
+            {/* TAB PANELS */}
+            <div
+              className={`flex flex-col border-t border-[#ececec] py-0 ${
+                mobileComposerFull ? 'min-h-0 flex-1 overflow-hidden' : ''
+              }`}
+            >
               {mainTab === 'home' && (
-                <div className={mobileComposerFull ? 'mx-auto mt-4 flex min-h-0 max-w-2xl flex-1 flex-col' : 'mx-auto mt-2 max-w-2xl'}>
+                <div
+                  className={
+                    mobileComposerFull
+                      ? 'mx-auto mt-4 flex min-h-0 w-full max-w-2xl flex-1 flex-col'
+                      : 'mx-auto flex w-full max-w-2xl flex-col pt-2'
+                  }
+                >
                   {canPost && (
                     <PostComposer
                       variant="community"
@@ -1692,7 +1558,11 @@ const CommunityPage: React.FC = () => {
                     </div>
                   )}
 
-                  <div className={`border-t border-neutral-200 ${mobileComposerFull ? 'hidden' : ''}`}>
+                  <div
+                    className={`flex flex-1 flex-col border-t border-neutral-200 ${
+                      mobileComposerFull ? 'hidden' : 'min-h-0'
+                    }`}
+                  >
                   {posts.length > 0 ? (
                     posts.map((post) => (
                       <PostFeedCard
@@ -1751,7 +1621,7 @@ const CommunityPage: React.FC = () => {
                       />
                     ))
                   ) : (
-                    <div className="flex min-h-[200px] items-center justify-center px-4 py-12 text-[17px] text-[#999]">
+                    <div className="flex flex-1 min-h-[280px] items-center justify-center px-4 py-12 text-[17px] text-[#999]">
                       {canViewFeed
                         ? t('community.feedEmpty')
                         : t('community.joinToSeePosts')}
@@ -1762,7 +1632,7 @@ const CommunityPage: React.FC = () => {
               )}
 
               {mainTab === 'apps' && handle && (
-                <div className="mx-auto max-w-2xl px-4">
+                <div className="mx-auto flex w-full max-w-2xl flex-col px-4">
                   <div className="flex items-center justify-between border-b border-[#ececec] py-4">
                     <h2 className="text-xl font-bold text-neutral-900">{t('community.appsHeading')}</h2>
                     {isOwner && (
@@ -1776,7 +1646,7 @@ const CommunityPage: React.FC = () => {
                       </button>
                     )}
                   </div>
-                  <div className="grid grid-cols-3 gap-4 py-6">
+                  <div className="grid grid-cols-2 gap-3 py-4 sm:grid-cols-3 sm:gap-4 sm:py-6">
                     {sidebarAppInstances.map((inst) => {
                       const IconEl =
                         inst.appId === COMMUNITY_APP_IDS.CHAT ? (
@@ -1809,9 +1679,9 @@ const CommunityPage: React.FC = () => {
                           key={inst.id}
                           type="button"
                           onClick={() => activateAppInstance(inst)}
-                          className="flex flex-col items-center gap-3 rounded-2xl border border-[#e5e5e5] bg-white p-5 text-center transition-colors hover:border-[#cfcfcf] hover:bg-neutral-50"
+                          className="flex flex-col items-center gap-2 rounded-2xl border border-[#e5e5e5] bg-white p-3 text-center transition-colors hover:border-[#cfcfcf] hover:bg-neutral-50 sm:gap-3 sm:p-5"
                         >
-                          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#f3f3f3] text-neutral-800">
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#f3f3f3] text-neutral-800 sm:h-16 sm:w-16">
                             {IconEl}
                           </div>
                           <p className="line-clamp-2 text-sm font-semibold leading-tight text-neutral-900">{inst.title}</p>
@@ -1827,9 +1697,9 @@ const CommunityPage: React.FC = () => {
               )}
 
               {mainTab === 'products' && handle && (
-                <div className="mx-auto max-w-2xl px-4">
-                  <div className="flex items-center justify-between border-b border-[#ececec] py-4">
-                    <h2 className="text-xl font-bold text-neutral-900">{t('community.productsHeading')}</h2>
+                <div className="mx-auto flex w-full max-w-2xl flex-col px-3 pb-6 sm:px-4">
+                  <div className="flex flex-col gap-3 border-b border-[#ececec] py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
+                    <h2 className="text-lg font-bold text-neutral-900 sm:text-xl">{t('community.productsHeading')}</h2>
                     <div className="flex items-center gap-2">
                       {isOwner && (
                         <button
@@ -1975,7 +1845,7 @@ const CommunityPage: React.FC = () => {
               )}
 
               {mainTab === 'about' && community.owner && (
-                <div className="mx-auto max-w-2xl space-y-0 px-4">
+                <div className="mx-auto flex w-full max-w-2xl flex-col space-y-0 px-4 pb-8">
                   <div className="border-b border-[#ececec] pb-8">
                     {/* <h2 className="text-lg font-semibold text-neutral-800">Team</h2> */}
                     <div className="mt-5 space-y-6">
@@ -2090,72 +1960,9 @@ const CommunityPage: React.FC = () => {
           )}
         </div>
 
-        {!isAppNavActive && (
-          /* RIGHT SIDEBAR — desktop only */
-          <div className="hidden h-full min-h-0 space-y-4 overflow-y-auto lg:block">
-            {/* SEARCH */}
-            <div className="bg-white border border-[#e7e7e7] rounded-[24px] p-2">
-              <div className="space-y-4">
-                <button className="w-full h-10 rounded-2xl bg-[#f5f5f5] hover:bg-[#ececec] transition-all font-medium flex items-center justify-center gap-2">
-                  <Copy size={16} />
-                  {t('common.copyLink')}
-                </button>
-                {canOpenDashboard && (
-                  <button
-                    type="button"
-                    onClick={() => navigate(communityDashboardPath(community.handle))}
-                    className="flex w-full px-2 items-center gap-3 text-[16px] text-[#444] transition-all hover:text-black"
-                  >
-                    <LayoutDashboard size={18} />
-                    {t('dashboard.title')}
-                  </button>
-                )}
-                {isOwner && (
-                  <button
-                    type="button"
-                    onClick={() => navigate(communitySettingsPath(community.handle))}
-                    className="flex w-full px-2 pb-2 items-center gap-3 text-[16px] text-[#444] transition-all hover:text-black"
-                  >
-                    <Bolt size={18} />
-                    {t('nav.settings')}
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* PEOPLE */}
-            <div className="bg-white border border-[#e7e7e7] rounded-xl overflow-hidden">
-              <div className="p-2 border-b border-[#ececec] flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-md pl-2 font-semibold">{t('community.peopleHeading')}</h3>
-                  <span className="text-[#888]">{formatCount(community.memberCount)}</span>
-                </div>
-                <button type="button" className="text-[#315efb] pr-2 font-medium">
-                  {t('community.seeAll')}
-                </button>
-              </div>
-
-              <div className="p-2">
-                <p className="text-sm tracking-[0.08em] text-[#999] uppercase mb-2 px-2">{t('community.peopleCreator')}</p>
-                
-                <div className="flex items-center justify-between">
-                  <Link to={`/@${community.owner?.username}`} className="flex items-center gap-3 flex-1">
-                    <img 
-                      src={community.owner?.avatar || `https://ui-avatars.com/api/?name=${community.owner?.fullName}&background=5d6472&color=fff&size=48&bold=true`}
-                      alt=""
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                    <div>
-                      <p className="font-medium">{community.owner?.fullName || community.owner?.username}</p>
-                      <p className="text-sm text-[#777]">@{community.owner?.username}</p>
-                    </div>
-                  </Link>
-                  <div className="px-3 h-8 rounded-full bg-[#f5f5f5] flex items-center text-sm font-medium">
-                    {t('community.ownerBadgeLower')}
-                  </div>
-                </div>
-              </div>
-            </div>
+        {!isAppNavActive && rightSidebarProps && (
+          <div className="hidden h-full min-h-0 overflow-y-auto lg:block">
+            <CommunityRightSidebar {...rightSidebarProps} />
           </div>
         )}
       </div>

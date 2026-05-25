@@ -7,6 +7,8 @@ const User = require('../models/User');
 const Community = require('../models/Community');
 const Post = require('../models/Post');
 const Notification = require('../models/Notification');
+const SupportTicket = require('../models/SupportTicket');
+const SupportTicketMessage = require('../models/SupportTicketMessage');
 const requireAdmin = require('../middleware/requireAdmin');
 const { ensureUserMessaging } = require('../services/messaging');
 const {
@@ -69,6 +71,7 @@ router.get('/stats', requireAdmin, async (req, res) => {
       usersCount,
       communitiesCount,
       supportThreads,
+      supportTicketsOpen,
       postsCount,
       messagesCount,
       notificationsCount,
@@ -80,16 +83,14 @@ router.get('/stats', requireAdmin, async (req, res) => {
       User.countDocuments(),
       Community.countDocuments(),
       Conversation.countDocuments({ kind: 'system_support' }),
+      SupportTicket.countDocuments({ status: 'open' }),
       Post.countDocuments(),
       DirectMessage.countDocuments(),
       Notification.countDocuments(),
       User.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
       Post.countDocuments({ createdAt: { $gte: sevenDaysAgo } }),
       User.countDocuments({ lastSeen: { $gte: sevenDaysAgo } }),
-      Conversation.countDocuments({
-        kind: 'system_support',
-        lastMessageSenderType: 'user',
-      }),
+      countSupportTicketsNeedingReply(),
     ]);
 
     const mongo = mongoStatusLabel();
@@ -106,6 +107,7 @@ router.get('/stats', requireAdmin, async (req, res) => {
       usersCount,
       communitiesCount,
       supportThreads,
+      supportTicketsOpen,
       postsCount,
       messagesCount,
       notificationsCount,
@@ -286,6 +288,247 @@ router.get('/logs', requireAdmin, async (req, res) => {
   }
 });
 
+const TICKET_CATEGORY_LABELS = {
+  bug: 'Bug Report',
+  authentication: 'Authentication',
+  other: 'Other',
+};
+
+async function countSupportTicketsNeedingReply() {
+  const openTickets = await SupportTicket.find({ status: 'open' }).select('_id').lean();
+  if (!openTickets.length) return 0;
+  const ids = openTickets.map((t) => t._id);
+  const lastByTicket = await SupportTicketMessage.aggregate([
+    { $match: { ticketId: { $in: ids } } },
+    { $sort: { createdAt: -1 } },
+    {
+      $group: {
+        _id: '$ticketId',
+        senderType: { $first: '$senderType' },
+      },
+    },
+  ]);
+  return lastByTicket.filter((row) => row.senderType === 'user').length;
+}
+
+async function lastMessagesByTicketIds(ticketIds) {
+  if (!ticketIds.length) return new Map();
+  const rows = await SupportTicketMessage.aggregate([
+    { $match: { ticketId: { $in: ticketIds } } },
+    { $sort: { createdAt: -1 } },
+    {
+      $group: {
+        _id: '$ticketId',
+        senderType: { $first: '$senderType' },
+        body: { $first: '$body' },
+        createdAt: { $first: '$createdAt' },
+      },
+    },
+  ]);
+  return new Map(rows.map((r) => [r._id.toString(), r]));
+}
+
+function serializeAdminTicket(doc, user, lastMsg) {
+  const id = doc._id.toString();
+  const needsReply = doc.status === 'open' && lastMsg?.senderType === 'user';
+  return {
+    id,
+    shortId: id.slice(-8),
+    status: doc.status,
+    category: doc.category,
+    categoryLabel: TICKET_CATEGORY_LABELS[doc.category] || doc.category,
+    title: doc.title,
+    description: doc.description,
+    communityId: doc.communityId ? doc.communityId.toString() : null,
+    communityHandle: doc.communityHandle || '',
+    communityName: doc.communityName || '',
+    appLink: doc.appLink || '',
+    attachmentNames: doc.attachmentNames || [],
+    createdAt: doc.createdAt,
+    updatedAt: doc.updatedAt,
+    closedAt: doc.closedAt,
+    userId: doc.userId.toString(),
+    username: user?.username || 'unknown',
+    fullName: user?.fullName || user?.username || 'Пользователь',
+    email: user?.email || '',
+    avatar: user?.avatar || '',
+    lastMessageText: (lastMsg?.body || doc.description || '').slice(0, 280),
+    lastMessageAt: lastMsg?.createdAt || doc.updatedAt,
+    lastMessageSender: lastMsg?.senderType || null,
+    needsReply,
+  };
+}
+
+router.get('/support-tickets', requireAdmin, async (req, res) => {
+  try {
+    const statusFilter = String(req.query.status || 'all');
+    const query = {};
+    if (statusFilter === 'open' || statusFilter === 'closed') {
+      query.status = statusFilter;
+    }
+
+    const tickets = await SupportTicket.find(query).sort({ updatedAt: -1 }).lean();
+    const userIds = tickets.map((t) => t.userId);
+    const users = await User.find({ _id: { $in: userIds } })
+      .select('username fullName email avatar')
+      .lean();
+    const userMap = new Map(users.map((u) => [u._id.toString(), u]));
+    const lastMap = await lastMessagesByTicketIds(tickets.map((t) => t._id));
+
+    let list = tickets.map((t) =>
+      serializeAdminTicket(t, userMap.get(t.userId.toString()), lastMap.get(t._id.toString())),
+    );
+
+    if (statusFilter === 'needs_reply') {
+      list = list.filter((t) => t.needsReply);
+    }
+
+    const [openCount, closedCount, needsReplyCount] = await Promise.all([
+      SupportTicket.countDocuments({ status: 'open' }),
+      SupportTicket.countDocuments({ status: 'closed' }),
+      countSupportTicketsNeedingReply(),
+    ]);
+
+    res.json({
+      tickets: list,
+      counts: {
+        open: openCount,
+        closed: closedCount,
+        all: openCount + closedCount,
+        needsReply: needsReplyCount,
+      },
+    });
+  } catch (err) {
+    console.error('Admin support-tickets list error:', err);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+router.get('/support-tickets/:id', requireAdmin, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Некорректный id' });
+    }
+
+    const ticket = await SupportTicket.findById(req.params.id).lean();
+    if (!ticket) return res.status(404).json({ message: 'Тикет не найден' });
+
+    const user = await User.findById(ticket.userId)
+      .select('username fullName email avatar createdAt')
+      .lean();
+
+    const messages = await SupportTicketMessage.find({ ticketId: ticket._id })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const lastMap = await lastMessagesByTicketIds([ticket._id]);
+
+    res.json({
+      ticket: serializeAdminTicket(ticket, user, lastMap.get(ticket._id.toString())),
+      messages: messages.map((m) => ({
+        id: m._id.toString(),
+        sender: m.senderType,
+        text: m.body,
+        timestamp: m.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error('Admin support-ticket detail error:', err);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+router.post('/support-tickets/:id/reply', requireAdmin, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Некорректный id' });
+    }
+
+    const text = String(req.body?.body || '').trim();
+    if (!text) return res.status(400).json({ message: 'Текст ответа обязателен' });
+
+    const ticket = await SupportTicket.findById(req.params.id);
+    if (!ticket) return res.status(404).json({ message: 'Тикет не найден' });
+    if (ticket.status === 'closed') {
+      return res.status(400).json({ message: 'Тикет закрыт — сначала откройте его' });
+    }
+
+    const msg = await SupportTicketMessage.create({
+      ticketId: ticket._id,
+      senderType: 'support',
+      body: text,
+    });
+
+    ticket.updatedAt = msg.createdAt;
+    await ticket.save();
+
+    res.status(201).json({
+      message: {
+        id: msg._id.toString(),
+        sender: 'support',
+        text: msg.body,
+        timestamp: msg.createdAt,
+      },
+    });
+  } catch (err) {
+    console.error('Admin support-ticket reply error:', err);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+router.patch('/support-tickets/:id/close', requireAdmin, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Некорректный id' });
+    }
+
+    const ticket = await SupportTicket.findById(req.params.id);
+    if (!ticket) return res.status(404).json({ message: 'Тикет не найден' });
+
+    ticket.status = 'closed';
+    ticket.closedAt = new Date();
+    ticket.updatedAt = ticket.closedAt;
+    await ticket.save();
+
+    const user = await User.findById(ticket.userId)
+      .select('username fullName email avatar')
+      .lean();
+    const lastMap = await lastMessagesByTicketIds([ticket._id]);
+
+    res.json({ ticket: serializeAdminTicket(ticket.toObject(), user, lastMap.get(ticket._id.toString())) });
+  } catch (err) {
+    console.error('Admin support-ticket close error:', err);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+router.patch('/support-tickets/:id/reopen', requireAdmin, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Некорректный id' });
+    }
+
+    const ticket = await SupportTicket.findById(req.params.id);
+    if (!ticket) return res.status(404).json({ message: 'Тикет не найден' });
+
+    ticket.status = 'open';
+    ticket.closedAt = null;
+    ticket.updatedAt = new Date();
+    await ticket.save();
+
+    const user = await User.findById(ticket.userId)
+      .select('username fullName email avatar')
+      .lean();
+    const lastMap = await lastMessagesByTicketIds([ticket._id]);
+
+    res.json({ ticket: serializeAdminTicket(ticket.toObject(), user, lastMap.get(ticket._id.toString())) });
+  } catch (err) {
+    console.error('Admin support-ticket reopen error:', err);
+    res.status(500).json({ message: 'Ошибка сервера' });
+  }
+});
+
+/** @deprecated Messenger threads — use /support-tickets for ticket system */
 router.get('/support/tickets', requireAdmin, async (req, res) => {
   try {
     const convs = await Conversation.find({ kind: 'system_support' })

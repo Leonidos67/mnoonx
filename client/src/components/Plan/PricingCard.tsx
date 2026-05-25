@@ -26,7 +26,6 @@ const FEATURE_ICONS: Record<string, LucideIcon> = {
   profilePosts: MessageCircle,
   publicCommunities: Users,
   basicFeed: TrendingUp,
-  oneCommunity: Users,
   aiBasic: Sparkles,
   higherLimits: MessageCircle,
   smartFeed: TrendingUp,

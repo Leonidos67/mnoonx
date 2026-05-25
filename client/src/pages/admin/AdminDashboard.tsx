@@ -41,6 +41,7 @@ interface AdminStats {
   usersCount: number;
   communitiesCount: number;
   supportThreads: number;
+  supportTicketsOpen?: number;
   postsCount: number;
   messagesCount: number;
   notificationsCount: number;
@@ -215,7 +216,12 @@ const AdminDashboard: React.FC = () => {
         <MetricCard icon={UsersRound} label="Сообщества" value={String(stats.communitiesCount)} />
         <MetricCard icon={FileText} label="Посты" value={String(stats.postsCount)} hint={`+${stats.newPosts7d} за 7 дн.`} />
         <MetricCard icon={MessageCircle} label="Сообщения" value={String(stats.messagesCount)} />
-        <MetricCard icon={Activity} label="Поддержка" value={String(stats.supportThreads)} hint={`Ответить: ${stats.needsReplyCount}`} />
+        <MetricCard
+          icon={Activity}
+          label="Тикеты"
+          value={String(stats.supportTicketsOpen ?? stats.supportThreads)}
+          hint={`Ждут ответа: ${stats.needsReplyCount}`}
+        />
         <MetricCard icon={TrendingUp} label="Активные (7 дн.)" value={String(stats.activeUsers7d)} hint="по lastSeen" />
       </div>
 
