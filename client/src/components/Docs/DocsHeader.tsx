@@ -8,6 +8,8 @@ import {
   DOCS_SUPPORT_PATH,
   isDocsHeaderNavActive,
 } from '../../docs/docsNav';
+import { PLATFORM_UPDATES_PATH } from '../../constants/platformUpdates';
+import { useTranslation } from '../../i18n/useTranslation';
 
 function DocsHeaderNavLink({
   label,
@@ -33,8 +35,10 @@ function DocsHeaderNavLink({
 }
 
 const DocsHeader: React.FC = () => {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
+  const isUpdatesPage = location.pathname === PLATFORM_UPDATES_PATH;
   const isSupportPage =
     location.pathname === DOCS_SUPPORT_PATH ||
     location.pathname.startsWith(`${DOCS_SUPPORT_PATH}/`);
@@ -105,6 +109,16 @@ const DocsHeader: React.FC = () => {
               active={item.active}
             />
           ))}
+          <Link
+            to={PLATFORM_UPDATES_PATH}
+            className={`relative shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              isUpdatesPage
+                ? 'bg-neutral-900 text-white shadow-sm'
+                : 'text-neutral-600 hover:bg-white hover:text-neutral-900'
+            }`}
+          >
+            {t('platformUpdates.navLabel')}
+          </Link>
         </nav>
 
         {!isSupportPage ? (

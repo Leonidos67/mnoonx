@@ -38,6 +38,7 @@ import CommunityDashboardAnalytics from './pages/community-dashboard/CommunityDa
 import CommunityDashboardInvites from './pages/community-dashboard/CommunityDashboardInvites';
 import Plan from './pages/Plan';
 import Activity from './pages/Activity';
+import PlatformUpdates from './pages/PlatformUpdates';
 import ProfileRoute from './components/Routing/ProfileRoute';
 import RequireAuth from './components/Routing/RequireAuth';
 import { RequireUsersDirectoryAccess } from './components/Routing/RequireUsername';
@@ -148,6 +149,7 @@ function App() {
             }
           />
           <Route path="/plan" element={<AppLayout><Plan /></AppLayout>} />
+          <Route path="/updates" element={<AppLayout><PlatformUpdates /></AppLayout>} />
           <Route
             path="/activity"
             element={

@@ -19,6 +19,7 @@ const RESERVED = new Set([
   'activity',
   'admin',
   'docs',
+  'updates',
 ]);
 
 /**

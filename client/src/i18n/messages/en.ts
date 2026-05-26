@@ -1336,4 +1336,87 @@ export const en = {
     removed: 'Banner removed',
     updateFailed: 'Failed to update banner',
   },
+  platformUpdates: {
+    navLabel: 'Updates',
+    promoButton: "What's new · {version}",
+    promoButtonAria: 'See platform updates {version}',
+    dismissPromoAria: 'Hide until the next platform update',
+    pageTitle: 'Platform updates',
+    pageSubtitle: 'What’s new in MNOONX Alpha Space — releases, improvements, and milestones.',
+    changelogTitle: 'Release notes',
+    changelogSubtitle: 'Every version ships with product, design, and community improvements.',
+    latestBadge: 'Latest · {version}',
+    uptime: {
+      badge: 'Live since launch',
+      since: 'Counting from {date}',
+      days: 'Days',
+      hours: 'Hours',
+      minutes: 'Min',
+      seconds: 'Sec',
+      ariaLive: '{days} days, {hours} hours, {minutes} minutes, {seconds} seconds online',
+    },
+    footer: 'More updates ship regularly. Follow the feed and changelog for the next release.',
+    links: {
+      docs: 'Open documentation',
+      support: 'Support center',
+    },
+    releases: {
+      v16: {
+        title: 'Documentation & Support',
+        items: {
+          docs: 'Launched the documentation hub: guides for communities, installable apps, owner dashboard, and growth.',
+          support: 'Added the Support center with a ticket wizard, ticket tracking, and help next to the docs.',
+          search: 'Docs search (⌘K) across all articles for faster answers.',
+        },
+      },
+      v15: {
+        title: 'Messenger refresh & stickers',
+        items: {
+          chatUi: 'Redesigned chat UI: clearer bubbles, improved mobile layout, and smoother scrolling.',
+          stickers: 'Sticker packs in DMs and community chat — express reactions without leaving the thread.',
+          readReceipts: 'Delivery and read indicators in community chat for your own messages.',
+        },
+      },
+      v14: {
+        title: 'Activity & visual refresh',
+        items: {
+          activity: 'New Activity page: missions, coin balance, store, levels, awards, and activity feed.',
+          design: 'Refreshed visual design across profile, settings, communities, and feed cards.',
+          mobile: 'Improved mobile layouts for communities, messenger, and post composer.',
+        },
+      },
+      v13: {
+        title: 'Smarter feed & Discover',
+        items: {
+          feed: 'Ranked home feed blends recency, engagement, and your follows for a livelier timeline.',
+          discover: 'Discover updates: market tab, community browsing, and clearer discovery surfaces.',
+          ai: 'AI assistant panel in the app shell for quick help while you browse.',
+        },
+      },
+      v12: {
+        title: 'Community apps & dashboard',
+        items: {
+          apps: 'Installable community apps: Chat, Courses, Content, Files, Announcements, and Events.',
+          dashboard: 'Owner dashboard with analytics, members, products, and invite tools.',
+          communities: 'Community store, branding uploads, join codes, and private communities.',
+        },
+      },
+      v11: {
+        title: 'Messaging & notifications',
+        items: {
+          messenger: 'Messenger with system chats, direct messages, and user search.',
+          notifications: 'In-app notifications with mentions, posts, and community tabs.',
+          dm: 'Unread badges on Messages and Notifications in the header and mobile nav.',
+        },
+      },
+      v10: {
+        title: 'MNOONX launch',
+        items: {
+          launch: 'Official launch of MNOONX Alpha Space — your Web3 social hub is live.',
+          feed: 'Global feed with posts, likes, reposts, comments, and link attachments.',
+          profiles: 'Profiles, follow graph, communities, and the first version of the product.',
+        },
+      },
+    },
+  },
 } as const;

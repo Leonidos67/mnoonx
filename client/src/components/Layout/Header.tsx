@@ -5,6 +5,7 @@ import SearchModal from '../Common/SearchModal';
 import HeaderIconBadge from '../Common/HeaderIconBadge';
 import MnoonxLogo from './MnoonxLogo';
 import GoToDashboardMenu from './GoToDashboardMenu';
+import PlatformUpdatesPromoButton from './PlatformUpdatesPromoButton';
 import { useAuth } from '../../context/AuthContext';
 import { useUnreads } from '../../context/UnreadsContext';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -57,6 +58,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
           >
             <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
+          <PlatformUpdatesPromoButton />
 
           {user ? (
             <div className="flex items-center gap-1 sm:gap-2">
