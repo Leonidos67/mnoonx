@@ -9,72 +9,79 @@ export interface PlatformRelease {
 export const PLATFORM_RELEASES: PlatformRelease[] = [
   {
     version: '1.6',
-    date: '2026-05-22',
+    date: '2026-05-26',
     titleKey: 'platformUpdates.releases.v16.title',
     itemKeys: [
       'platformUpdates.releases.v16.items.docs',
       'platformUpdates.releases.v16.items.support',
       'platformUpdates.releases.v16.items.search',
+      'platformUpdates.releases.v16.items.nav',
     ],
   },
   {
     version: '1.5',
-    date: '2026-05-14',
+    date: '2026-05-26',
     titleKey: 'platformUpdates.releases.v15.title',
     itemKeys: [
       'platformUpdates.releases.v15.items.chatUi',
       'platformUpdates.releases.v15.items.stickers',
       'platformUpdates.releases.v15.items.readReceipts',
+      'platformUpdates.releases.v15.items.threads',
     ],
   },
   {
     version: '1.4',
-    date: '2026-05-06',
+    date: '2026-05-26',
     titleKey: 'platformUpdates.releases.v14.title',
     itemKeys: [
       'platformUpdates.releases.v14.items.activity',
       'platformUpdates.releases.v14.items.design',
       'platformUpdates.releases.v14.items.mobile',
+      'platformUpdates.releases.v14.items.settings',
     ],
   },
   {
     version: '1.3',
-    date: '2026-04-22',
+    date: '2026-05-22',
     titleKey: 'platformUpdates.releases.v13.title',
     itemKeys: [
       'platformUpdates.releases.v13.items.feed',
       'platformUpdates.releases.v13.items.discover',
       'platformUpdates.releases.v13.items.ai',
+      'platformUpdates.releases.v13.items.diversity',
     ],
   },
   {
     version: '1.2',
-    date: '2026-04-05',
+    date: '2026-05-22',
     titleKey: 'platformUpdates.releases.v12.title',
     itemKeys: [
       'platformUpdates.releases.v12.items.apps',
       'platformUpdates.releases.v12.items.dashboard',
       'platformUpdates.releases.v12.items.communities',
+      'platformUpdates.releases.v12.items.roles',
     ],
   },
   {
     version: '1.1',
-    date: '2026-03-18',
+    date: '2026-05-21',
     titleKey: 'platformUpdates.releases.v11.title',
     itemKeys: [
       'platformUpdates.releases.v11.items.messenger',
       'platformUpdates.releases.v11.items.notifications',
       'platformUpdates.releases.v11.items.dm',
+      'platformUpdates.releases.v11.items.system',
     ],
   },
   {
     version: '1.0',
-    date: '2026-03-01',
+    date: '2026-05-21',
     titleKey: 'platformUpdates.releases.v10.title',
     itemKeys: [
       'platformUpdates.releases.v10.items.launch',
       'platformUpdates.releases.v10.items.feed',
       'platformUpdates.releases.v10.items.profiles',
+      'platformUpdates.releases.v10.items.communities',
     ],
   },
 ];

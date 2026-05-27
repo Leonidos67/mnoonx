@@ -1342,9 +1342,11 @@ export const en = {
     promoButtonAria: 'See platform updates {version}',
     dismissPromoAria: 'Hide until the next platform update',
     pageTitle: 'Platform updates',
-    pageSubtitle: 'What’s new in MNOONX Alpha Space — releases, improvements, and milestones.',
+    pageSubtitle:
+      'A detailed changelog for MNOONX Alpha Space: what we shipped, why it matters, and how it improves communities, messaging, and your daily workflow.',
     changelogTitle: 'Release notes',
-    changelogSubtitle: 'Every version ships with product, design, and community improvements.',
+    changelogSubtitle:
+      'Expand any version below to read full notes. We document product, design, and infrastructure changes with every release.',
     latestBadge: 'Latest · {version}',
     uptime: {
       badge: 'Live since launch',
@@ -1364,57 +1366,92 @@ export const en = {
       v16: {
         title: 'Documentation & Support',
         items: {
-          docs: 'Launched the documentation hub: guides for communities, installable apps, owner dashboard, and growth.',
-          support: 'Added the Support center with a ticket wizard, ticket tracking, and help next to the docs.',
-          search: 'Docs search (⌘K) across all articles for faster answers.',
+          docs:
+            'We launched a full documentation hub at /docs: step-by-step guides for creating communities, installing apps (Chat, Courses, Content, Files, Announcements, Events), configuring the owner dashboard, and growing an audience. Articles are grouped by topic so owners and members can find answers without leaving the product.',
+          support:
+            'The Support center (/docs/support) lets you open tickets through a guided wizard, attach context, and track status in one place. It sits next to the docs so you can self-serve first or escalate to the team when something blocks you.',
+          search:
+            'Documentation search with ⌘K (Ctrl+K on Windows) indexes all sections and article titles. Results jump straight to the right page — useful when you need a setting name or API path quickly.',
+          nav:
+            'Docs and Support are linked from the docs header and the platform updates page. The “What’s new” promo in the main header points here so you always know where to read about the latest release.',
         },
       },
       v15: {
         title: 'Messenger refresh & stickers',
         items: {
-          chatUi: 'Redesigned chat UI: clearer bubbles, improved mobile layout, and smoother scrolling.',
-          stickers: 'Sticker packs in DMs and community chat — express reactions without leaving the thread.',
-          readReceipts: 'Delivery and read indicators in community chat for your own messages.',
+          chatUi:
+            'Messenger and community chat received a visual overhaul: clearer message bubbles, better contrast, improved spacing on mobile, and sticky scroll-to-latest behavior so long threads stay readable. Input areas no longer jump when the keyboard opens on phones.',
+          stickers:
+            'Sticker packs are available in direct messages and community chat instances. Pick a pack, send a sticker in one tap, and keep the conversation flowing without switching apps or pasting images manually.',
+          readReceipts:
+            'For messages you send in community chat, you now see delivery and read states (sent, delivered to members, read by everyone when applicable). That makes it easier to know whether an announcement or reply actually reached the room.',
+          threads:
+            'Conversation list shows previews, timestamps, and unread counts consistently across system chats, DMs, and community inboxes. Search inside Messenger helps you open or start a chat with any user on the platform.',
         },
       },
       v14: {
         title: 'Activity & visual refresh',
         items: {
-          activity: 'New Activity page: missions, coin balance, store, levels, awards, and activity feed.',
-          design: 'Refreshed visual design across profile, settings, communities, and feed cards.',
-          mobile: 'Improved mobile layouts for communities, messenger, and post composer.',
+          activity:
+            'The Activity page centralizes missions, coin balance, level progress, the reward store, awards, and a personal activity feed. Complete missions to earn points, spend coins on boosts, and see a history of actions that contributed to your score.',
+          design:
+            'We refreshed typography, cards, and spacing across profiles, settings, community pages, and the home feed. Buttons, tabs, and empty states now share the same rounded language and neutral palette for a calmer, more product-grade feel.',
+          mobile:
+            'Community pages on mobile use side drawers for navigation and actions, a scrollable header, and a full-screen post composer. Messenger and notifications respect safe areas and bottom navigation so nothing is hidden under system UI.',
+          settings:
+            'Settings gained clearer sections for profile, notifications, and subscription toggles (where enabled). Mobile uses a two-step menu → content pattern so each screen stays focused on one task.',
         },
       },
       v13: {
         title: 'Smarter feed & Discover',
         items: {
-          feed: 'Ranked home feed blends recency, engagement, and your follows for a livelier timeline.',
-          discover: 'Discover updates: market tab, community browsing, and clearer discovery surfaces.',
-          ai: 'AI assistant panel in the app shell for quick help while you browse.',
+          feed:
+            'The home feed no longer sorts by date alone. A ranked mode weighs recency, likes, reposts, authors and communities you follow, and diversity so one creator or one day does not dominate your timeline. You still get fresh posts, but with more signal.',
+          discover:
+            'Discover lists communities and market-style surfaces with clearer cards, handles, and member counts. Public and private communities are labeled; joining with a passphrase is documented in the UI when required.',
+          ai:
+            'An AI assistant drawer in the app shell answers questions about navigation and features while you stay on the current page. It is optional and can be opened or closed without losing your place in the feed or a community.',
+          diversity:
+            'The ranking pool loads a larger batch of posts server-side, then reorders for display. That reduces duplicate vibes from the same author back-to-back and spreads community promos more evenly through the day.',
         },
       },
       v12: {
         title: 'Community apps & dashboard',
         items: {
-          apps: 'Installable community apps: Chat, Courses, Content, Files, Announcements, and Events.',
-          dashboard: 'Owner dashboard with analytics, members, products, and invite tools.',
-          communities: 'Community store, branding uploads, join codes, and private communities.',
+          apps:
+            'Owners can install multiple instances of Chat, Courses, Content, Files, Announcements, and Events from the community store. Each instance has its own title, visibility for members, and panel in the left navigation on desktop.',
+          dashboard:
+            'The owner dashboard (/dashboard/:handle) includes home overview, analytics charts, member list with roles, product bundles, content tools, and invite links. Admins can be added without sharing the owner password.',
+          communities:
+            'Communities support avatar and banner uploads, public/private visibility, optional join codes, and member posting rules. The store UI lets you add apps without editing code.',
+          roles:
+            'Member lists distinguish owner, admins, and members. Owners control apps and settings; admins can help moderate depending on permissions you grant in future releases.',
         },
       },
       v11: {
         title: 'Messaging & notifications',
         items: {
-          messenger: 'Messenger with system chats, direct messages, and user search.',
-          notifications: 'In-app notifications with mentions, posts, and community tabs.',
-          dm: 'Unread badges on Messages and Notifications in the header and mobile nav.',
+          messenger:
+            'Messenger ships with per-user inboxes, direct messages between two people, and search to find someone by username. Opening a DM creates mirrored conversations so each participant sees their own thread list.',
+          notifications:
+            'The notifications page groups mentions, posts, community events, and system messages. Tabs help you focus on @mentions vs everything else; unread counts sync to the header badge.',
+          dm:
+            'Unread badges appear on Messages and Notifications in the desktop header and mobile bottom navigation. Counts poll periodically so you see new activity without refreshing the page.',
+          system:
+            'Every account gets seeded system conversations (welcome and support-style channels) on first use, with deduplication so repeats do not clutter the inbox after signup races.',
         },
       },
       v10: {
         title: 'MNOONX launch',
         items: {
-          launch: 'Official launch of MNOONX Alpha Space — your Web3 social hub is live.',
-          feed: 'Global feed with posts, likes, reposts, comments, and link attachments.',
-          profiles: 'Profiles, follow graph, communities, and the first version of the product.',
+          launch:
+            'MNOONX Alpha Space went live on 21 May 2026 as a Web3-oriented social platform: one account for your profile, global feed, communities, and messaging. This release is the foundation everything else builds on.',
+          feed:
+            'Publish posts with text, images, and link previews; like and repost; comment on posts; open a dedicated post page for permalinks. The composer supports drafts while you attach media.',
+          profiles:
+            'Profiles live at /@username with avatar, bio, follower counts, and a list of posts. Follow and unfollow other users; followers and following are stored as first-class relationships.',
+          communities:
+            'Create a community with a handle, description, and branding basics. Members can join public communities instantly or private ones with a code. Community feeds mirror the global post model with permission checks for who may post.',
         },
       },
     },

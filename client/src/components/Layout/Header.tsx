@@ -49,7 +49,8 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
           </div>
         </div>
 
-        <div className="ml-2 flex shrink-0 items-center gap-1 sm:ml-4 sm:gap-2">
+        <div className="ml-2 flex min-w-0 shrink-0 items-center gap-1 sm:ml-4 sm:gap-2">
+          <PlatformUpdatesPromoButton />
           <button
             type="button"
             onClick={() => setSearchOpen(true)}
@@ -58,10 +59,9 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
           >
             <Search className="h-5 w-5" strokeWidth={2} aria-hidden />
           </button>
-          <PlatformUpdatesPromoButton />
 
           {user ? (
-            <div className="flex items-center gap-1 sm:gap-2">
+            <div className="flex min-w-0 items-center gap-1 sm:gap-2">
               <HeaderIconBadge
                 to="/notifications"
                 label={t('header.notifications')}
@@ -84,6 +84,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
             </div>
           ) : (
             <button
+              type="button"
               onClick={() => window.dispatchEvent(new CustomEvent('openLogin'))}
               className="hidden items-center gap-2 rounded-full border border-neutral-300 px-3 py-2 transition-all hover:bg-black hover:text-white active:scale-[0.95] lg:flex"
             >

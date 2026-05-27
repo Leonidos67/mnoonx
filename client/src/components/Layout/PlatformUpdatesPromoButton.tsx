@@ -97,12 +97,14 @@ const PlatformUpdatesPromoButton: React.FC = () => {
     return null;
   }
 
+  const promoLabel = t('platformUpdates.promoButtonAria', { version: `v${latestVersion}` });
+
   return (
     <div className="relative shrink-0 pr-1 pt-1">
       <button
         type="button"
         onClick={handleDismiss}
-        className="absolute -right-0.5 -top-0.5 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-900/85 text-white shadow-md transition-colors hover:bg-neutral-800"
+        className="absolute -right-0.5 -top-0.5 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-neutral-900/90 text-white shadow-md transition-colors hover:bg-neutral-800"
         aria-label={t('platformUpdates.dismissPromoAria')}
       >
         <X className="h-3 w-3" strokeWidth={2.5} aria-hidden />
@@ -110,8 +112,9 @@ const PlatformUpdatesPromoButton: React.FC = () => {
 
       <Link
         to={PLATFORM_UPDATES_PATH}
-        className="relative inline-flex shrink-0 overflow-hidden rounded-full shadow-sm transition-transform hover:brightness-105 active:scale-[0.95]"
-        aria-label={t('platformUpdates.promoButtonAria', { version: `v${latestVersion}` })}
+        className="relative inline-flex shrink-0 items-center overflow-hidden rounded-full shadow-sm transition-transform hover:brightness-105 active:scale-[0.95]"
+        aria-label={promoLabel}
+        title={promoLabel}
       >
         <span className="pointer-events-none absolute inset-0" aria-hidden>
           <PromoGradientFallback />
@@ -125,7 +128,7 @@ const PlatformUpdatesPromoButton: React.FC = () => {
             </GrainientErrorBoundary>
           ) : null}
         </span>
-        <span className="relative z-10 whitespace-nowrap px-3 py-2 text-sm font-semibold text-white drop-shadow-sm sm:px-4">
+        <span className="relative z-10 whitespace-nowrap px-4 py-2 text-sm font-semibold text-white drop-shadow-sm">
           {t('platformUpdates.promoButton', { version: `v${latestVersion}` })}
         </span>
       </Link>

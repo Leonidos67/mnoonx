@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { LayoutDashboard } from 'lucide-react';
 import FloatingMenu from '../Common/FloatingMenu';
 import DashboardCommunityPickerList from './DashboardCommunityPickerList';
 import DashboardPickerModal from './DashboardPickerModal';
@@ -46,9 +47,11 @@ const GoToDashboardMenu: React.FC = () => {
         onClick={toggle}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="inline-flex items-center rounded-full border px-3 py-2 text-sm font-medium text-neutral-600 transition-all hover:bg-black/10 hover:text-neutral-700 active:scale-[0.95] sm:px-4"
+        className="inline-flex shrink-0 items-center justify-center rounded-full border text-neutral-600 transition-all hover:bg-black/10 hover:text-neutral-700 active:scale-[0.95] max-lg:h-10 max-lg:w-10 max-lg:p-0 lg:px-4 lg:py-2 lg:text-sm lg:font-medium"
+        aria-label={t('goToDashboard.label')}
       >
-        {t('goToDashboard.label')}
+        <LayoutDashboard className="h-5 w-5 lg:hidden" aria-hidden />
+        <span className="hidden lg:inline">{t('goToDashboard.label')}</span>
       </button>
 
       {isDesktop && (
