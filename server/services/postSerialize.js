@@ -59,8 +59,8 @@ async function serializeFeedPost(post, viewerUserId) {
     viewsCount: post.viewsCount || 0,
     createdAt: post.createdAt,
     updatedAt: post.updatedAt,
-    isLiked: uid ? post.likes.some((id) => String(id) === uid) : false,
-    isReposted: uid ? post.reposts.some((id) => String(id) === uid) : false,
+    isLiked: uid ? (post.likes || []).some((id) => String(id) === uid) : false,
+    isReposted: uid ? (post.reposts || []).some((id) => String(id) === uid) : false,
     isPrivate: post.isPrivate || false,
   };
 }

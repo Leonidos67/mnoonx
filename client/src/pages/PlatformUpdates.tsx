@@ -1,12 +1,16 @@
 import React from 'react';
 import PlatformUptimeHero from '../components/PlatformUpdates/PlatformUptimeHero';
 import PlatformReleaseAccordion from '../components/PlatformUpdates/PlatformReleaseAccordion';
-import { PLATFORM_RELEASES, getLatestPlatformVersion } from '../constants/platformUpdates';
+import {
+  PLATFORM_RELEASES,
+  formatPlatformVersionLabel,
+  getLatestPlatformVersion,
+} from '../constants/platformUpdates';
 import { useTranslation } from '../i18n/useTranslation';
 
 const PlatformUpdates: React.FC = () => {
   const { t } = useTranslation();
-  const latestVersion = getLatestPlatformVersion();
+  const latestVersion = formatPlatformVersionLabel(getLatestPlatformVersion());
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 py-8 pb-16 sm:py-10 lg:px-8 lg:py-12">

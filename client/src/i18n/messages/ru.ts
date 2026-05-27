@@ -18,6 +18,7 @@ export const ru = {
     postDeleted: 'Пост удалён',
     postPublished: 'Пост опубликован',
     failedToCreatePost: 'Не удалось создать пост',
+    signInRequired: 'Сессия истекла. Войдите снова.',
     failedToFetchPosts: 'Не удалось загрузить посты',
     failedToPostComment: 'Не удалось отправить комментарий',
     failedToEditComment: 'Не удалось изменить комментарий',
@@ -52,6 +53,8 @@ export const ru = {
     discover: 'Обзор',
     settings: 'Настройки',
     plan: 'Тариф',
+    docs: 'Документация',
+    support: 'Поддержка',
     startCommunity: 'Создать сообщество',
     myCommunities: 'Мои сообщества',
     signInToSeeCommunities: 'Войдите, чтобы видеть свои сообщества.',
@@ -102,6 +105,20 @@ export const ru = {
     timeMinutes: '{count} мин',
     timeHours: '{count} ч',
     timeDays: '{count} д',
+    sidebarPromo: {
+      marketLabel: 'Рынок',
+      marketTitle: 'Теплокарта • Живая аналитика',
+      marketDescription:
+        'Следите за рынком в реальном времени, находите «горячие» зоны и сразу спрашивайте AI.',
+      marketCta: 'Перейти на рынок',
+      discoverLabel: 'Обзор',
+      discoverTitle: 'Сообщества • Авторы',
+      discoverDescription:
+        'Находите лучшие крипто-сообщества, подписывайтесь на авторов и не пропускайте настоящий alpha.',
+      discoverCta: 'Перейти в обзор',
+      prevSlide: 'Предыдущий слайд',
+      nextSlide: 'Следующий слайд',
+    },
   },
   discover: {
     title: 'Обзор',
@@ -134,6 +151,12 @@ export const ru = {
     category: 'Категория',
     type: 'Тип',
     sheetFallbackTitle: 'Сообщество',
+    exportHero: {
+      title: 'Ваше сообщество на базе профессионального продукта.',
+      description:
+        'Управляйте контентом, участниками и приложениями профессионально — с панелями, инструментами обзора и всем необходимым для роста в Web3.',
+      cta: 'Создать сообщество',
+    },
     marketTab: {
       tagline: 'Цены, динамика рынка и AI-аналитика криптовалют',
       searchPlaceholder: 'Поиск токенов, символов или адресов контрактов…',

@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, ChevronDown, Headphones, Rocket } from 'lucide-react';
 import type { PlatformRelease } from '../../constants/platformUpdates';
-import { PLATFORM_RELEASES } from '../../constants/platformUpdates';
+import {
+  PLATFORM_RELEASES,
+  formatPlatformVersionLabel,
+} from '../../constants/platformUpdates';
 import { DOCS_DEFAULT_PATH, DOCS_SUPPORT_PATH } from '../../docs/docsNav';
 import { useLanguage } from '../../context/LanguageContext';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -35,7 +38,8 @@ const PlatformReleaseAccordion: React.FC<PlatformReleaseAccordionProps> = ({
       {releases.map((release, index) => {
         const isOpen = openVersion === release.version;
         const isLatest = index === 0;
-        const isLaunch = release.version === '1.0';
+        const isLaunch = release.version === '1.0.0';
+        const versionLabel = formatPlatformVersionLabel(release.version);
         const panelId = `release-panel-${release.version}`;
         const headerId = `release-header-${release.version}`;
 
@@ -113,7 +117,7 @@ const PlatformReleaseAccordion: React.FC<PlatformReleaseAccordionProps> = ({
                     ))}
                   </ul>
 
-                  {release.version === '1.6' && (
+                  {release.version === '1.2.0' && (
                     <div className="mt-5 flex flex-wrap gap-2">
                       <Link
                         to={DOCS_DEFAULT_PATH}

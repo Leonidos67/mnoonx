@@ -501,7 +501,16 @@ const Home: React.FC = () => {
           linkAttachment: hasLink ? newPostLink : undefined,
         })
       });
-      if (!res.ok) throw new Error(t('common.failedToCreatePost'));
+      if (res.status === 401) {
+        window.dispatchEvent(new CustomEvent('openLogin'));
+        throw new Error(t('common.signInRequired'));
+      }
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(
+          (errBody as { message?: string }).message || t('common.failedToCreatePost'),
+        );
+      }
       
       const newPost = await res.json();
       setPosts(prev => [newPost, ...prev]);

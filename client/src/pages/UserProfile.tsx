@@ -715,7 +715,7 @@ const UserProfileComponent: React.FC = () => {
       <article
         key={postId}
         onClick={() => setSelectedPost(post)}
-        className={`p-4 hover:bg-neutral-50 transition-colors border-b border-neutral-200 group/article cursor-pointer ${
+        className={`max-w-full overflow-x-hidden p-4 hover:bg-neutral-50 transition-colors border-b border-neutral-200 group/article cursor-pointer ${
           selectedPost?._id === post._id ? 'bg-neutral-50' : ''
         }`}
       >
@@ -953,11 +953,13 @@ const UserProfileComponent: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1200px] gap-6">
-      <div className="flex h-full min-h-0 max-w-[600px] flex-1 flex-col overflow-hidden border-x border-neutral-200 bg-white">
+    <div className="mx-auto flex h-full min-h-0 w-full min-w-0 max-w-[1200px] gap-6 overflow-x-hidden">
+      <div className="flex h-full min-h-0 min-w-0 max-w-[600px] flex-1 flex-col overflow-hidden border-x border-neutral-200 bg-white">
         <div
           ref={profileScrollRef}
-          className={`min-h-0 flex-1 ${mobileComposerFull ? 'overflow-hidden' : 'overflow-y-auto'}`}
+          className={`min-h-0 min-w-0 flex-1 ${
+            mobileComposerFull ? 'overflow-hidden' : 'overflow-x-hidden overflow-y-auto'
+          }`}
         >
         {/* Compact bar — after scrolling past full profile header */}
         <div
@@ -968,7 +970,7 @@ const UserProfileComponent: React.FC = () => {
           }`}
           aria-hidden={!compactProfileBar}
         >
-          <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-2.5">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
               <span
                 className="truncate text-base font-bold text-neutral-900"
@@ -995,7 +997,7 @@ const UserProfileComponent: React.FC = () => {
                 </button>
               ) : null}
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               {isOwnProfile ? (
                 <>
                   <button
@@ -1095,7 +1097,7 @@ const UserProfileComponent: React.FC = () => {
             ) : null}
           </div>
           <p className="text-neutral-500">@{profile.username}</p>
-          <div className="flex gap-2 mt-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             {isOwnProfile ? (
               <>
                 <button
@@ -1142,10 +1144,24 @@ const UserProfileComponent: React.FC = () => {
               </>
             )}
           </div>
-          {profile.bio && <p className="mt-3 text-neutral-900 leading-relaxed">{profile.bio}</p>}
+          {profile.bio && (
+            <p className="mt-3 break-words text-neutral-900 leading-relaxed">{profile.bio}</p>
+          )}
           <div className="flex flex-wrap gap-4 mt-2 text-sm text-neutral-500">
             {profile.location && (<div className="flex items-center gap-1"><MapPin size={16} /><span>{profile.location}</span></div>)}
-            {profile.website && (<div className="flex items-center gap-1"><LinkIcon size={16} /><a href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">{profile.website.replace(/^https?:\/\//, '')}</a></div>)}
+            {profile.website && (
+              <div className="flex min-w-0 max-w-full items-center gap-1">
+                <LinkIcon size={16} className="shrink-0" />
+                <a
+                  href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="min-w-0 break-all text-blue-500 hover:underline"
+                >
+                  {profile.website.replace(/^https?:\/\//, '')}
+                </a>
+              </div>
+            )}
           </div>
           <div className="mb-2 flex gap-5 text-md">
             <button
@@ -1264,7 +1280,7 @@ const UserProfileComponent: React.FC = () => {
 
       </div>
 
-      <div className="hidden h-full min-h-0 w-[400px] shrink-0 flex-col py-4 pr-4 lg:flex">
+      <div className="hidden h-full min-h-0 w-[400px] min-w-0 shrink-0 flex-col overflow-x-hidden py-4 pr-4 lg:flex">
         <div className="flex min-h-0 flex-1 flex-col">
           {selectedPost ? (
             <PostDetailPanel

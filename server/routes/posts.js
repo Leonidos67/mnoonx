@@ -46,6 +46,13 @@ const postMediaUpload = multer({
 
 const MAX_POST_MEDIA = 10;
 
+function requireAuth(req, res, next) {
+  if (!req.userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+  next();
+}
+
 function serializeLinkAttachment(linkAttachment) {
   if (!linkAttachment?.title?.trim() || !linkAttachment?.url?.trim()) return null;
   return {
@@ -167,7 +174,7 @@ async function serializePostComments(comments) {
 }
 
 // POST /api/posts - Создать пост
-router.post('/', auth, async (req, res) => {
+router.post('/', auth, requireAuth, async (req, res) => {
   try {
     const { content, media, community, isPrivate, linkAttachment: linkRaw } = req.body;
     const authorId = req.userId.toString();
@@ -400,7 +407,7 @@ router.get('/:id', auth, async (req, res) => {
 });
 
 // PUT /api/posts/:id - Обновить пост
-router.put('/:id', auth, async (req, res) => {
+router.put('/:id', auth, requireAuth, async (req, res) => {
   try {
     const { content } = req.body;
     const postId = req.params.id;
@@ -444,8 +451,8 @@ router.put('/:id', auth, async (req, res) => {
       repostsCount: post.repostsCount || 0,
       viewsCount: post.viewsCount || 0,
       createdAt: post.createdAt,
-      isLiked: post.likes.some((id) => String(id) === userId),
-      isReposted: post.reposts.some((id) => String(id) === userId),
+      isLiked: (post.likes || []).some((id) => String(id) === userId),
+      isReposted: (post.reposts || []).some((id) => String(id) === userId),
       isPrivate: post.isPrivate || false
     };
 
@@ -574,7 +581,7 @@ router.delete('/:id/comments/:commentId', auth, async (req, res) => {
 });
 
 // POST /api/posts/:id/like - Лайкнуть/анлайкнуть пост
-router.post('/:id/like', auth, async (req, res) => {
+router.post('/:id/like', auth, requireAuth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) {
@@ -595,7 +602,7 @@ router.post('/:id/like', auth, async (req, res) => {
 });
 
 // POST /api/posts/:id/repost - Репостнуть
-router.post('/:id/repost', auth, async (req, res) => {
+router.post('/:id/repost', auth, requireAuth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) {
@@ -627,7 +634,7 @@ router.post('/:id/repost', auth, async (req, res) => {
 });
 
 // POST /api/posts/:id/bookmark - В закладки
-router.post('/:id/bookmark', auth, async (req, res) => {
+router.post('/:id/bookmark', auth, requireAuth, async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
     if (!post) {
@@ -657,7 +664,7 @@ router.post('/:id/bookmark', auth, async (req, res) => {
 });
 
 // DELETE /api/posts/:id - Удалить пост
-router.delete('/:id', auth, async (req, res) => {
+router.delete('/:id', auth, requireAuth, async (req, res) => {
   try {
     const postId = req.params.id;
     const userId = req.userId.toString();

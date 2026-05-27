@@ -5,6 +5,7 @@ import Grainient from '../Grainient';
 import {
   PLATFORM_UPDATES_PATH,
   dismissUpdatesPromo,
+  formatPlatformVersionLabel,
   getLatestPlatformVersion,
   shouldShowUpdatesPromo,
 } from '../../constants/platformUpdates';
@@ -77,7 +78,8 @@ const PromoGradientFallback: React.FC = () => (
 const PlatformUpdatesPromoButton: React.FC = () => {
   const { t } = useTranslation();
   const location = useLocation();
-  const latestVersion = getLatestPlatformVersion();
+  const latestVersionRaw = getLatestPlatformVersion();
+  const latestVersionLabel = formatPlatformVersionLabel(latestVersionRaw);
   const [webglOk] = useState(canUseWebGL2);
   const [visible, setVisible] = useState(
     () => shouldShowUpdatesPromo() && location.pathname !== PLATFORM_UPDATES_PATH
@@ -87,17 +89,17 @@ const PlatformUpdatesPromoButton: React.FC = () => {
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      dismissUpdatesPromo(latestVersion);
+      dismissUpdatesPromo(latestVersionRaw);
       setVisible(false);
     },
-    [latestVersion]
+    [latestVersionRaw]
   );
 
   if (!visible || location.pathname === PLATFORM_UPDATES_PATH) {
     return null;
   }
 
-  const promoLabel = t('platformUpdates.promoButtonAria', { version: `v${latestVersion}` });
+  const promoLabel = t('platformUpdates.promoButtonAria', { version: `v${latestVersionLabel}` });
 
   return (
     <div className="relative shrink-0 pr-1 pt-1">
@@ -129,7 +131,7 @@ const PlatformUpdatesPromoButton: React.FC = () => {
           ) : null}
         </span>
         <span className="relative z-10 whitespace-nowrap px-4 py-2 text-sm font-semibold text-white drop-shadow-sm">
-          {t('platformUpdates.promoButton', { version: `v${latestVersion}` })}
+          {t('platformUpdates.promoButton', { version: `v${latestVersionLabel}` })}
         </span>
       </Link>
     </div>

@@ -1,6 +1,7 @@
 import React, { Component, type ErrorInfo, type ReactNode, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Grainient from '../Grainient';
+import { useTranslation } from '../../i18n/useTranslation';
 
 function canUseWebGL2(): boolean {
   try {
@@ -67,6 +68,7 @@ const StaticFallback: React.FC = () => (
 );
 
 const DiscoverExportBackground: React.FC = () => {
+  const { t } = useTranslation();
   const [webglOk] = useState(canUseWebGL2);
 
   return (
@@ -96,18 +98,17 @@ const DiscoverExportBackground: React.FC = () => {
         <div className="absolute inset-0 z-10 flex flex-col items-start justify-center gap-4 px-8">
           <div className="max-w-xl">
             <h2 className="text-2xl font-bold tracking-tight text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.45)] sm:text-3xl lg:text-4xl">
-              Your community, driven by a professional product.
+              {t('discover.exportHero.title')}
             </h2>
             <p className="mt-3 text-sm leading-relaxed text-white/95 drop-shadow-[0_1px_8px_rgba(0,0,0,0.4)] sm:text-base">
-              Start managing your content, members, and apps more professionally — with dashboards,
-              discover tools, and everything you need to grow in Web3.
+              {t('discover.exportHero.description')}
             </p>
           </div>
           <Link
-            to="/create-community"
+            to="/new"
             className="relative z-10 inline-flex shrink-0 items-center justify-center rounded-2xl bg-white px-6 py-3 text-sm font-semibold text-gray-900 shadow-lg transition-colors hover:bg-white/95 sm:text-base"
           >
-            Create a Community
+            {t('discover.exportHero.cta')}
           </Link>
         </div>
       </div>

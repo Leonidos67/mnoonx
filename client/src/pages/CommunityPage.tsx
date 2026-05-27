@@ -1142,8 +1142,8 @@ const CommunityPage: React.FC = () => {
       <div className="flex h-full min-h-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           <div className="mx-auto w-full max-w-[720px] px-4 py-6 pb-10 sm:px-6">
-            <article className="overflow-hidden rounded-2xl border border-[#e7e7e7] bg-white shadow-sm">
-              <div className="relative h-40 shrink-0 bg-gradient-to-br from-neutral-800 via-neutral-900 to-neutral-950 sm:h-[200px]">
+            <article className="flex min-h-[calc(100dvh-var(--app-header-height)-var(--app-mobile-nav-height)-3rem)] flex-col overflow-hidden rounded-2xl border border-[#e7e7e7] bg-white shadow-sm lg:min-h-[calc(100dvh-var(--app-header-height)-4rem)]">
+              <div className="relative h-40 shrink-0 overflow-hidden rounded-t-2xl bg-gradient-to-br from-neutral-800 via-neutral-900 to-neutral-950 sm:h-[200px]">
                 {preview.banner ? (
                   <img src={preview.banner} alt="" className="h-full w-full object-cover" />
                 ) : null}
@@ -1260,9 +1260,9 @@ const CommunityPage: React.FC = () => {
     leftNav === 'events';
 
   return (
-    <div className="flex h-full min-h-full flex-col overflow-hidden">
+    <div className="flex h-full min-h-[calc(100dvh-var(--app-header-height)-var(--app-mobile-nav-height))] flex-col overflow-hidden lg:min-h-[calc(100dvh-var(--app-header-height))]">
       <div
-        className={`mx-auto grid h-full min-h-full w-full max-w-[1600px] flex-1 grid-rows-[minmax(0,1fr)] gap-2 p-2 max-lg:gap-0 max-lg:p-0 ${
+        className={`mx-auto grid h-full min-h-full w-full max-w-[1600px] flex-1 grid-rows-[minmax(0,1fr)] gap-2 p-2 max-lg:min-h-[calc(100dvh-var(--app-header-height)-var(--app-mobile-nav-height))] max-lg:gap-0 max-lg:p-0 lg:min-h-[calc(100dvh-var(--app-header-height)-1rem)] ${
           isAppNavActive ? 'grid-cols-1 lg:grid-cols-[280px_1fr]' : 'grid-cols-1 lg:grid-cols-[280px_1fr_340px]'
         }`}
       >
@@ -1273,8 +1273,8 @@ const CommunityPage: React.FC = () => {
           </div>
         )}
 
-        {/* CENTER — full viewport height like side columns */}
-        <div className="relative z-0 flex h-full min-h-0 min-w-0 flex-col overflow-hidden max-lg:min-h-0">
+        {/* CENTER — at least full viewport height (minus header / mobile nav) */}
+        <div className="relative z-0 flex h-full min-h-[calc(100dvh-var(--app-header-height)-var(--app-mobile-nav-height))] min-w-0 flex-col overflow-hidden lg:min-h-[calc(100dvh-var(--app-header-height)-1rem)]">
           {leftNav === 'chat' && hasChatApp && handle && activeChatInstanceId ? (
             <CommunityChatPanel
               handle={handle}
@@ -1347,16 +1347,16 @@ const CommunityPage: React.FC = () => {
               className={
                 mobileComposerFull
                   ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
-                  : 'flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain max-lg:pb-[calc(60px+env(safe-area-inset-bottom,0px))]'
+                  : 'flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain max-lg:pb-[calc(env(safe-area-inset-bottom,0px))]'
               }
             >
           <div
-            className={`flex flex-col rounded-xl border border-[#e7e7e7] bg-white max-lg:rounded-none max-lg:border-x-0 ${
-              mobileComposerFull ? 'min-h-0 flex-1 overflow-hidden' : ''
+            className={`flex min-h-full flex-col overflow-hidden rounded-xl border border-[#e7e7e7] bg-white max-lg:rounded-none max-lg:border-x-0 ${
+              mobileComposerFull ? 'min-h-0 flex-1 overflow-hidden' : 'flex-1'
             }`}
           >
-            {/* BANNER */}
-            <div className="relative h-[140px] bg-gradient-to-r from-gray-800 to-gray-900 sm:h-[200px] lg:h-[250px]">
+            {/* BANNER — top radius matches parent card */}
+            <div className="relative h-[140px] shrink-0 overflow-hidden rounded-t-xl bg-gradient-to-r from-gray-800 to-gray-900 max-lg:rounded-t-none sm:h-[200px] lg:h-[250px]">
               {community.banner && (
                 <img src={community.banner} alt="" className="h-full w-full object-cover" />
               )}

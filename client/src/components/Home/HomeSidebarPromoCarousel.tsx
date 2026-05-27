@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import PixelBlast from '../PixelBlast';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const AUTO_MS = 20000;
 const TRANSITION = { duration: 0.42, ease: [0.32, 0.72, 0, 1] as const };
@@ -59,36 +60,14 @@ class PixelBlastErrorBoundary extends Component<
 }
 
 type PromoSlide = {
-  id: string;
-  label: string;
+  id: 'market' | 'discover';
   accent: string;
-  title: string;
-  description: string;
-  cta: string;
   to: string;
 };
 
-const SLIDES: PromoSlide[] = [
-  {
-    id: 'market',
-    label: 'Market',
-    accent: '#3B82F6',
-    title: 'Heatmap • AI Alpha • Live Analytics',
-    description:
-      'Follow the market in real time, see where it is "burning" and immediately ask the AI.',
-    cta: 'Go to Market',
-    to: '/discover?tab=market',
-  },
-  {
-    id: 'discover',
-    label: 'Discover',
-    accent: '#7C3AED',
-    title: 'Communities • Creators',
-    description:
-      'Find the best crypto communities, follow top creators and never miss real alpha again.',
-    cta: 'Go to Discover',
-    to: '/discover',
-  },
+const SLIDE_META: PromoSlide[] = [
+  { id: 'market', accent: '#3B82F6', to: '/discover?tab=market' },
+  { id: 'discover', accent: '#7C3AED', to: '/discover' },
 ];
 
 const StaticBackground: React.FC<{ accent: string }> = ({ accent }) => (
@@ -101,20 +80,26 @@ const StaticBackground: React.FC<{ accent: string }> = ({ accent }) => (
   />
 );
 
-const PromoSlideContent: React.FC<{ slide: PromoSlide }> = ({ slide }) => (
+const PromoSlideContent: React.FC<{
+  slide: PromoSlide;
+  label: string;
+  title: string;
+  description: string;
+  cta: string;
+}> = ({ slide, label, title, description, cta }) => (
   <div className="absolute inset-0 z-10 flex flex-col justify-center gap-3 px-4 pb-2">
     <div className="pointer-events-auto">
       <p className="text-xs font-semibold tracking-wide" style={{ color: slide.accent }}>
-        {slide.label}
+        {label}
       </p>
-      <h3 className="mt-1 text-lg font-bold leading-snug text-neutral-900">{slide.title}</h3>
-      <p className="mt-1 max-w-[280px] text-sm text-neutral-600">{slide.description}</p>
+      <h3 className="mt-1 text-lg font-bold leading-snug text-neutral-900">{title}</h3>
+      <p className="mt-1 max-w-[280px] text-sm text-neutral-600">{description}</p>
       <Link
         to={slide.to}
         className="mt-4 inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-opacity hover:opacity-90"
         style={{ backgroundColor: slide.accent }}
       >
-        {slide.cta}
+        {cta}
       </Link>
     </div>
   </div>
@@ -123,9 +108,20 @@ const PromoSlideContent: React.FC<{ slide: PromoSlide }> = ({ slide }) => (
 type PromoSlideLayerProps = {
   slide: PromoSlide;
   webglOk: boolean;
+  label: string;
+  title: string;
+  description: string;
+  cta: string;
 };
 
-const PromoSlideLayer: React.FC<PromoSlideLayerProps> = ({ slide, webglOk }) => (
+const PromoSlideLayer: React.FC<PromoSlideLayerProps> = ({
+  slide,
+  webglOk,
+  label,
+  title,
+  description,
+  cta,
+}) => (
   <>
     <StaticBackground accent={slide.accent} />
     {webglOk ? (
@@ -149,24 +145,46 @@ const PromoSlideLayer: React.FC<PromoSlideLayerProps> = ({ slide, webglOk }) => 
       </PixelBlastErrorBoundary>
     ) : null}
     <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-white/90 via-white/45 to-white/15" />
-    <PromoSlideContent slide={slide} />
+    <PromoSlideContent
+      slide={slide}
+      label={label}
+      title={title}
+      description={description}
+      cta={cta}
+    />
   </>
 );
 
 const HomeSidebarPromoCarousel: React.FC = () => {
+  const { t } = useTranslation();
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(1);
   const [webglOk] = useState(canUseWebGL2);
-  const slide = SLIDES[index];
+  const slide = SLIDE_META[index];
+
+  const slideCopy =
+    slide.id === 'market'
+      ? {
+          label: t('home.sidebarPromo.marketLabel'),
+          title: t('home.sidebarPromo.marketTitle'),
+          description: t('home.sidebarPromo.marketDescription'),
+          cta: t('home.sidebarPromo.marketCta'),
+        }
+      : {
+          label: t('home.sidebarPromo.discoverLabel'),
+          title: t('home.sidebarPromo.discoverTitle'),
+          description: t('home.sidebarPromo.discoverDescription'),
+          cta: t('home.sidebarPromo.discoverCta'),
+        };
 
   const goPrev = useCallback(() => {
     setDirection(-1);
-    setIndex((i) => (i - 1 + SLIDES.length) % SLIDES.length);
+    setIndex((i) => (i - 1 + SLIDE_META.length) % SLIDE_META.length);
   }, []);
 
   const goNext = useCallback(() => {
     setDirection(1);
-    setIndex((i) => (i + 1) % SLIDES.length);
+    setIndex((i) => (i + 1) % SLIDE_META.length);
   }, []);
 
   useEffect(() => {
@@ -188,7 +206,7 @@ const HomeSidebarPromoCarousel: React.FC = () => {
             transition={TRANSITION}
             className="absolute inset-0"
           >
-            <PromoSlideLayer slide={slide} webglOk={webglOk} />
+            <PromoSlideLayer slide={slide} webglOk={webglOk} {...slideCopy} />
           </motion.div>
         </AnimatePresence>
 
@@ -202,13 +220,13 @@ const HomeSidebarPromoCarousel: React.FC = () => {
             <ChevronLeft size={16} />
           </button>
           <span className="min-w-[2rem] px-0.5 text-center text-xs font-medium tabular-nums text-neutral-600">
-            {index + 1}/{SLIDES.length}
+            {index + 1}/{SLIDE_META.length}
           </span>
           <button
             type="button"
             onClick={goNext}
             className="rounded-full p-1 text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
-            aria-label="Next slide"
+            aria-label={t('home.sidebarPromo.nextSlide')}
           >
             <ChevronRight size={16} />
           </button>

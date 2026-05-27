@@ -6,16 +6,20 @@ const JWT_SECRET = process.env.JWT_SECRET;
 module.exports = (req, res, next) => {
   try {
     const authHeader = req.header('Authorization');
-    
-    // НЕ БЛОКИРУЕМ запрос если нет токена
+
     if (!authHeader) {
       req.userId = null;
       return next();
     }
 
     const token = authHeader.replace('Bearer ', '');
-    
+
     if (!token) {
+      req.userId = null;
+      return next();
+    }
+
+    if (!JWT_SECRET) {
       req.userId = null;
       return next();
     }

@@ -6,9 +6,15 @@ export interface PlatformRelease {
   itemKeys: string[];
 }
 
+/** User-facing label (v-prefix added in UI). Latest line: 1.2; patch releases: 1.1.N; launch: 1.0.0 */
+export function formatPlatformVersionLabel(version: string): string {
+  if (version === '1.2.0') return '1.2';
+  return version;
+}
+
 export const PLATFORM_RELEASES: PlatformRelease[] = [
   {
-    version: '1.6',
+    version: '1.2.0',
     date: '2026-05-26',
     titleKey: 'platformUpdates.releases.v16.title',
     itemKeys: [
@@ -19,8 +25,8 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     ],
   },
   {
-    version: '1.5',
-    date: '2026-05-26',
+    version: '1.1.5',
+    date: '2026-05-23',
     titleKey: 'platformUpdates.releases.v15.title',
     itemKeys: [
       'platformUpdates.releases.v15.items.chatUi',
@@ -30,8 +36,8 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     ],
   },
   {
-    version: '1.4',
-    date: '2026-05-26',
+    version: '1.1.4',
+    date: '2026-05-23',
     titleKey: 'platformUpdates.releases.v14.title',
     itemKeys: [
       'platformUpdates.releases.v14.items.activity',
@@ -41,7 +47,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     ],
   },
   {
-    version: '1.3',
+    version: '1.1.3',
     date: '2026-05-22',
     titleKey: 'platformUpdates.releases.v13.title',
     itemKeys: [
@@ -52,7 +58,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     ],
   },
   {
-    version: '1.2',
+    version: '1.1.2',
     date: '2026-05-22',
     titleKey: 'platformUpdates.releases.v12.title',
     itemKeys: [
@@ -63,7 +69,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     ],
   },
   {
-    version: '1.1',
+    version: '1.1.1',
     date: '2026-05-21',
     titleKey: 'platformUpdates.releases.v11.title',
     itemKeys: [
@@ -74,7 +80,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     ],
   },
   {
-    version: '1.0',
+    version: '1.0.0',
     date: '2026-05-21',
     titleKey: 'platformUpdates.releases.v10.title',
     itemKeys: [
@@ -91,7 +97,7 @@ export const PLATFORM_UPDATES_PATH = '/updates';
 const PLATFORM_UPDATES_DISMISS_KEY = 'mnoonx-platform-updates-dismissed';
 
 export function getLatestPlatformVersion(): string {
-  return PLATFORM_RELEASES[0]?.version ?? '1.0';
+  return PLATFORM_RELEASES[0]?.version ?? '1.0.0';
 }
 
 export function readDismissedUpdatesVersion(): string | null {

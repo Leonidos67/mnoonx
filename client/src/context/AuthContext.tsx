@@ -33,14 +33,50 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-    
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
-    }
-    setLoading(false);
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      const savedToken = localStorage.getItem('token');
+      if (!savedToken) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_URL}/me`, {
+          headers: { Authorization: `Bearer ${savedToken}` },
+        });
+        if (!res.ok) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          if (!cancelled) {
+            setToken(null);
+            setUser(null);
+          }
+          return;
+        }
+        const data = await res.json();
+        if (!cancelled && data.user) {
+          setToken(savedToken);
+          setUser(data.user);
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
+      } catch {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        if (!cancelled) {
+          setToken(null);
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = async (email: string, password: string) => {

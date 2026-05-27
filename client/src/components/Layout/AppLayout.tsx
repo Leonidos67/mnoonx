@@ -36,7 +36,7 @@ const AppMain: React.FC<{ children: ReactNode }> = ({ children }) => {
       className={`flex min-h-0 flex-1 overflow-hidden ${isOpen ? 'max-lg:flex-col' : ''}`}
     >
       <div
-        className={`relative min-h-0 min-w-0 flex-1 overflow-auto border-0 transition-[border-radius] duration-300 ${panelRadius} ${
+        className={`relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto border-0 transition-[border-radius] duration-300 ${panelRadius} ${
           isDiscoverMarket ? 'bg-stone-50' : 'bg-white'
         }`}
       >

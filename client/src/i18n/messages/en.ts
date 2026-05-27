@@ -18,6 +18,7 @@ export const en = {
     postDeleted: 'Post deleted',
     postPublished: 'Post published',
     failedToCreatePost: 'Failed to create post',
+    signInRequired: 'Session expired. Please sign in again.',
     failedToFetchPosts: 'Failed to fetch posts',
     failedToPostComment: 'Failed to post comment',
     failedToEditComment: 'Failed to edit comment',
@@ -52,6 +53,8 @@ export const en = {
     discover: 'Discover',
     settings: 'Settings',
     plan: 'Plan',
+    docs: 'Docs',
+    support: 'Support',
     startCommunity: 'Start a Community',
     myCommunities: 'My Communities',
     signInToSeeCommunities: 'Sign in to see your communities.',
@@ -102,6 +105,20 @@ export const en = {
     timeMinutes: '{count}m',
     timeHours: '{count}h',
     timeDays: '{count}d',
+    sidebarPromo: {
+      marketLabel: 'Market',
+      marketTitle: 'Heatmap • AI Alpha • Live Analytics',
+      marketDescription:
+        'Follow the market in real time, see where it is "burning" and immediately ask the AI.',
+      marketCta: 'Go to Market',
+      discoverLabel: 'Discover',
+      discoverTitle: 'Communities • Creators',
+      discoverDescription:
+        'Find the best crypto communities, follow top creators and never miss real alpha again.',
+      discoverCta: 'Go to Discover',
+      prevSlide: 'Previous slide',
+      nextSlide: 'Next slide',
+    },
   },
   discover: {
     title: 'Discover',
@@ -134,6 +151,12 @@ export const en = {
     category: 'Category',
     type: 'Type',
     sheetFallbackTitle: 'Community',
+    exportHero: {
+      title: 'Your community, driven by a professional product.',
+      description:
+        'Start managing your content, members, and apps more professionally — with dashboards, discover tools, and everything you need to grow in Web3.',
+      cta: 'Create a Community',
+    },
     marketTab: {
       tagline: 'Track prices, market momentum, and AI-powered crypto insights',
       searchPlaceholder: 'Search tokens, symbols, or contract addresses...',

@@ -13,6 +13,8 @@ import {
   Menu,
   Languages,
   ChevronRight,
+  HeartHandshake,
+  BookMarked,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -263,6 +265,15 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                   <CreditCard size={14} className="shrink-0 text-neutral-500" />
                   {t('nav.plan')}
                 </Link>
+                <Link
+                  to="/support"
+                  role="menuitem"
+                  onClick={() => setUserMenuOpen(false)}
+                  className={userMenuItemClass}
+                >
+                  <HeartHandshake size={14} className="shrink-0 text-neutral-500" />
+                  {t('nav.support')}
+                </Link>
                 <div className="group relative">
                   <div
                     className={`${userMenuItemClass} cursor-default justify-between gap-2`}
@@ -315,6 +326,15 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                     </div>
                   </div>
                 </div>
+                <Link
+                  to="/docs"
+                  role="menuitem"
+                  onClick={() => setUserMenuOpen(false)}
+                  className={userMenuItemClass}
+                >
+                  <BookMarked size={14} className="shrink-0 text-neutral-500" />
+                  {t('nav.docs')}
+                </Link>
                 <div className="h-px bg-neutral-100 my-1" />
                 <button
                   type="button"

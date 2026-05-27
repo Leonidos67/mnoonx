@@ -17,7 +17,7 @@ const PostLinkAttachmentDisplay: React.FC<PostLinkAttachmentDisplayProps> = ({ l
   if (url.startsWith('/')) {
     return (
       <p className="">
-        <Link to={url} className={linkClass}>
+        <Link to={url} className={`${linkClass} break-words`}>
           {title}
         </Link>
       </p>
@@ -26,7 +26,7 @@ const PostLinkAttachmentDisplay: React.FC<PostLinkAttachmentDisplayProps> = ({ l
 
   return (
     <p className="mt-2">
-      <a href={url} target="_blank" rel="noopener noreferrer" className={linkClass}>
+      <a href={url} target="_blank" rel="noopener noreferrer" className={`${linkClass} break-all`}>
         {title}
       </a>
     </p>

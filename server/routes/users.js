@@ -45,6 +45,44 @@ router.get('/list', auth, async (req, res) => {
   }
 });
 
+// GET /api/users/suggested — who to follow (must be before /:username)
+router.get('/suggested', auth, async (req, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const viewerId = req.userId.toString();
+    const followingRows = await Follow.find({ follower: viewerId }).select('following').lean();
+    const exclude = new Set([viewerId]);
+    followingRows.forEach((row) => {
+      if (row.following) exclude.add(String(row.following));
+    });
+
+    const candidates = await User.find()
+      .select('username fullName avatar followersCount')
+      .sort({ followersCount: -1, createdAt: -1 })
+      .limit(40)
+      .lean();
+
+    const users = candidates
+      .filter((u) => !exclude.has(u._id.toString()))
+      .slice(0, 8)
+      .map((u) => ({
+        _id: u._id.toString(),
+        username: u.username,
+        fullName: u.fullName || u.username,
+        avatar: u.avatar || '',
+        followersCount: u.followersCount || 0,
+      }));
+
+    res.json({ users });
+  } catch (error) {
+    console.error('Suggested users error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 const ALLOWED_PROFILE_NAME_COLORS = new Set([
   '',
   '#7c3aed',

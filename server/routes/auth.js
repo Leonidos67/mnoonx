@@ -3,9 +3,23 @@ const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const auth = require('../middleware/auth');
 
-// Убедись, что JWT_SECRET задан
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+function userPayload(user) {
+  return {
+    id: user._id.toString(),
+    username: user.username,
+    email: user.email,
+    fullName: user.fullName,
+    avatar: user.avatar,
+    followersCount: user.followersCount,
+    followingCount: user.followingCount,
+    postsCount: user.postsCount,
+    createdAt: user.createdAt,
+  };
+}
 
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
@@ -37,27 +51,17 @@ router.post('/register', async (req, res) => {
     await user.save();
 
     // Создаем токен с ФИКСИРОВАННЫМ секретом
-    const token = jwt.sign(
-      { userId: user._id },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    if (!JWT_SECRET) {
+      return res.status(500).json({ message: 'Server misconfiguration: JWT_SECRET missing' });
+    }
+
+    const token = jwt.sign({ userId: user._id.toString() }, JWT_SECRET, { expiresIn: '7d' });
 
     console.log('Token created with secret:', JWT_SECRET.substring(0, 10) + '...');
 
     res.status(201).json({
       token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName,
-        avatar: user.avatar,
-        followersCount: user.followersCount,
-        followingCount: user.followingCount,
-        postsCount: user.postsCount,
-        createdAt: user.createdAt
-      }
+      user: userPayload(user),
     });
   } catch (error) {
     console.error('Register error:', error);
@@ -80,12 +84,11 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Создаем токен
-    const token = jwt.sign(
-      { userId: user._id.toString() }, // Убедимся, что передаем строку
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    if (!JWT_SECRET) {
+      return res.status(500).json({ message: 'Server misconfiguration: JWT_SECRET missing' });
+    }
+
+    const token = jwt.sign({ userId: user._id.toString() }, JWT_SECRET, { expiresIn: '7d' });
 
     console.log('Token created:', {
       userId: user._id.toString(),
@@ -94,20 +97,27 @@ router.post('/login', async (req, res) => {
 
     res.json({
       token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName,
-        avatar: user.avatar,
-        followersCount: user.followersCount,
-        followingCount: user.followingCount,
-        postsCount: user.postsCount,
-        createdAt: user.createdAt
-      }
+      user: userPayload(user),
     });
   } catch (error) {
     console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/auth/me — validate stored token
+router.get('/me', auth, async (req, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    const user = await User.findById(req.userId).select('-password');
+    if (!user) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    res.json({ user: userPayload(user) });
+  } catch (error) {
+    console.error('Auth me error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
