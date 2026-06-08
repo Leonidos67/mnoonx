@@ -11,6 +11,7 @@ import AppLayout from './components/Layout/AppLayout';
 
 import Home from './pages/Home';
 import Discover from './pages/Discover';
+import MarketCoinPage from './pages/MarketCoinPage';
 import CommunityPage from './pages/CommunityPage';
 
 import LoginModal from './components/Auth/LoginModal';
@@ -38,6 +39,7 @@ import CommunityDashboardAnalytics from './pages/community-dashboard/CommunityDa
 import CommunityDashboardInvites from './pages/community-dashboard/CommunityDashboardInvites';
 import Plan from './pages/Plan';
 import Activity from './pages/Activity';
+import PortfolioTrackerPage from './pages/PortfolioTrackerPage';
 import PlatformUpdates from './pages/PlatformUpdates';
 import ProfileRoute from './components/Routing/ProfileRoute';
 import RequireAuth from './components/Routing/RequireAuth';
@@ -46,6 +48,7 @@ import RequireCommunityOwner from './components/Routing/RequireCommunityOwner';
 import { COMMUNITY_SETTINGS_SEGMENT, COMMUNITY_STORE_SEGMENT } from './constants/communityRoutes';
 import AdminRoutes from './pages/admin/AdminRoutes';
 import DocsRoutes from './pages/docs/DocsRoutes';
+import TonConnectAppProvider from './components/Portfolio/TonConnectAppProvider';
 
 function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -63,6 +66,7 @@ function App() {
       <ToastProvider>
       <ConfirmProvider>
       <UnreadsProvider>
+      <TonConnectAppProvider>
       <Router
         future={{
           v7_startTransition: true,
@@ -75,7 +79,18 @@ function App() {
 
           {/* Основные страницы */}
           <Route path="/" element={<AppLayout><Home /></AppLayout>} />
+          <Route path="/discover/coin/:coinId" element={<AppLayout><MarketCoinPage /></AppLayout>} />
           <Route path="/discover" element={<AppLayout><Discover /></AppLayout>} />
+          <Route
+            path="/portfolio-tracker"
+            element={
+              <AppLayout>
+                <RequireAuth>
+                  <PortfolioTrackerPage />
+                </RequireAuth>
+              </AppLayout>
+            }
+          />
           <Route path="/ai" element={<Navigate to="/discover?tab=market" replace />} />
           <Route
             path={`/community/:handle/${COMMUNITY_SETTINGS_SEGMENT}`}
@@ -188,6 +203,7 @@ function App() {
           }} 
         />
       </Router>
+      </TonConnectAppProvider>
       </UnreadsProvider>
       </ConfirmProvider>
       </ToastProvider>

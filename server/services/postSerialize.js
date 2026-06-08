@@ -53,6 +53,16 @@ async function serializeFeedPost(post, viewerUserId) {
             url: String(post.linkAttachment.url).trim(),
           }
         : null,
+    coinAttachment:
+      post.coinAttachment?.coinId?.trim() &&
+      post.coinAttachment?.name?.trim() &&
+      post.coinAttachment?.symbol?.trim()
+        ? {
+            coinId: String(post.coinAttachment.coinId).trim().toLowerCase(),
+            name: String(post.coinAttachment.name).trim(),
+            symbol: String(post.coinAttachment.symbol).trim().toLowerCase(),
+          }
+        : null,
     likesCount: post.likesCount || 0,
     commentsCount: post.commentsCount || 0,
     repostsCount: post.repostsCount || 0,

@@ -1,4 +1,5 @@
-import { DOCS_SECTIONS, docsPagePath } from './docsNav';
+import type { AppLocale } from '../context/LanguageContext';
+import { buildDocsSections, docsPagePath } from './docsNav';
 
 export interface DocsSearchHit {
   sectionId: string;
@@ -8,20 +9,22 @@ export interface DocsSearchHit {
   path: string;
 }
 
-export const DOCS_SEARCH_INDEX: DocsSearchHit[] = DOCS_SECTIONS.flatMap((section) =>
-  section.items.map((item) => ({
-    sectionId: section.id,
-    pageSlug: item.slug,
-    title: item.title,
-    sectionTitle: section.sidebarLabel,
-    path: docsPagePath(section.id, item.slug),
-  }))
-);
+export function buildDocsSearchIndex(locale: AppLocale): DocsSearchHit[] {
+  return buildDocsSections(locale).flatMap((section) =>
+    section.items.map((item) => ({
+      sectionId: section.id,
+      pageSlug: item.slug,
+      title: item.title,
+      sectionTitle: section.sidebarLabel,
+      path: docsPagePath(section.id, item.slug),
+    }))
+  );
+}
 
-export function searchDocs(query: string, limit = 8): DocsSearchHit[] {
+export function searchDocs(query: string, locale: AppLocale, limit = 8): DocsSearchHit[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
-  return DOCS_SEARCH_INDEX.filter(
+  return buildDocsSearchIndex(locale).filter(
     (hit) =>
       hit.title.toLowerCase().includes(q) ||
       hit.sectionTitle.toLowerCase().includes(q)

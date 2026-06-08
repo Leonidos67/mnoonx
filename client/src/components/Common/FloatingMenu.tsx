@@ -11,6 +11,7 @@ interface FloatingMenuProps {
   onClose: () => void;
   children: React.ReactNode;
   width?: number;
+  placement?: 'bottom' | 'top';
 }
 
 const FloatingMenu: React.FC<FloatingMenuProps> = ({
@@ -19,6 +20,7 @@ const FloatingMenu: React.FC<FloatingMenuProps> = ({
   onClose,
   children,
   width = 192,
+  placement = 'bottom',
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -41,17 +43,21 @@ const FloatingMenu: React.FC<FloatingMenuProps> = ({
 
   if (!open || !anchor) return null;
 
-  const top = anchor.rect.bottom + 4;
+  const gap = 4;
   const left = Math.min(
     Math.max(8, anchor.rect.right - width),
     window.innerWidth - width - 8
   );
+  const positionStyle =
+    placement === 'top'
+      ? { bottom: window.innerHeight - anchor.rect.top + gap, left, width }
+      : { top: anchor.rect.bottom + gap, left, width };
 
   return createPortal(
     <div
       ref={menuRef}
       className="fixed z-[10000] rounded-lg border border-neutral-200 bg-white p-1 shadow-lg"
-      style={{ top, left, width }}
+      style={positionStyle}
       onClick={(e) => e.stopPropagation()}
       role="menu"
     >

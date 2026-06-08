@@ -41,6 +41,10 @@ app.use('/api/messages', require('./routes/messages'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/support', require('./routes/support'));
+app.use('/api/portfolio', require('./routes/portfolio'));
+
+const { sendTonConnectManifest } = require('./tonConnectManifest');
+app.get('/tonconnect-manifest.json', sendTonConnectManifest);
 
 // Test route
 app.get('/', (req, res) => {

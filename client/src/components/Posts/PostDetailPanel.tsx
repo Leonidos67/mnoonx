@@ -95,7 +95,11 @@ const PostDetailPanel: React.FC<PostDetailPanelProps> = ({
               </p>
             </div>
           </div>
-          <PostContentBody content={post.content} linkAttachment={post.linkAttachment} />
+          <PostContentBody
+            content={post.content}
+            linkAttachment={post.linkAttachment}
+            coinAttachment={post.coinAttachment}
+          />
           {post.media && post.media.length > 0 && (
             <div className="mt-3">
               <PostMediaGallery media={post.media} meta={buildPostLightboxMeta(post)} className="!mt-0" />

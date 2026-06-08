@@ -10,6 +10,7 @@ import {
 import PostMediaGallery from '../components/Posts/PostMediaGallery';
 import PostComposer from '../components/Posts/PostComposer';
 import PostContentBody from '../components/Posts/PostContentBody';
+import type { PostCoinAttachment } from '../types/postCoin';
 import type { PostLinkAttachment } from '../types/postLink';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 import HomeSidebarPromoCarousel from '../components/Home/HomeSidebarPromoCarousel';
@@ -59,6 +60,7 @@ interface Post {
   viewsCount: number;
   media: string[];
   linkAttachment?: import('../types/postLink').PostLinkAttachment | null;
+  coinAttachment?: PostCoinAttachment | null;
   createdAt: string;
   isLiked?: boolean;
   isReposted?: boolean;
@@ -107,6 +109,7 @@ const Home: React.FC = () => {
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
   const [newPostLink, setNewPostLink] = useState<PostLinkAttachment | null>(null);
+  const [newPostCoin, setNewPostCoin] = useState<PostCoinAttachment | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [suggestedUsers, setSuggestedUsers] = useState<SuggestedUser[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -225,6 +228,7 @@ const Home: React.FC = () => {
     setNewPostContent('');
     setNewPostMedia([]);
     setNewPostLink(null);
+    setNewPostCoin(null);
   }, []);
 
   const handleLike = async (postId: string) => {
@@ -486,7 +490,10 @@ const Home: React.FC = () => {
 
   const handleCreatePost = async () => {
     const hasLink = Boolean(newPostLink?.title?.trim() && newPostLink?.url?.trim());
-    if ((!newPostContent.trim() && newPostMedia.length === 0 && !hasLink) || !token || isPosting) return;
+    const hasCoin = Boolean(
+      newPostCoin?.coinId?.trim() && newPostCoin?.name?.trim() && newPostCoin?.symbol?.trim()
+    );
+    if ((!newPostContent.trim() && newPostMedia.length === 0 && !hasLink && !hasCoin) || !token || isPosting) return;
     try {
       setIsPosting(true);
       const res = await fetch(API_URL, {
@@ -499,6 +506,7 @@ const Home: React.FC = () => {
           content: newPostContent,
           media: newPostMedia,
           linkAttachment: hasLink ? newPostLink : undefined,
+          coinAttachment: hasCoin ? newPostCoin : undefined,
         })
       });
       if (res.status === 401) {
@@ -517,6 +525,7 @@ const Home: React.FC = () => {
       setNewPostContent('');
       setNewPostMedia([]);
       setNewPostLink(null);
+      setNewPostCoin(null);
       setIsCreateOpen(false);
       showToast(t('common.postPublished'));
     } catch (err: unknown) {
@@ -792,7 +801,11 @@ const Home: React.FC = () => {
               </div>
             </div>
 
-            <PostContentBody content={post.content} linkAttachment={post.linkAttachment} />
+            <PostContentBody
+              content={post.content}
+              linkAttachment={post.linkAttachment}
+              coinAttachment={post.coinAttachment}
+            />
 
             {post.media && post.media.length > 0 && (
               <div className="mt-3">
@@ -867,6 +880,8 @@ const Home: React.FC = () => {
           onMediaChange={setNewPostMedia}
           linkAttachment={newPostLink}
           onLinkAttachmentChange={setNewPostLink}
+          coinAttachment={newPostCoin}
+          onCoinAttachmentChange={setNewPostCoin}
           onCancel={closeComposer}
           onSubmit={() => void handleCreatePost()}
           isPosting={isPosting}
@@ -978,6 +993,7 @@ const Home: React.FC = () => {
                       <PostContentBody
                         content={post.content}
                         linkAttachment={post.linkAttachment}
+                        coinAttachment={post.coinAttachment}
                         contentClassName="text-neutral-900 leading-relaxed whitespace-pre-wrap break-words text-[15px]"
                       />
                     </div>

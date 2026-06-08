@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@heroicons/react": "^2.0.0",
+    "@tonconnect/ui-react": "^2.4.4",
     "@types/node": "^16.18.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
@@ -11,6 +12,7 @@
     "framer-motion": "^10.16.4",
     "lottie-web": "^5.13.0",
     "lucide-react": "^1.16.0",
+    "motion": "^12.40.0",
     "ogl": "^1.0.11",
     "postprocessing": "^6.36.0",
     "react": "^18.2.0",
@@ -24,6 +26,8 @@
     "vaul": "^1.1.2"
   },
   "scripts": {
+    "prestart": "node scripts/generateTonConnectIcon.js && node scripts/generateTonManifest.js",
+    "prebuild": "node scripts/generateTonConnectIcon.js && node scripts/generateTonManifest.js",
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",

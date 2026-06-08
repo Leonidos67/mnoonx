@@ -1,10 +1,15 @@
 import React, { useEffect } from 'react';
 import AIChat from './AIChat';
+import MobileBottomSheet from '../Common/MobileBottomSheet';
 import { useAIChatPanel } from '../../context/AIChatPanelContext';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 
-/** Right column of the layout — not a modal; shares space with page content */
+const LG_MEDIA = '(min-width: 1024px)';
+
+/** Desktop: right column. Mobile: Vaul bottom sheet with swipe dismiss. */
 const AIChatDrawer: React.FC = () => {
-  const { isOpen, closePanel, promptSeed } = useAIChatPanel();
+  const { isOpen, closePanel, chatSeed } = useAIChatPanel();
+  const isDesktop = useMediaQuery(LG_MEDIA);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -15,19 +20,36 @@ const AIChatDrawer: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [isOpen, closePanel]);
 
+  if (!isDesktop) {
+    return (
+      <MobileBottomSheet
+        open={isOpen}
+        onClose={closePanel}
+        title="MNOONX AI"
+        padded={false}
+        zIndexClass="z-[110]"
+        contentClassName="max-h-[88dvh]"
+      >
+        <div className="flex h-[min(82dvh,720px)] min-h-[360px] flex-col">
+          <AIChat chatSeed={chatSeed} onCollapse={closePanel} />
+        </div>
+      </MobileBottomSheet>
+    );
+  }
+
   return (
     <aside
       aria-label="MNOONX AI"
       aria-hidden={!isOpen}
       className={`flex shrink-0 flex-col overflow-hidden border-[#e7e7e7] bg-white transition-[width,height,border-color] duration-300 ease-out ${
         isOpen
-          ? 'h-[min(46vh,440px)] w-full border-t max-lg:min-h-[280px] lg:h-full lg:w-[min(380px,36vw)] lg:max-w-[420px] lg:border-l lg:border-t-0'
-          : 'h-0 w-0 border-transparent max-lg:h-0'
+          ? 'h-full w-[min(380px,36vw)] max-w-[420px] border-l'
+          : 'h-0 w-0 border-transparent'
       }`}
     >
       {isOpen && (
-        <div className="flex h-full min-h-0 w-full min-w-[280px] flex-col lg:min-w-[340px]">
-          <AIChat promptSeed={promptSeed} onCollapse={closePanel} />
+        <div className="flex h-full min-h-0 w-full min-w-[340px] flex-col">
+          <AIChat chatSeed={chatSeed} onCollapse={closePanel} />
         </div>
       )}
     </aside>

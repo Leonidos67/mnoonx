@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
+import { useTranslation } from '../../i18n/useTranslation';
 import DocsCardGrid, { type DocsCardItem } from './DocsCardGrid';
 import DocsOnPageNav, { type DocsTocItem } from './DocsOnPageNav';
 
@@ -58,18 +59,19 @@ const DocsArticle: React.FC<DocsArticleProps> = ({
   prev,
   next,
 }) => {
+  const { t } = useTranslation();
   const toc: DocsTocItem[] = useMemo(() => {
     const items: DocsTocItem[] = [];
-    if (context) items.push({ id: 'context', label: 'Зачем это нужно' });
+    if (context) items.push({ id: 'context', label: t('docs.article.whyThis') });
     if (cardGrids?.length) {
       cardGrids.forEach((g, i) => items.push({ id: sectionId('grid', i), label: g.title }));
     }
     steps?.forEach((s, i) => items.push({ id: `step-${i}`, label: s.title }));
     sections?.forEach((s, i) => items.push({ id: sectionId('sec', i), label: s.heading }));
-    if (tips?.length) items.push({ id: 'tips', label: 'Советы' });
-    if (faq?.length) items.push({ id: 'faq', label: 'Частые вопросы' });
+    if (tips?.length) items.push({ id: 'tips', label: t('docs.article.tips') });
+    if (faq?.length) items.push({ id: 'faq', label: t('docs.article.faq') });
     return items;
-  }, [steps, sections, tips, faq, cardGrids, context]);
+  }, [steps, sections, tips, faq, cardGrids, context, t]);
 
   return (
     <div className="flex w-full min-w-0 gap-10">
@@ -99,8 +101,7 @@ const DocsArticle: React.FC<DocsArticleProps> = ({
               MNOONX Alpha Space
             </p>
             <p className="mt-2 max-w-lg text-lg leading-relaxed text-white/90">
-              Социальная платформа для сообществ: лента, профили, магазин приложений и панель
-              владельца — в одном продукте.
+              {t('docs.article.heroTagline')}
             </p>
           </div>
         ) : null}
@@ -138,7 +139,7 @@ const DocsArticle: React.FC<DocsArticleProps> = ({
 
         {faq && faq.length > 0 ? (
           <section id="faq" className="scroll-mt-24 mb-10">
-            <h2 className="mb-4 text-xl font-semibold text-neutral-900">Частые вопросы</h2>
+            <h2 className="mb-4 text-xl font-semibold text-neutral-900">{t('docs.article.faq')}</h2>
             <dl className="max-w-2xl space-y-5">
               {faq.map((item) => (
                 <div key={item.question} className="border-b border-stone-200/80 pb-5 last:border-0">
@@ -159,7 +160,7 @@ const DocsArticle: React.FC<DocsArticleProps> = ({
           >
             <div className="mb-3 flex items-center gap-2 text-amber-950">
               <Lightbulb className="h-5 w-5 shrink-0 text-amber-600" aria-hidden />
-              <span className="font-semibold">Советы</span>
+              <span className="font-semibold">{t('docs.article.tips')}</span>
             </div>
             <ul className="space-y-2 text-[15px] leading-relaxed text-amber-950/90">
               {tips.map((tip) => (
@@ -179,7 +180,7 @@ const DocsArticle: React.FC<DocsArticleProps> = ({
               className="flex min-w-[160px] flex-1 flex-col rounded-xl border border-stone-200 bg-white px-4 py-3 transition-colors hover:border-stone-300"
             >
               <span className="flex items-center gap-1 text-xs font-medium text-neutral-500">
-                <ChevronLeft className="h-4 w-4" /> Назад
+                <ChevronLeft className="h-4 w-4" /> {t('docs.article.back')}
               </span>
               <span className="mt-1 text-sm font-semibold text-neutral-900">{prev.title}</span>
             </Link>
@@ -192,7 +193,7 @@ const DocsArticle: React.FC<DocsArticleProps> = ({
               className="flex min-w-[160px] flex-1 flex-col items-end rounded-xl border border-orange-600 bg-orange-600 px-4 py-3 text-right text-white transition-colors hover:bg-orange-700"
             >
               <span className="flex items-center gap-1 text-xs font-medium text-orange-100">
-                Далее <ChevronRight className="h-4 w-4" />
+                {t('docs.article.next')} <ChevronRight className="h-4 w-4" />
               </span>
               <span className="mt-1 text-sm font-semibold">{next.title}</span>
             </Link>
@@ -200,7 +201,7 @@ const DocsArticle: React.FC<DocsArticleProps> = ({
         </nav>
       </article>
 
-      <DocsOnPageNav toc={toc} pageTitle={title} />
+      <DocsOnPageNav toc={toc} />
     </div>
   );
 };

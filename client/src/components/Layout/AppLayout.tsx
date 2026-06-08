@@ -4,9 +4,10 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 import MobileBottomNav from './MobileBottomNav';
 import AIChatDrawer from '../AI/AIChatDrawer';
-import DiscoverMarketGridBackground from './DiscoverMarketGridBackground';
 import { AIChatPanelProvider, useAIChatPanel } from '../../context/AIChatPanelContext';
-import { useDiscoverMarketTab } from '../../hooks/useDiscoverMarketTab';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+
+const LG_MEDIA = '(min-width: 1024px)';
 
 const SIDEBAR_COLLAPSED_KEY = 'mnoonx-sidebar-collapsed';
 
@@ -25,23 +26,19 @@ interface AppLayoutProps {
 
 const AppMain: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { isOpen } = useAIChatPanel();
-  const isDiscoverMarket = useDiscoverMarketTab();
+  const isDesktop = useMediaQuery(LG_MEDIA);
 
-  const panelRadius = isOpen
-    ? 'rounded-l-3xl rounded-tr-none rounded-br-none max-lg:rounded-3xl'
-    : 'rounded-3xl';
+  const panelRadius =
+    isOpen && isDesktop
+      ? 'rounded-l-3xl rounded-tr-none rounded-br-none'
+      : 'rounded-3xl';
 
   return (
-    <main
-      className={`flex min-h-0 flex-1 overflow-hidden ${isOpen ? 'max-lg:flex-col' : ''}`}
-    >
+    <main className="flex min-h-0 flex-1 overflow-hidden">
       <div
-        className={`relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto border-0 transition-[border-radius] duration-300 ${panelRadius} ${
-          isDiscoverMarket ? 'bg-stone-50' : 'bg-white'
-        }`}
+        className={`relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto border-0 bg-white transition-[border-radius] duration-300 ${panelRadius}`}
       >
-        {isDiscoverMarket && <DiscoverMarketGridBackground />}
-        <div className={`relative z-10 min-h-full ${isDiscoverMarket ? '' : 'h-full'}`}>
+        <div className="relative z-10 h-full min-h-full">
           {children}
         </div>
       </div>

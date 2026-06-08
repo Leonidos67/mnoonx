@@ -23,7 +23,7 @@ router.get('/markets', async (req, res) => {
       vs_currency: vs,
       per_page: perPage,
       sparkline: true,
-      price_change_percentage: '24h,7d,30d,200d',
+      price_change_percentage: '1h,24h,7d,30d,200d',
     });
 
     const [trending, global, fearGreed] = await Promise.all([
@@ -32,7 +32,7 @@ router.get('/markets', async (req, res) => {
       marketStats.fetchFearGreed(),
     ]);
 
-    const payload = coingecko.buildMarketsPayload(markets, trending);
+    const payload = coingecko.buildMarketsPayload(markets, trending, global);
     const body = {
       ...payload,
       marketStats: marketStats.buildMarketStats({
@@ -90,11 +90,15 @@ router.get('/search', async (req, res) => {
 
 router.post('/chat', async (req, res) => {
   try {
-    const { message, mode, previousResponse } = req.body || {};
+    const { message, mode, previousResponse, coinContext, locale } = req.body || {};
+    const resolvedMode =
+      mode === 'rewrite' ? 'rewrite' : mode === 'coin_analyze' ? 'coin_analyze' : 'analyze';
     const result = await aiAlpha.runChat({
       message,
-      mode: mode === 'rewrite' ? 'rewrite' : 'analyze',
+      mode: resolvedMode,
       previousResponse,
+      coinContext,
+      locale: locale === 'ru' ? 'ru' : 'en',
     });
     res.json(result);
   } catch (err) {

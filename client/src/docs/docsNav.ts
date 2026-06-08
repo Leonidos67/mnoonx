@@ -1,3 +1,8 @@
+import type { AppLocale } from '../context/LanguageContext';
+import { en } from '../i18n/messages/en';
+import { ru } from '../i18n/messages/ru';
+import { DOCS_SECTION_STRUCTURE } from './docsSectionStructure';
+
 export interface DocsNavItem {
   slug: string;
   title: string;
@@ -5,101 +10,48 @@ export interface DocsNavItem {
 
 export interface DocsNavSection {
   id: string;
-  /** Группа в левом сайдбаре */
   sidebarLabel: string;
   items: DocsNavItem[];
 }
 
-export const DOCS_SECTIONS: DocsNavSection[] = [
-  {
-    id: 'start',
-    sidebarLabel: 'Начало работы',
-    items: [
-      { slug: 'overview', title: 'Обзор платформы' },
-      { slug: 'account', title: 'Аккаунт и вход' },
-      { slug: 'navigation', title: 'Навигация' },
-    ],
-  },
-  {
-    id: 'profile',
-    sidebarLabel: 'Профиль',
-    items: [
-      { slug: 'basics', title: 'Профиль и лента' },
-      { slug: 'connections', title: 'Подписки и связи' },
-    ],
-  },
-  {
-    id: 'community',
-    sidebarLabel: 'Сообщества',
-    items: [
-      { slug: 'roadmap', title: 'План запуска' },
-      { slug: 'create', title: 'Создание сообщества' },
-      { slug: 'access', title: 'Доступ и приватность' },
-      { slug: 'branding', title: 'Оформление' },
-      { slug: 'members', title: 'Участники' },
-      { slug: 'feed', title: 'Лента сообщества' },
-    ],
-  },
-  {
-    id: 'apps',
-    sidebarLabel: 'Приложения',
-    items: [
-      { slug: 'overview', title: 'Что такое приложения' },
-      { slug: 'store', title: 'Магазин приложений' },
-      { slug: 'install', title: 'Установка' },
-      { slug: 'configure', title: 'Настройка экземпляров' },
-      { slug: 'chat', title: 'Чат' },
-      { slug: 'courses', title: 'Курсы' },
-      { slug: 'content', title: 'Контент' },
-      { slug: 'files', title: 'Файлы' },
-      { slug: 'announcements', title: 'Объявления' },
-      { slug: 'events', title: 'События' },
-    ],
-  },
-  {
-    id: 'dashboard',
-    sidebarLabel: 'Панель владельца',
-    items: [
-      { slug: 'overview', title: 'Панель владельца' },
-      { slug: 'analytics', title: 'Аналитика' },
-      { slug: 'members', title: 'Участники и роли' },
-    ],
-  },
-  {
-    id: 'social',
-    sidebarLabel: 'Социальные функции',
-    items: [
-      { slug: 'posts', title: 'Посты и взаимодействия' },
-      { slug: 'messenger', title: 'Мессенджер' },
-      { slug: 'discover', title: 'Discover' },
-    ],
-  },
-  {
-    id: 'growth',
-    sidebarLabel: 'Развитие',
-    items: [
-      { slug: 'strategy', title: 'Стратегия роста' },
-      { slug: 'monetization', title: 'Монетизация' },
-      { slug: 'checklist', title: 'Чеклист запуска' },
-    ],
-  },
-];
+function docsMessagesFor(locale: AppLocale) {
+  return locale === 'ru' ? ru.docs : en.docs;
+}
+
+function pageTitle(messages: ReturnType<typeof docsMessagesFor>, sectionId: string, slug: string): string {
+  const pages = messages.nav.pages as Record<string, Record<string, string>>;
+  return pages[sectionId]?.[slug] ?? slug;
+}
+
+export function buildDocsSections(locale: AppLocale): DocsNavSection[] {
+  const messages = docsMessagesFor(locale);
+  return DOCS_SECTION_STRUCTURE.map((section) => ({
+    id: section.id,
+    sidebarLabel: messages.nav.sections[section.id as keyof typeof messages.nav.sections],
+    items: section.items.map((slug) => ({
+      slug,
+      title: pageTitle(messages, section.id, slug),
+    })),
+  }));
+}
+
+/** @deprecated Use buildDocsSections(locale) — kept for search index bootstrap */
+export const DOCS_SECTIONS: DocsNavSection[] = buildDocsSections('ru');
 
 export const DOCS_DEFAULT_PATH = '/docs/start/overview';
 export const DOCS_SUPPORT_PATH = '/docs/support';
 
-/** Верхняя навигация в шапке: Docs | Support */
 export type DocsHeaderNavId = 'docs' | 'support';
 
 export interface DocsHeaderNavItem {
   id: DocsHeaderNavId;
-  label: string;
+  labelKey: 'docs.header.docs' | 'docs.header.support';
   to: string;
 }
 
 export const DOCS_HEADER_NAV: DocsHeaderNavItem[] = [
-  { id: 'docs', label: 'Docs', to: DOCS_DEFAULT_PATH },
-  { id: 'support', label: 'Support', to: DOCS_SUPPORT_PATH },
+  { id: 'docs', labelKey: 'docs.header.docs', to: DOCS_DEFAULT_PATH },
+  { id: 'support', labelKey: 'docs.header.support', to: DOCS_SUPPORT_PATH },
 ];
 
 export function isDocsHeaderNavActive(pathname: string, id: DocsHeaderNavId): boolean {
@@ -117,21 +69,29 @@ export function docsPagePath(sectionId: string, pageSlug: string): string {
   return `/docs/${sectionId}/${pageSlug}`;
 }
 
-export function findDocsNavItem(sectionId: string, pageSlug: string): DocsNavItem | null {
-  const section = DOCS_SECTIONS.find((s) => s.id === sectionId);
+export function findDocsNavItem(
+  sectionId: string,
+  pageSlug: string,
+  locale: AppLocale = 'ru'
+): DocsNavItem | null {
+  const section = buildDocsSections(locale).find((s) => s.id === sectionId);
   if (!section) return null;
   return section.items.find((i) => i.slug === pageSlug) ?? null;
 }
 
-export function findDocsSection(sectionId: string): DocsNavSection | null {
-  return DOCS_SECTIONS.find((s) => s.id === sectionId) ?? null;
+export function findDocsSection(sectionId: string, locale: AppLocale = 'ru'): DocsNavSection | null {
+  return buildDocsSections(locale).find((s) => s.id === sectionId) ?? null;
 }
 
-export function getAdjacentDocsPages(sectionId: string, pageSlug: string): {
+export function getAdjacentDocsPages(
+  sectionId: string,
+  pageSlug: string,
+  locale: AppLocale = 'ru'
+): {
   prev: { path: string; title: string } | null;
   next: { path: string; title: string } | null;
 } {
-  const flat = DOCS_SECTIONS.flatMap((s) =>
+  const flat = buildDocsSections(locale).flatMap((s) =>
     s.items.map((i) => ({ sectionId: s.id, ...i }))
   );
   const idx = flat.findIndex((p) => p.sectionId === sectionId && p.slug === pageSlug);

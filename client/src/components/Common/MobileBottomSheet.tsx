@@ -14,6 +14,9 @@ export interface MobileBottomSheetProps {
   padded?: boolean;
   /** Allow swipe / backdrop dismiss. Default true. */
   dismissible?: boolean;
+  /** Extra classes on the drawer surface */
+  contentClassName?: string;
+  zIndexClass?: string;
 }
 
 /** Vaul bottom sheet — only on viewports below `lg`. */
@@ -24,6 +27,8 @@ const MobileBottomSheet: React.FC<MobileBottomSheetProps> = ({
   children,
   padded = false,
   dismissible = true,
+  contentClassName = '',
+  zIndexClass = 'z-[100]',
 }) => {
   const isDesktop = useMediaQuery(LG_MEDIA);
 
@@ -39,9 +44,9 @@ const MobileBottomSheet: React.FC<MobileBottomSheetProps> = ({
       shouldScaleBackground
     >
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-[100] bg-black/60" />
+        <Drawer.Overlay className={`fixed inset-0 ${zIndexClass} bg-black/60`} />
         <Drawer.Content
-          className="fixed inset-x-0 bottom-0 z-[100] flex max-h-[92dvh] flex-col rounded-t-[20px] bg-white outline-none"
+          className={`fixed inset-x-0 bottom-0 ${zIndexClass} flex max-h-[92dvh] flex-col rounded-t-[20px] bg-white outline-none ${contentClassName}`}
           aria-describedby={undefined}
         >
           <Drawer.Title className="sr-only">{title}</Drawer.Title>

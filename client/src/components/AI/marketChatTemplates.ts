@@ -131,7 +131,7 @@ _${disclaimer}_`;
 
   return `## Market overview
 
-High-level snapshot from live market data (CoinGecko). Use it for context — not as a trade signal.
+High-level snapshot from live market data. Use it for context — not as a trade signal.
 
 ${capLine}
 ${extras}

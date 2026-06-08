@@ -14,20 +14,21 @@ interface OwnedCommunity {
 
 export type PostLinkMode = 'community' | 'url';
 
-interface PostLinkAttachmentModalProps {
-  open: boolean;
-  onClose: () => void;
-  onSave: (link: PostLinkAttachment) => void;
+export interface PostLinkAttachmentFormProps {
   initialValue?: PostLinkAttachment | null;
   token: string | null;
+  onSave: (link: PostLinkAttachment) => void;
+  onCancel: () => void;
+  /** Compact footer for mobile sheet */
+  variant?: 'modal' | 'sheet';
 }
 
-const PostLinkAttachmentModal: React.FC<PostLinkAttachmentModalProps> = ({
-  open,
-  onClose,
-  onSave,
+export const PostLinkAttachmentForm: React.FC<PostLinkAttachmentFormProps> = ({
   initialValue,
   token,
+  onSave,
+  onCancel,
+  variant = 'modal',
 }) => {
   const { t } = useTranslation();
   const [title, setTitle] = useState('');
@@ -58,12 +59,11 @@ const PostLinkAttachmentModal: React.FC<PostLinkAttachmentModalProps> = ({
   }, [initialValue]);
 
   useEffect(() => {
-    if (!open) return;
     resetForm();
-  }, [open, resetForm]);
+  }, [resetForm]);
 
   useEffect(() => {
-    if (!open || !token) return;
+    if (!token) return;
     let cancelled = false;
     setLoadingCommunities(true);
     fetch(`${COMMUNITIES_API}/mine`, { headers: { Authorization: `Bearer ${token}` } })
@@ -81,12 +81,12 @@ const PostLinkAttachmentModal: React.FC<PostLinkAttachmentModalProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [open, token]);
+  }, [token]);
 
   useEffect(() => {
-    if (!open || mode !== 'community' || selectedHandle || communities.length === 0) return;
+    if (mode !== 'community' || selectedHandle || communities.length === 0) return;
     setSelectedHandle(communities[0].handle);
-  }, [open, mode, communities, selectedHandle]);
+  }, [mode, communities, selectedHandle]);
 
   const handleSave = () => {
     const trimmedTitle = title.trim();
@@ -101,7 +101,6 @@ const PostLinkAttachmentModal: React.FC<PostLinkAttachmentModalProps> = ({
         return;
       }
       onSave({ title: trimmedTitle, url: communityPath(selectedHandle) });
-      onClose();
       return;
     }
 
@@ -124,8 +123,161 @@ const PostLinkAttachmentModal: React.FC<PostLinkAttachmentModalProps> = ({
       return;
     }
     onSave({ title: trimmedTitle, url });
-    onClose();
   };
+
+  const footerClass =
+    variant === 'sheet'
+      ? 'flex justify-end gap-2 border-t border-neutral-200 pt-4'
+      : 'flex justify-end gap-2 border-t border-neutral-200 px-5 py-4';
+
+  const bodyClass = variant === 'sheet' ? 'space-y-4' : 'space-y-4 px-5 py-4';
+
+  return (
+    <>
+      <div className={bodyClass}>
+        <div>
+          <label htmlFor="post-link-title" className="mb-1.5 block text-sm font-medium text-neutral-700">
+            {t('postLink.titleLabel')}
+          </label>
+          <input
+            id="post-link-title"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={120}
+            placeholder={t('postLink.titlePlaceholder')}
+            className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-[#315efb] focus:ring-2 focus:ring-[#315efb]/20"
+          />
+        </div>
+
+        <div>
+          <p className="mb-2 text-sm font-medium text-neutral-700">{t('postLink.linkType')}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setMode('community')}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                mode === 'community'
+                  ? 'border-[#315efb] bg-[#eef2ff] text-[#315efb]'
+                  : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+              }`}
+            >
+              {t('postLink.attachCommunity')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('url')}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                mode === 'url'
+                  ? 'border-[#315efb] bg-[#eef2ff] text-[#315efb]'
+                  : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+              }`}
+            >
+              {t('postLink.insertUrl')}
+            </button>
+          </div>
+        </div>
+
+        {mode === 'community' ? (
+          <div>
+            <p className="mb-2 text-sm text-neutral-500">{t('postLink.yourCommunities')}</p>
+            {!token ? (
+              <p className="text-sm text-neutral-500">{t('postLink.signInForCommunities')}</p>
+            ) : loadingCommunities ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-neutral-400" aria-hidden />
+              </div>
+            ) : communities.length === 0 ? (
+              <p className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50 px-3 py-4 text-sm text-neutral-500">
+                {t('postLink.noCommunities')}
+              </p>
+            ) : (
+              <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-neutral-200 p-1">
+                {communities.map((c) => {
+                  const selected = selectedHandle === c.handle;
+                  return (
+                    <li key={c._id}>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedHandle(c.handle)}
+                        className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                          selected ? 'bg-[#eef2ff] text-[#315efb]' : 'hover:bg-neutral-50'
+                        }`}
+                      >
+                        <img
+                          src={
+                            c.avatar ||
+                            `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=111827&color=fff&size=40&bold=true`
+                          }
+                          alt=""
+                          className="h-9 w-9 rounded-lg object-cover"
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{c.name}</span>
+                          <span className="block truncate text-xs text-neutral-500">@{c.handle}</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        ) : (
+          <div>
+            <label htmlFor="post-link-url" className="mb-1.5 block text-sm font-medium text-neutral-700">
+              {t('postLink.urlLabel')}
+            </label>
+            <input
+              id="post-link-url"
+              type="url"
+              value={customUrl}
+              onChange={(e) => setCustomUrl(e.target.value)}
+              placeholder="https://"
+              className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-[#315efb] focus:ring-2 focus:ring-[#315efb]/20"
+            />
+          </div>
+        )}
+
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      </div>
+
+      <div className={footerClass}>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-full px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"
+        >
+          {t('postComposer.cancel')}
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white hover:bg-neutral-800"
+        >
+          {t('postLink.save')}
+        </button>
+      </div>
+    </>
+  );
+};
+
+interface PostLinkAttachmentModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSave: (link: PostLinkAttachment) => void;
+  initialValue?: PostLinkAttachment | null;
+  token: string | null;
+}
+
+const PostLinkAttachmentModal: React.FC<PostLinkAttachmentModalProps> = ({
+  open,
+  onClose,
+  onSave,
+  initialValue,
+  token,
+}) => {
+  const { t } = useTranslation();
 
   if (!open) return null;
 
@@ -154,131 +306,15 @@ const PostLinkAttachmentModal: React.FC<PostLinkAttachmentModalProps> = ({
             <X className="h-5 w-5" aria-hidden />
           </button>
         </div>
-
-        <div className="space-y-4 px-5 py-4">
-          <div>
-            <label htmlFor="post-link-title" className="mb-1.5 block text-sm font-medium text-neutral-700">
-              {t('postLink.titleLabel')}
-            </label>
-            <input
-              id="post-link-title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              maxLength={120}
-              placeholder={t('postLink.titlePlaceholder')}
-              className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-[#315efb] focus:ring-2 focus:ring-[#315efb]/20"
-            />
-          </div>
-
-          <div>
-            <p className="mb-2 text-sm font-medium text-neutral-700">{t('postLink.linkType')}</p>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setMode('community')}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                  mode === 'community'
-                    ? 'border-[#315efb] bg-[#eef2ff] text-[#315efb]'
-                    : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50'
-                }`}
-              >
-                {t('postLink.attachCommunity')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('url')}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
-                  mode === 'url'
-                    ? 'border-[#315efb] bg-[#eef2ff] text-[#315efb]'
-                    : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50'
-                }`}
-              >
-                {t('postLink.insertUrl')}
-              </button>
-            </div>
-          </div>
-
-          {mode === 'community' ? (
-            <div>
-              <p className="mb-2 text-sm text-neutral-500">{t('postLink.yourCommunities')}</p>
-              {!token ? (
-                <p className="text-sm text-neutral-500">{t('postLink.signInForCommunities')}</p>
-              ) : loadingCommunities ? (
-                <div className="flex justify-center py-6">
-                  <Loader2 className="h-6 w-6 animate-spin text-neutral-400" aria-hidden />
-                </div>
-              ) : communities.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-neutral-200 bg-neutral-50 px-3 py-4 text-sm text-neutral-500">
-                  {t('postLink.noCommunities')}
-                </p>
-              ) : (
-                <ul className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-neutral-200 p-1">
-                  {communities.map((c) => {
-                    const selected = selectedHandle === c.handle;
-                    return (
-                      <li key={c._id}>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedHandle(c.handle)}
-                          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                            selected ? 'bg-[#eef2ff] text-[#315efb]' : 'hover:bg-neutral-50'
-                          }`}
-                        >
-                          <img
-                            src={
-                              c.avatar ||
-                              `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&background=111827&color=fff&size=40&bold=true`
-                            }
-                            alt=""
-                            className="h-9 w-9 rounded-lg object-cover"
-                          />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate font-medium">{c.name}</span>
-                            <span className="block truncate text-xs text-neutral-500">@{c.handle}</span>
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </div>
-          ) : (
-            <div>
-              <label htmlFor="post-link-url" className="mb-1.5 block text-sm font-medium text-neutral-700">
-                {t('postLink.urlLabel')}
-              </label>
-              <input
-                id="post-link-url"
-                type="url"
-                value={customUrl}
-                onChange={(e) => setCustomUrl(e.target.value)}
-                placeholder="https://"
-                className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-[#315efb] focus:ring-2 focus:ring-[#315efb]/20"
-              />
-            </div>
-          )}
-
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-neutral-200 px-5 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full px-4 py-2 text-sm font-semibold text-neutral-700 hover:bg-neutral-100"
-          >
-            {t('postComposer.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white hover:bg-neutral-800"
-          >
-            {t('postLink.save')}
-          </button>
-        </div>
+        <PostLinkAttachmentForm
+          initialValue={initialValue}
+          token={token}
+          onSave={(link) => {
+            onSave(link);
+            onClose();
+          }}
+          onCancel={onClose}
+        />
       </div>
     </div>
   );

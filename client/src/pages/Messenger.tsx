@@ -23,6 +23,7 @@ import MessengerAttachmentMenu, {
 import MessengerEmojiPicker from '../components/Messenger/MessengerEmojiPicker';
 import MessengerAnimojiAttachPanel from '../components/Messenger/MessengerAnimojiAttachPanel';
 import MessengerStickersAttachPanel from '../components/Messenger/MessengerStickersAttachPanel';
+import MessengerCoinAttachPanel from '../components/Messenger/MessengerCoinAttachPanel';
 import MessengerMessageBody from '../components/Messenger/MessengerMessageBody';
 import MessengerChatContextMenu, {
   type ChatContextMenuAnchor,
@@ -52,7 +53,9 @@ import {
   rebuildReplyMessage,
   splitReplyMessage,
 } from '../utils/messengerAnimoji';
+import { encodeCoinMessage, isCoinOnlyMessage } from '../utils/messengerCoins';
 import { encodeStickerMessage, isStickerOnlyMessage } from '../utils/messengerStickers';
+import type { PostCoinAttachment } from '../types/postCoin';
 import type { MessengerStickerItem, MessengerStickerPack } from '../types/messengerStickers';
 import {
   loadMessengerChatPrefs,
@@ -152,7 +155,9 @@ const Messenger: React.FC = () => {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
-  const [attachMenuView, setAttachMenuView] = useState<'main' | 'animoji' | 'stickers'>('main');
+  const [attachMenuView, setAttachMenuView] = useState<'main' | 'animoji' | 'stickers' | 'coin'>(
+    'main'
+  );
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
@@ -535,6 +540,18 @@ const Messenger: React.FC = () => {
     sendSticker(pack, sticker);
   };
 
+  const sendCoin = useCallback(
+    (coin: PostCoinAttachment) => {
+      void sendMessageWithBody(encodeCoinMessage(coin));
+    },
+    [sendMessageWithBody]
+  );
+
+  const handleAttachCoinSelect = (coin: PostCoinAttachment) => {
+    closeAttachMenu();
+    sendCoin(coin);
+  };
+
   const handleAttachmentAction = (action: AttachmentMenuAction) => {
     if (action === 'close') {
       closeAttachMenu();
@@ -546,6 +563,10 @@ const Messenger: React.FC = () => {
     }
     if (action === 'stickers') {
       setAttachMenuView('stickers');
+      return;
+    }
+    if (action === 'coin') {
+      setAttachMenuView('coin');
       return;
     }
     setAttachMenuOpen(false);
@@ -983,9 +1004,9 @@ const Messenger: React.FC = () => {
         <div className="shrink-0 border-b border-neutral-200 p-3 sm:p-4">
           <div className="flex items-center justify-between">
             <h1 className="text-lg font-semibold text-neutral-800 sm:text-xl">Messages</h1>
-            <Link to="/users" className="shrink-0 text-sm font-medium text-blue-500 hover:underline">
+            {/* <Link to="/users" className="shrink-0 text-sm font-medium text-blue-500 hover:underline">
               Find people
-            </Link>
+            </Link> */}
           </div>
           <div className="relative mt-3">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
@@ -1125,7 +1146,7 @@ const Messenger: React.FC = () => {
                     >
                       <div
                         className={`rounded-2xl ${
-                          isStickerOnlyMessage(message.text)
+                          isStickerOnlyMessage(message.text) || isCoinOnlyMessage(message.text)
                             ? 'p-0'
                             : isAttachmentOnlyMessage(message.text)
                               ? 'px-1 py-1'
@@ -1244,10 +1265,17 @@ const Messenger: React.FC = () => {
                           onBack={() => setAttachMenuView('main')}
                           onClose={closeAttachMenu}
                         />
-                      ) : (
+                      ) : attachMenuView === 'stickers' ? (
                         <MessengerStickersAttachPanel
                           key="attach-stickers"
                           onSelect={handleAttachStickerSelect}
+                          onBack={() => setAttachMenuView('main')}
+                          onClose={closeAttachMenu}
+                        />
+                      ) : (
+                        <MessengerCoinAttachPanel
+                          key="attach-coin"
+                          onSelect={handleAttachCoinSelect}
                           onBack={() => setAttachMenuView('main')}
                           onClose={closeAttachMenu}
                         />
@@ -1317,11 +1345,11 @@ const Messenger: React.FC = () => {
             <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-neutral-200">
               <MessageCircle className="h-10 w-10 text-neutral-400" />
             </div>
-            <h3 className="text-lg font-semibold text-neutral-800">Your Messages</h3>
-            <p className="mt-1 text-neutral-500">Select a conversation or find someone by username</p>
-            <Link to="/users" className="mt-4 inline-block text-sm font-medium text-[#315efb] hover:underline">
+            <h3 className="text-lg font-semibold text-neutral-800">{t('messenger.yourMessages')}</h3>
+            <p className="mt-1 text-neutral-500">{t('messenger.selectConversationHint')}</p>
+            {/* <Link to="/users" className="mt-4 inline-block text-sm font-medium text-[#315efb] hover:underline">
               Browse all members
-            </Link>
+            </Link> */}
           </div>
         </div>
       )}

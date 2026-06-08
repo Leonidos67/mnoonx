@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { PanelRightClose, Sparkles, Trash2, TrendingDown, TrendingUp, BarChart3 } from 'lucide-react';
+import AnimatedReply from './AnimatedReply';
 import MarkdownContent from './MarkdownContent';
 import MnoonxAISiriOrb from './MnoonxAISiriOrb';
 import {
@@ -7,9 +8,16 @@ import {
   MARKET_CHAT_QUICK_ACTIONS,
   type MarketChatTemplateId,
 } from './marketChatTemplates';
-import type { ChatResponse, MarketsResponse } from '../../types/ai';
+import { buildCoinChatTemplate } from './coinChatTemplates';
+import { useAIChatPanel, type AIChatSeed } from '../../context/AIChatPanelContext';
+import type { ChatResponse, CoinDetail, MarketsResponse } from '../../types/ai';
+import { useTranslation } from '../../i18n/useTranslation';
 
 import { AI_API as API_AI } from '../../config/api';
+
+function isHiddenAiError(message: string): boolean {
+  return /quota|gemini|rate-limits|GEMINI_API|generativelanguage/i.test(message);
+}
 
 const QUICK_ICONS: Record<MarketChatTemplateId, React.ReactNode> = {
   gainers: <TrendingUp className="h-3.5 w-3.5 shrink-0 text-emerald-600" />,
@@ -18,24 +26,23 @@ const QUICK_ICONS: Record<MarketChatTemplateId, React.ReactNode> = {
 };
 
 interface AIChatProps {
-  promptSeed?: string;
+  chatSeed?: AIChatSeed | null;
   onCollapse?: () => void;
 }
 
-const AIChat: React.FC<AIChatProps> = ({ promptSeed, onCollapse }) => {
+const AIChat: React.FC<AIChatProps> = ({ chatSeed, onCollapse }) => {
+  const { t } = useTranslation();
+  const { lastProcessedSeedId, markSeedProcessed } = useAIChatPanel();
   const [prompt, setPrompt] = useState('');
   const [reply, setReply] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [templateLoading, setTemplateLoading] = useState(false);
+  const [replyAnimKey, setReplyAnimKey] = useState(0);
+  const [replyAnimated, setReplyAnimated] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const marketsCache = useRef<MarketsResponse | null>(null);
   const marketsFetchRef = useRef<Promise<MarketsResponse | null> | null>(null);
-
-  useEffect(() => {
-    if (promptSeed) setPrompt(promptSeed);
-  }, [promptSeed]);
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [reply, loading, error]);
@@ -84,12 +91,72 @@ const AIChat: React.FC<AIChatProps> = ({ promptSeed, onCollapse }) => {
       }
       const data = (await res.json()) as ChatResponse;
       setReply(data.reply);
+      setReplyAnimated(true);
+      setReplyAnimKey((k) => k + 1);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'AI request failed');
+      const msg = e instanceof Error ? e.message : 'AI request failed';
+      if (!isHiddenAiError(msg)) setError(msg);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const sendCoinAnalyze = useCallback(
+    async (message: string, coinContext: CoinDetail, locale?: 'en' | 'ru') => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(`${API_AI}/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message,
+            mode: 'coin_analyze',
+            coinContext,
+            locale: locale ?? 'en',
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error((body as { message?: string }).message || 'AI request failed');
+        }
+        const data = (await res.json()) as ChatResponse;
+        setReply(data.reply);
+        setReplyAnimated(false);
+      } catch {
+        // Keep the on-page template visible when enrichment is unavailable
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!chatSeed) return;
+
+    if (chatSeed.autoSend && chatSeed.coinContext) {
+      setPrompt('');
+    } else {
+      setPrompt(chatSeed.prompt);
+    }
+
+    if (!chatSeed.autoSend || chatSeed.id <= lastProcessedSeedId) return;
+
+    markSeedProcessed(chatSeed.id);
+    setError(null);
+
+    if (chatSeed.coinContext) {
+      const template = buildCoinChatTemplate(chatSeed.coinContext, t);
+      setReply(template);
+      setReplyAnimated(true);
+      setReplyAnimKey((k) => k + 1);
+      void sendCoinAnalyze(chatSeed.prompt, chatSeed.coinContext, chatSeed.locale);
+      return;
+    }
+
+    void sendChat(chatSeed.prompt);
+  }, [chatSeed, lastProcessedSeedId, markSeedProcessed, sendChat, sendCoinAnalyze, t]);
 
   const applyMarketTemplate = useCallback(
     async (id: MarketChatTemplateId) => {
@@ -100,7 +167,10 @@ const AIChat: React.FC<AIChatProps> = ({ promptSeed, onCollapse }) => {
         if (!data) {
           throw new Error('Could not load market data. Please try again in a moment.');
         }
-        setReply(buildMarketChatTemplate(id, data));
+        const template = buildMarketChatTemplate(id, data);
+        setReply(template);
+        setReplyAnimated(true);
+        setReplyAnimKey((k) => k + 1);
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Could not load this snapshot');
       } finally {
@@ -119,6 +189,7 @@ const AIChat: React.FC<AIChatProps> = ({ promptSeed, onCollapse }) => {
   const handleClear = () => {
     setPrompt('');
     setReply(null);
+    setReplyAnimated(false);
     setError(null);
   };
 
@@ -142,13 +213,17 @@ const AIChat: React.FC<AIChatProps> = ({ promptSeed, onCollapse }) => {
           <h2 className="text-base font-bold text-neutral-900">MNOONX AI</h2>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-4 py-4">
           {showEmptyState && (
             <div className="flex min-h-[min(280px,45vh)] flex-col items-center justify-center py-4">
               <MnoonxAISiriOrb loading={busy} />
               {busy && (
                 <p className="mt-4 text-sm font-medium text-[#315efb]">
-                  {templateLoading ? 'Loading market data…' : 'Thinking…'}
+                  {templateLoading
+                    ? 'Loading market data…'
+                    : loading
+                      ? t('discover.coinPage.aiTemplate.enriching')
+                      : 'Thinking…'}
                 </p>
               )}
               {!busy && (
@@ -171,7 +246,24 @@ const AIChat: React.FC<AIChatProps> = ({ promptSeed, onCollapse }) => {
           {error && !busy && (
             <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
           )}
-          {reply && !busy && <MarkdownContent content={reply} variant="light" />}
+          {reply && (
+            <>
+              {replyAnimated ? (
+                <AnimatedReply key={replyAnimKey} content={reply} />
+              ) : (
+                <MarkdownContent
+                  content={reply}
+                  variant="light"
+                  className="min-w-0 max-w-full break-words [overflow-wrap:anywhere]"
+                />
+              )}
+              {busy && loading && (
+                <p className="mt-3 text-xs font-medium text-[#315efb]">
+                  {t('discover.coinPage.aiTemplate.enriching')}
+                </p>
+              )}
+            </>
+          )}
           <div ref={messagesEndRef} />
         </div>
       </div>
@@ -188,7 +280,7 @@ const AIChat: React.FC<AIChatProps> = ({ promptSeed, onCollapse }) => {
               }
             }}
             placeholder="Analyze $SOL…"
-            rows={1}
+            rows={3}
             className="max-h-32 flex-1 resize-none px-4 py-3 text-[15px] outline-none"
             maxLength={4000}
           />

@@ -5,6 +5,7 @@ import SearchModal from '../Common/SearchModal';
 import HeaderIconBadge from '../Common/HeaderIconBadge';
 import MnoonxLogo from './MnoonxLogo';
 import GoToDashboardMenu from './GoToDashboardMenu';
+import MobileUserMenu from './MobileUserMenu';
 import PlatformUpdatesPromoButton from './PlatformUpdatesPromoButton';
 import { useAuth } from '../../context/AuthContext';
 import { useUnreads } from '../../context/UnreadsContext';
@@ -62,14 +63,16 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
 
           {user ? (
             <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-              <HeaderIconBadge
-                to="/notifications"
-                label={t('header.notifications')}
-                count={notificationUnread}
-                ariaLabelWhenUnread={t('header.notificationsUnread', { count: notificationUnread })}
-              >
-                <Bell className="h-5 w-5" />
-              </HeaderIconBadge>
+              <span className="hidden lg:contents">
+                <HeaderIconBadge
+                  to="/notifications"
+                  label={t('header.notifications')}
+                  count={notificationUnread}
+                  ariaLabelWhenUnread={t('header.notificationsUnread', { count: notificationUnread })}
+                >
+                  <Bell className="h-5 w-5" />
+                </HeaderIconBadge>
+              </span>
               <span className="hidden lg:contents">
                 <HeaderIconBadge
                   to="/messenger"
@@ -81,6 +84,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
                 </HeaderIconBadge>
               </span>
               <GoToDashboardMenu />
+              <MobileUserMenu />
             </div>
           ) : (
             <button

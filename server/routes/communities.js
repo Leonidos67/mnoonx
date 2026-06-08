@@ -351,10 +351,71 @@ function defaultCourseChapters() {
           images: [],
           attachments: [],
           dripLabel: 'Unlocks immediately',
+          isLocked: false,
+          unlockAfterDays: 0,
         },
       ],
     },
   ];
+}
+
+function lessonUnlockedForMember(lesson, joinedAt, now = new Date()) {
+  if (lesson.isLocked) return false;
+  const days = Math.max(0, Number(lesson.unlockAfterDays) || 0);
+  if (days <= 0) return true;
+  const unlockAt = new Date(joinedAt);
+  unlockAt.setDate(unlockAt.getDate() + days);
+  return now >= unlockAt;
+}
+
+function lockedLessonPlaceholder(ls, dripLabel) {
+  return {
+    _id: ls._id,
+    title: ls.title,
+    lessonType: ls.lessonType,
+    isLocked: Boolean(ls.isLocked),
+    isAccessible: false,
+    dripLabel: dripLabel || ls.dripLabel,
+    unlockAfterDays: Number(ls.unlockAfterDays) || 0,
+    videoEmbedUrl: '',
+    content: '',
+    images: [],
+    attachments: [],
+  };
+}
+
+function sanitizeLessonForViewer(lesson, joinedAt, isOwner) {
+  const ls = lesson && typeof lesson.toObject === 'function' ? lesson.toObject() : { ...lesson };
+  if (isOwner) {
+    return { ...ls, isAccessible: true };
+  }
+  const unlocked = lessonUnlockedForMember(ls, joinedAt);
+  if (unlocked) {
+    return { ...ls, isAccessible: true };
+  }
+  return lockedLessonPlaceholder(ls);
+}
+
+function sanitizeCourseForViewer(course, community, userId, isOwner) {
+  const obj = course && typeof course.toObject === 'function' ? course.toObject() : { ...course };
+  if (isOwner) {
+    return { ...obj, viewerRole: 'owner' };
+  }
+  const joinedAt = getMemberJoinedAt(community, userId);
+  const sequential = Boolean(obj.sequentialUnlock);
+  let chainOpen = true;
+  const chapters = (obj.chapters || []).map((ch) => ({
+    ...ch,
+    lessons: (ch.lessons || []).map((ls) => {
+      if (sequential && !chainOpen) {
+        return lockedLessonPlaceholder(ls, 'Complete previous lessons first');
+      }
+      const sanitized = sanitizeLessonForViewer(ls, joinedAt, false);
+      if (!sanitized.isAccessible) chainOpen = false;
+      return sanitized;
+    }),
+  }));
+  return { ...obj, chapters, viewerRole: 'member' };
 }
 
 function canAccessChatInstance(community, userId, instance) {
@@ -1132,7 +1193,7 @@ router.get('/:handle/courses/:courseId', auth, async (req, res) => {
       return res.status(404).json({ message: 'Course not found' });
     }
 
-    res.json(course.toObject());
+    res.json(sanitizeCourseForViewer(course, fresh, req.userId, owner));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -1241,7 +1302,18 @@ router.patch('/:handle/courses/:courseId', auth, async (req, res) => {
     });
     if (!course) return res.status(404).json({ message: 'Course not found' });
 
-    const { name, description, isHidden, coverUrl, chapters } = req.body;
+    const {
+      name,
+      description,
+      isHidden,
+      coverUrl,
+      welcomeMessage,
+      completionMessage,
+      sequentialUnlock,
+      defaultLessonUnlockDays,
+      tags,
+      chapters,
+    } = req.body;
     if (name !== undefined) {
       const t = String(name).trim();
       if (!t) return res.status(400).json({ message: 'Name cannot be empty' });
@@ -1250,6 +1322,20 @@ router.patch('/:handle/courses/:courseId', auth, async (req, res) => {
     if (description !== undefined) course.description = String(description).slice(0, 10000);
     if (isHidden !== undefined) course.isHidden = Boolean(isHidden);
     if (coverUrl !== undefined) course.coverUrl = String(coverUrl).slice(0, 500000);
+    if (welcomeMessage !== undefined) course.welcomeMessage = String(welcomeMessage).slice(0, 5000);
+    if (completionMessage !== undefined) course.completionMessage = String(completionMessage).slice(0, 5000);
+    if (sequentialUnlock !== undefined) course.sequentialUnlock = Boolean(sequentialUnlock);
+    if (defaultLessonUnlockDays !== undefined) {
+      course.defaultLessonUnlockDays = Math.max(0, Math.min(365, Number(defaultLessonUnlockDays) || 0));
+    }
+    if (tags !== undefined) {
+      if (!Array.isArray(tags)) return res.status(400).json({ message: 'tags must be an array' });
+      course.tags = tags
+        .map((tag) => String(tag).trim().slice(0, 40))
+        .filter(Boolean)
+        .slice(0, 20);
+      course.markModified('tags');
+    }
     if (chapters !== undefined) {
       if (!Array.isArray(chapters)) return res.status(400).json({ message: 'chapters must be an array' });
       if (chapters.length > 80) return res.status(400).json({ message: 'Too many chapters' });

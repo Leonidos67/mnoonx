@@ -55,6 +55,7 @@ import {
 import PostComposer from '../components/Posts/PostComposer';
 import PostFeedCard from '../components/Posts/PostFeedCard';
 import PostDetailPanel from '../components/Posts/PostDetailPanel';
+import type { PostCoinAttachment } from '../types/postCoin';
 import type { PostLinkAttachment } from '../types/postLink';
 import type { FeedPost } from '../types/postFeed';
 import EditTextModal from '../components/Common/EditTextModal';
@@ -171,6 +172,7 @@ const CommunityPage: React.FC = () => {
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
   const [newPostLink, setNewPostLink] = useState<PostLinkAttachment | null>(null);
+  const [newPostCoin, setNewPostCoin] = useState<PostCoinAttachment | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const isLgUp = useMediaQuery('(min-width: 1024px)');
@@ -637,7 +639,10 @@ const CommunityPage: React.FC = () => {
   // ЕДИНСТВЕННАЯ функция handleCreatePost (удалите дубликат ниже)
   const handleCreatePost = async () => {
     const hasLink = Boolean(newPostLink?.title?.trim() && newPostLink?.url?.trim());
-    if ((!newPostContent.trim() && newPostMedia.length === 0 && !hasLink) || !token || !canPost || isPosting) return;
+    const hasCoin = Boolean(
+      newPostCoin?.coinId?.trim() && newPostCoin?.name?.trim() && newPostCoin?.symbol?.trim()
+    );
+    if ((!newPostContent.trim() && newPostMedia.length === 0 && !hasLink && !hasCoin) || !token || !canPost || isPosting) return;
     
     try {
       setIsPosting(true);
@@ -651,6 +656,7 @@ const CommunityPage: React.FC = () => {
           content: newPostContent, 
           media: newPostMedia,
           linkAttachment: hasLink ? newPostLink : undefined,
+          coinAttachment: hasCoin ? newPostCoin : undefined,
           community: community?._id,
           isPrivate: postVisibility === 'private'
         })
@@ -879,6 +885,7 @@ const CommunityPage: React.FC = () => {
     setNewPostContent('');
     setNewPostMedia([]);
     setNewPostLink(null);
+    setNewPostCoin(null);
   }, []);
   const chatInstances =
     community?.installedAppInstances?.filter((i) => i.appId === COMMUNITY_APP_IDS.CHAT) ?? [];
@@ -1534,6 +1541,8 @@ const CommunityPage: React.FC = () => {
                       onMediaChange={setNewPostMedia}
                       linkAttachment={newPostLink}
                       onLinkAttachmentChange={setNewPostLink}
+                      coinAttachment={newPostCoin}
+                      onCoinAttachmentChange={setNewPostCoin}
                       onCancel={closeComposer}
                       onSubmit={() => void handleCreatePost()}
                       isPosting={isPosting}
@@ -1705,32 +1714,12 @@ const CommunityPage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => navigate(communityStorePath(handle))}
-                          className="mr-1 flex h-9 w-9 items-center justify-center rounded-lg bg-[#eef2ff] text-[#315efb] transition-colors hover:bg-[#dfe7ff]"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#eef2ff] text-[#315efb] transition-colors hover:bg-[#dfe7ff]"
                           title={t('community.addFromStoreTitle')}
                         >
                           <Plus className="h-5 w-5" />
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => setProductsView('list')}
-                        className={`rounded-lg p-2 transition-colors ${
-                          productsView === 'list' ? 'bg-[#eef2ff] text-[#315efb]' : 'text-neutral-500 hover:bg-neutral-100'
-                        }`}
-                        title={t('community.listViewTitle')}
-                      >
-                        <LayoutList className="h-5 w-5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setProductsView('grid')}
-                        className={`rounded-lg p-2 transition-colors ${
-                          productsView === 'grid' ? 'bg-[#eef2ff] text-[#315efb]' : 'text-neutral-500 hover:bg-neutral-100'
-                        }`}
-                        title={t('community.gridViewTitle')}
-                      >
-                        <LayoutGrid className="h-5 w-5" />
-                      </button>
                     </div>
                   </div>
 

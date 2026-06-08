@@ -38,6 +38,18 @@ html, body {
   overflow: hidden;
 }
 
+/* TON Connect wallet picker must sit above app modals (z-120 … z-300) */
+#tc-widget-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646 !important;
+  pointer-events: none;
+}
+
+#tc-widget-root > * {
+  pointer-events: auto;
+}
+
 :root {
   --app-header-height: 60px;
   --app-mobile-nav-height: 60px;

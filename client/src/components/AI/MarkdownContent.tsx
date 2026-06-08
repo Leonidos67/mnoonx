@@ -7,13 +7,13 @@ interface MarkdownContentProps {
 }
 
 const lightInline = {
-  strong: 'font-semibold text-emerald-700',
+  strong: 'font-semibold text-neutral-800',
   code: 'rounded bg-neutral-100 px-1.5 py-0.5 text-sm text-amber-800',
   link: 'text-[#315efb] underline-offset-2 hover:underline',
 };
 
 const darkInline = {
-  strong: 'font-semibold text-emerald-300',
+  strong: 'font-semibold text-neutral-100',
   code: 'rounded bg-white/10 px-1.5 py-0.5 text-sm text-amber-200',
   link: 'text-[#6ea8ff] underline-offset-2 hover:underline',
 };
@@ -97,6 +97,20 @@ function renderBlocks(content: string, variant: 'light' | 'dark'): React.ReactNo
     const trimmed = line.trim();
 
     if (!trimmed) {
+      i += 1;
+      continue;
+    }
+
+    if (/^-{3,}$/.test(trimmed)) {
+      i += 1;
+      continue;
+    }
+
+    if (/^_(.+)_$/.test(trimmed) || /DYOR|financial advice|финансовой рекомендац/i.test(trimmed)) {
+      const disclaimerText = trimmed.replace(/^_(.+)_$/, '$1');
+      pushBlock(
+        <p className="mt-3 text-[11px] leading-snug text-gray-400">{disclaimerText}</p>
+      );
       i += 1;
       continue;
     }
@@ -203,7 +217,7 @@ function renderBlocks(content: string, variant: 'light' | 'dark'): React.ReactNo
     }
 
     pushBlock(
-      <p className="mb-3 whitespace-pre-wrap last:mb-0">
+      <p className="mb-3 min-w-0 max-w-full break-words [overflow-wrap:anywhere] [word-break:break-word] whitespace-pre-wrap last:mb-0">
         {renderInline(paragraphLines.join(' '), `p-${blockIndex}`, variant)}
       </p>
     );
@@ -219,7 +233,9 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({
 }) => {
   const textColor = variant === 'light' ? 'text-neutral-700' : 'text-neutral-200';
   return (
-    <div className={`ai-markdown max-w-none text-[15px] leading-relaxed ${textColor} ${className}`}>
+    <div
+      className={`ai-markdown min-w-0 w-full max-w-full overflow-x-hidden text-[15px] leading-relaxed ${textColor} ${className}`}
+    >
       {renderBlocks(content, variant)}
     </div>
   );

@@ -19,6 +19,11 @@ const postSchema = new mongoose.Schema({
     title: { type: String, default: '', maxlength: 120 },
     url: { type: String, default: '', maxlength: 500 },
   },
+  coinAttachment: {
+    coinId: { type: String, default: '', maxlength: 64 },
+    name: { type: String, default: '', maxlength: 80 },
+    symbol: { type: String, default: '', maxlength: 16 },
+  },
   likes: [{
     type: String // ID пользователей которые лайкнули
   }],

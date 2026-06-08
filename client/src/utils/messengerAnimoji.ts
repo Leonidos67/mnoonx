@@ -1,4 +1,5 @@
 import { MessengerEmojiItem } from '../constants/messengerEmojis';
+import { coinPreviewLabel, isCoinOnlyMessage, parseCoinParams } from './messengerCoins';
 import { isStickerOnlyMessage, stickerPreviewLabel } from './messengerStickers';
 
 const ANIMOJI_TOKEN_RE =
@@ -6,13 +7,16 @@ const ANIMOJI_TOKEN_RE =
 
 const STICKER_TOKEN_RE = /\[\[sticker:([^\]]+)\]\]/g;
 
+const COIN_TOKEN_RE = /\[\[coin:([^\]]+)\]\]/g;
+
 const MESSAGE_TOKEN_RE =
-  /\[\[(animoji):id=([^;\]]+);emoji=([^;\]]+);(?:slug=([^;\]]+);)?url=([^\]]+)\]\]|\[\[(sticker):([^\]]+)\]\]/g;
+  /\[\[(animoji):id=([^;\]]+);emoji=([^;\]]+);(?:slug=([^;\]]+);)?url=([^\]]+)\]\]|\[\[(sticker):([^\]]+)\]\]|\[\[(coin):([^\]]+)\]\]/g;
 
 export type MessagePart =
   | { type: 'text'; value: string }
   | { type: 'animoji'; id: string; emoji: string; lottieUrl: string; slug?: string }
-  | { type: 'sticker'; packSlug: string; stickerId: string; imageUrl: string };
+  | { type: 'sticker'; packSlug: string; stickerId: string; imageUrl: string }
+  | { type: 'coin'; coinId: string; name: string; symbol: string };
 
 function parseStickerParams(inner: string): { packSlug: string; stickerId: string; imageUrl: string } | null {
   const params: Record<string, string> = {};
@@ -46,6 +50,10 @@ export function formatMessagePreview(text: string): string {
     const parsed = parseStickerParams(inner);
     return parsed ? stickerPreviewLabel(parsed.packSlug) : 'Sticker';
   });
+  out = out.replace(COIN_TOKEN_RE, (_full, inner) => {
+    const parsed = parseCoinParams(inner);
+    return parsed ? coinPreviewLabel(parsed) : 'Coin';
+  });
   return out;
 }
 
@@ -72,6 +80,11 @@ export function parseMessageParts(text: string): MessagePart[] {
       if (sticker) {
         parts.push({ type: 'sticker', ...sticker });
       }
+    } else if (match[8] === 'coin') {
+      const coin = parseCoinParams(match[9]);
+      if (coin) {
+        parts.push({ type: 'coin', ...coin });
+      }
     }
     lastIndex = match.index + match[0].length;
   }
@@ -90,9 +103,10 @@ export function isAnimojiOnlyMessage(text: string): boolean {
 
 export function isAttachmentOnlyMessage(text: string): boolean {
   const trimmed = text.trim();
-  return isAnimojiOnlyMessage(trimmed) || isStickerOnlyMessage(trimmed);
+  return isAnimojiOnlyMessage(trimmed) || isStickerOnlyMessage(trimmed) || isCoinOnlyMessage(trimmed);
 }
 
+export { isCoinOnlyMessage } from './messengerCoins';
 export { isStickerOnlyMessage } from './messengerStickers';
 
 /** Stored reply shape: `> quote…` block, blank line, then the sent message body. */

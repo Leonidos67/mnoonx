@@ -3,7 +3,10 @@
   "installCommand": "cd client && npm ci --legacy-peer-deps",
   "buildCommand": "cd client && CI=false npm run build",
   "outputDirectory": "client/build",
+  "env": {
+    "REACT_APP_SITE_URL": "https://mnoonx.fun"
+  },
   "rewrites": [
-    { "source": "/((?!static/).*)", "destination": "/index.html" }
+    { "source": "/((?!static/|tonconnect-manifest\\.json$|tonconnect-icon-180\\.png$).*)", "destination": "/index.html" }
   ]
 }

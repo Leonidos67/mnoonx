@@ -31,7 +31,14 @@ function friendlyError(status, rawMessage) {
 /**
  * @param {{ system?: string, user: string, maxTokens?: number, temperature?: number, model?: string }} opts
  */
-async function generateText({ system, user, maxTokens = 1200, temperature = 0.7, model }) {
+async function generateText({
+  system,
+  user,
+  maxTokens = 1200,
+  temperature = 0.7,
+  model,
+  useGoogleSearch = false,
+}) {
   const modelId = model || getModel();
   const url = `${GEMINI_BASE}/models/${encodeURIComponent(modelId)}:generateContent`;
 
@@ -45,6 +52,10 @@ async function generateText({ system, user, maxTokens = 1200, temperature = 0.7,
 
   if (system) {
     body.systemInstruction = { parts: [{ text: system }] };
+  }
+
+  if (useGoogleSearch) {
+    body.tools = [{ google_search: {} }];
   }
 
   const res = await fetch(url, {
@@ -88,7 +99,13 @@ async function generateText({ system, user, maxTokens = 1200, temperature = 0.7,
 /**
  * OpenAI-style messages → Gemini generateText
  */
-async function chatCompletion({ messages, maxTokens = 1200, temperature = 0.65, model }) {
+async function chatCompletion({
+  messages,
+  maxTokens = 1200,
+  temperature = 0.65,
+  model,
+  useGoogleSearch = false,
+}) {
   const list = Array.isArray(messages) ? messages : [];
   const system = list
     .filter((m) => m.role === 'system')
@@ -105,6 +122,7 @@ async function chatCompletion({ messages, maxTokens = 1200, temperature = 0.65, 
     maxTokens,
     temperature,
     model,
+    useGoogleSearch,
   });
 }
 

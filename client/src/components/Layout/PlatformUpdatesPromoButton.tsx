@@ -98,9 +98,7 @@ const PlatformUpdatesPromoButton: React.FC = () => {
   if (!visible || location.pathname === PLATFORM_UPDATES_PATH) {
     return null;
   }
-
-  const promoLabel = t('platformUpdates.promoButtonAria', { version: `v${latestVersionLabel}` });
-
+  
   return (
     <div className="relative shrink-0 pr-1 pt-1">
       <button
@@ -115,8 +113,6 @@ const PlatformUpdatesPromoButton: React.FC = () => {
       <Link
         to={PLATFORM_UPDATES_PATH}
         className="relative inline-flex shrink-0 items-center overflow-hidden rounded-full shadow-sm transition-transform hover:brightness-105 active:scale-[0.95]"
-        aria-label={promoLabel}
-        title={promoLabel}
       >
         <span className="pointer-events-none absolute inset-0" aria-hidden>
           <PromoGradientFallback />

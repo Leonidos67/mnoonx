@@ -46,6 +46,7 @@ import type { FeedPost } from '../types/postFeed';
 import PostMediaGallery from '../components/Posts/PostMediaGallery';
 import PostComposer from '../components/Posts/PostComposer';
 import PostContentBody from '../components/Posts/PostContentBody';
+import type { PostCoinAttachment } from '../types/postCoin';
 import type { PostLinkAttachment } from '../types/postLink';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
@@ -110,6 +111,7 @@ const UserProfileComponent: React.FC = () => {
   const [reposts, setReposts] = useState<FeedPost[]>([]);
   const [repostsLoading, setRepostsLoading] = useState(false);
   const [searchFollower, setSearchFollower] = useState('');
+  const [connectionsTab, setConnectionsTab] = useState<'followers' | 'following'>('followers');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [profileMenuAnchor, setProfileMenuAnchor] = useState<{ rect: DOMRect } | null>(null);
   const [followersSheetOpen, setFollowersSheetOpen] = useState(false);
@@ -122,6 +124,7 @@ const UserProfileComponent: React.FC = () => {
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
   const [newPostLink, setNewPostLink] = useState<PostLinkAttachment | null>(null);
+  const [newPostCoin, setNewPostCoin] = useState<PostCoinAttachment | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [showPostCreator, setShowPostCreator] = useState(false);
   const mobileComposerFull = showPostCreator && !isLgUp && activeTab === 'posts';
@@ -498,11 +501,15 @@ const UserProfileComponent: React.FC = () => {
     setNewPostContent('');
     setNewPostMedia([]);
     setNewPostLink(null);
+    setNewPostCoin(null);
   }, []);
 
   const handleCreatePost = async () => {
     const hasLink = Boolean(newPostLink?.title?.trim() && newPostLink?.url?.trim());
-    if ((!newPostContent.trim() && newPostMedia.length === 0 && !hasLink) || !token || isPosting) return;
+    const hasCoin = Boolean(
+      newPostCoin?.coinId?.trim() && newPostCoin?.name?.trim() && newPostCoin?.symbol?.trim()
+    );
+    if ((!newPostContent.trim() && newPostMedia.length === 0 && !hasLink && !hasCoin) || !token || isPosting) return;
     try {
       setIsPosting(true);
       const res = await fetch(POSTS_API_URL, {
@@ -515,6 +522,7 @@ const UserProfileComponent: React.FC = () => {
           content: newPostContent,
           media: newPostMedia,
           linkAttachment: hasLink ? newPostLink : undefined,
+          coinAttachment: hasCoin ? newPostCoin : undefined,
         })
       });
       if (!res.ok) {
@@ -530,6 +538,7 @@ const UserProfileComponent: React.FC = () => {
       setNewPostContent('');
       setNewPostMedia([]);
       setNewPostLink(null);
+      setNewPostCoin(null);
       closeComposer();
       showToast(t('common.postPublished'));
       tryAwardActivity('post');
@@ -628,6 +637,44 @@ const UserProfileComponent: React.FC = () => {
     (f) =>
       f.fullName?.toLowerCase().includes(searchFollower.toLowerCase()) ||
       f.username?.toLowerCase().includes(searchFollower.toLowerCase())
+  );
+
+  const activeConnectionUsers =
+    connectionsTab === 'followers' ? filteredFollowers : filteredFollowing;
+  const connectionSearchPlaceholder =
+    connectionsTab === 'followers'
+      ? t('userProfile.searchFollowersPlaceholder')
+      : t('userProfile.searchFollowingPlaceholder');
+  const connectionEmptySearch =
+    connectionsTab === 'followers'
+      ? t('userProfile.noFollowersFound')
+      : t('userProfile.noFollowingFound');
+  const connectionEmptyList =
+    connectionsTab === 'followers'
+      ? t('userProfile.noFollowersYet')
+      : t('userProfile.notFollowingAnyone');
+
+  const renderConnectionUser = (person: FollowerUser) => (
+    <Link
+      key={person._id || person.username}
+      to={`/@${person.username}`}
+      className="group flex items-center gap-3 rounded-xl p-3 transition-colors hover:bg-neutral-50"
+    >
+      <img
+        src={
+          person.avatar ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(person.fullName || person.username)}&background=000&color=fff&size=40&bold=true`
+        }
+        alt={person.fullName || person.username}
+        className="h-10 w-10 shrink-0 rounded-full"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold group-hover:underline">
+          {person.fullName || person.username}
+        </p>
+        <p className="truncate text-sm text-neutral-500">@{person.username}</p>
+      </div>
+    </Link>
   );
 
   const openProfileMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -805,6 +852,7 @@ const UserProfileComponent: React.FC = () => {
               <PostContentBody
                 content={post.content}
                 linkAttachment={post.linkAttachment}
+                coinAttachment={post.coinAttachment}
                 contentClassName="text-neutral-900 leading-relaxed whitespace-pre-wrap break-words text-[15px]"
               />
             </div>
@@ -953,7 +1001,8 @@ const UserProfileComponent: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full min-w-0 max-w-[1200px] gap-6 overflow-x-hidden">
+    <div className="mx-auto flex h-full min-h-0 w-full min-w-0 max-w-[1200px] gap-0 overflow-x-hidden">
+
       <div className="flex h-full min-h-0 min-w-0 max-w-[600px] flex-1 flex-col overflow-hidden border-x border-neutral-200 bg-white">
         <div
           ref={profileScrollRef}
@@ -1168,7 +1217,10 @@ const UserProfileComponent: React.FC = () => {
               type="button"
               className="hover:underline"
               onClick={() => {
-                if (!isLgUp) setFollowingSheetOpen(true);
+                if (!isLgUp) {
+                  setConnectionsTab('following');
+                  setFollowingSheetOpen(true);
+                }
               }}
             >
               <span className="font-bold text-neutral-900">{formatCount(profile.followingCount || 0)}</span>
@@ -1178,7 +1230,10 @@ const UserProfileComponent: React.FC = () => {
               type="button"
               className="hover:underline"
               onClick={() => {
-                if (!isLgUp) setFollowersSheetOpen(true);
+                if (!isLgUp) {
+                  setConnectionsTab('followers');
+                  setFollowersSheetOpen(true);
+                }
               }}
             >
               <span className="font-bold text-neutral-900">{formatCount(profile.followersCount || 0)}</span>
@@ -1226,6 +1281,8 @@ const UserProfileComponent: React.FC = () => {
             onMediaChange={setNewPostMedia}
             linkAttachment={newPostLink}
             onLinkAttachmentChange={setNewPostLink}
+            coinAttachment={newPostCoin}
+            onCoinAttachmentChange={setNewPostCoin}
             onCancel={closeComposer}
             onSubmit={() => void handleCreatePost()}
             isPosting={isPosting}
@@ -1280,7 +1337,7 @@ const UserProfileComponent: React.FC = () => {
 
       </div>
 
-      <div className="hidden h-full min-h-0 w-[400px] min-w-0 shrink-0 flex-col overflow-x-hidden py-4 pr-4 lg:flex">
+      <div className="hidden h-full min-h-0 w-[400px] min-w-0 shrink-0 flex-col overflow-x-hidden border-r border-neutral-200 lg:flex">
         <div className="flex min-h-0 flex-1 flex-col">
           {selectedPost ? (
             <PostDetailPanel
@@ -1302,50 +1359,62 @@ const UserProfileComponent: React.FC = () => {
               }}
             />
           ) : (
-            <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto">
-          <div className="rounded-2xl bg-neutral-50 p-4">
-            <h2 className="text-xl font-bold mb-4">{t('userProfile.followersHeading', { count: followers.length })}</h2>
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-neutral-400" />
-              <input type="text" value={searchFollower} onChange={(e) => setSearchFollower(e.target.value)} placeholder={t('userProfile.searchFollowersPlaceholder')}
-                className="w-full pl-9 pr-4 py-2 bg-white border border-neutral-200 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-black/10 transition-all" />
-            </div>
-            <div className="space-y-1 max-h-[400px] overflow-y-auto">
-              {filteredFollowers.length > 0 ? filteredFollowers.map(follower => (
-                <Link key={follower._id || follower.username} to={`/@${follower.username}`} className="flex items-center justify-between p-3 hover:bg-white rounded-xl transition-colors group">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img src={follower.avatar || `https://ui-avatars.com/api/?name=${follower.fullName || follower.username}&background=000&color=fff&size=40&bold=true`}
-                      alt={follower.fullName || follower.username} className="w-10 h-10 rounded-full flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm truncate group-hover:underline">{follower.fullName || follower.username}</p>
-                      <p className="text-sm text-neutral-500 truncate">@{follower.username}</p>
-                    </div>
+            <div className="flex h-full min-h-0 flex-col overflow-hidden p-4">
+              <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl bg-neutral-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConnectionsTab('followers');
+                    setSearchFollower('');
+                  }}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    connectionsTab === 'followers'
+                      ? 'bg-white text-neutral-900 shadow-sm'
+                      : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  {t('userProfile.followers')}
+                  <span className="ml-1 text-neutral-500">{formatCount(profile.followersCount || followers.length)}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConnectionsTab('following');
+                    setSearchFollower('');
+                  }}
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+                    connectionsTab === 'following'
+                      ? 'bg-white text-neutral-900 shadow-sm'
+                      : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  {t('userProfile.following')}
+                  <span className="ml-1 text-neutral-500">{formatCount(profile.followingCount || following.length)}</span>
+                </button>
+              </div>
+
+              <div className="relative mb-4 shrink-0">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="text"
+                  value={searchFollower}
+                  onChange={(e) => setSearchFollower(e.target.value)}
+                  placeholder={connectionSearchPlaceholder}
+                  className="w-full rounded-full border border-neutral-200 bg-white py-2 pl-9 pr-4 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-black/10"
+                />
+              </div>
+
+              <div className="min-h-0 flex-1 space-y-1 overflow-y-auto">
+                {activeConnectionUsers.length > 0 ? (
+                  activeConnectionUsers.map(renderConnectionUser)
+                ) : (
+                  <div className="py-8 text-center">
+                    <p className="text-sm text-neutral-500">
+                      {searchFollower.trim() ? connectionEmptySearch : connectionEmptyList}
+                    </p>
                   </div>
-                </Link>
-              )) : (
-                <div className="text-center py-8"><p className="text-neutral-500 text-sm">{searchFollower ? t('userProfile.noFollowersFound') : t('userProfile.noFollowersYet')}</p></div>
-              )}
-            </div>
-          </div>
-          <div className="bg-neutral-50 rounded-2xl p-4">
-            <h2 className="text-xl font-bold mb-4">{t('userProfile.followingHeading', { count: following.length })}</h2>
-            <div className="space-y-1 max-h-[300px] overflow-y-auto">
-              {following.length > 0 ? following.slice(0, 5).map(follow => (
-                <Link key={follow._id || follow.username} to={`/@${follow.username}`} className="flex items-center justify-between p-3 hover:bg-white rounded-xl transition-colors group">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img src={follow.avatar || `https://ui-avatars.com/api/?name=${follow.fullName || follow.username}&background=000&color=fff&size=40&bold=true`}
-                      alt={follow.fullName || follow.username} className="w-10 h-10 rounded-full flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm truncate group-hover:underline">{follow.fullName || follow.username}</p>
-                      <p className="text-sm text-neutral-500 truncate">@{follow.username}</p>
-                    </div>
-                  </div>
-                </Link>
-              )) : (
-                <div className="text-center py-8"><p className="text-neutral-500 text-sm">{t('userProfile.notFollowingAnyone')}</p></div>
-              )}
-            </div>
-          </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1475,8 +1544,8 @@ const UserProfileComponent: React.FC = () => {
         users={filteredFollowing}
         search={searchFollower}
         onSearchChange={setSearchFollower}
-        searchPlaceholder={t('userProfile.searchFollowersPlaceholder')}
-        emptySearch={t('userProfile.noFollowersFound')}
+        searchPlaceholder={t('userProfile.searchFollowingPlaceholder')}
+        emptySearch={t('userProfile.noFollowingFound')}
         emptyList={t('userProfile.notFollowingAnyone')}
       />
 

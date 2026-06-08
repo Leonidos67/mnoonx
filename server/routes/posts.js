@@ -61,6 +61,33 @@ function serializeLinkAttachment(linkAttachment) {
   };
 }
 
+function serializeCoinAttachment(coinAttachment) {
+  const coinId = String(coinAttachment?.coinId || '').trim().toLowerCase();
+  const name = String(coinAttachment?.name || '').trim();
+  const symbol = String(coinAttachment?.symbol || '').trim().toLowerCase();
+  if (!coinId || !name || !symbol) return null;
+  return {
+    coinId: coinId.slice(0, 64),
+    name: name.slice(0, 80),
+    symbol: symbol.slice(0, 16),
+  };
+}
+
+function parseCoinAttachmentInput(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const coinId = String(raw.coinId || '').trim().toLowerCase();
+  const name = String(raw.name || '').trim();
+  const symbol = String(raw.symbol || '').trim().toLowerCase();
+  if (!coinId || !name || !symbol) return { error: 'Coin id, name and symbol are required' };
+  if (!/^[a-z0-9_-]+$/.test(coinId)) return { error: 'Invalid coin id' };
+  if (!/^[a-z0-9]+$/.test(symbol)) return { error: 'Invalid coin symbol' };
+  return {
+    coinId: coinId.slice(0, 64),
+    name: name.slice(0, 80),
+    symbol: symbol.slice(0, 16),
+  };
+}
+
 async function parseLinkAttachmentInput(raw, userId) {
   if (!raw || typeof raw !== 'object') return null;
   const title = String(raw.title || '').trim();
@@ -176,7 +203,7 @@ async function serializePostComments(comments) {
 // POST /api/posts - Создать пост
 router.post('/', auth, requireAuth, async (req, res) => {
   try {
-    const { content, media, community, isPrivate, linkAttachment: linkRaw } = req.body;
+    const { content, media, community, isPrivate, linkAttachment: linkRaw, coinAttachment: coinRaw } = req.body;
     const authorId = req.userId.toString();
 
     console.log('\n📝 CREATE POST');
@@ -193,8 +220,13 @@ router.post('/', auth, requireAuth, async (req, res) => {
       return res.status(400).json({ message: linkParsed.error });
     }
 
-    if (!trimmedContent && mediaList.length === 0 && !linkParsed) {
-      return res.status(400).json({ message: 'Add text, a link, or at least one image' });
+    const coinParsed = parseCoinAttachmentInput(coinRaw);
+    if (coinParsed?.error) {
+      return res.status(400).json({ message: coinParsed.error });
+    }
+
+    if (!trimmedContent && mediaList.length === 0 && !linkParsed && !coinParsed) {
+      return res.status(400).json({ message: 'Add text, a link, a coin chart, or at least one image' });
     }
 
     if (community) {
@@ -225,6 +257,7 @@ router.post('/', auth, requireAuth, async (req, res) => {
       community: community || null,
       isPrivate: isPrivate || false,
       linkAttachment: linkParsed || undefined,
+      coinAttachment: coinParsed || undefined,
     });
 
     await post.save();
@@ -233,6 +266,7 @@ router.post('/', auth, requireAuth, async (req, res) => {
     const { serializeFeedPost } = require('../services/postSerialize');
     const postData = await serializeFeedPost(post, req.userId);
     postData.linkAttachment = serializeLinkAttachment(post.linkAttachment);
+    postData.coinAttachment = serializeCoinAttachment(post.coinAttachment);
     postData.isBookmarked = false;
 
     res.status(201).json(postData);
@@ -316,6 +350,7 @@ router.get('/', auth, async (req, res) => {
         community: communityInfo,
         media: post.media || [],
         linkAttachment: serializeLinkAttachment(post.linkAttachment),
+        coinAttachment: serializeCoinAttachment(post.coinAttachment),
         likesCount: post.likesCount || 0,
         commentsCount: post.commentsCount || 0,
         repostsCount: post.repostsCount || 0,
@@ -386,6 +421,7 @@ router.get('/:id', auth, async (req, res) => {
       community: communityInfo,
       media: post.media || [],
       linkAttachment: serializeLinkAttachment(post.linkAttachment),
+      coinAttachment: serializeCoinAttachment(post.coinAttachment),
       likesCount: post.likesCount || 0,
       commentsCount: post.commentsCount || 0,
       comments,

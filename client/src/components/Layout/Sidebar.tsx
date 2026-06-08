@@ -15,6 +15,7 @@ import {
   ChevronRight,
   HeartHandshake,
   BookMarked,
+  BriefcaseBusiness,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -88,6 +89,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
   const navItems = useMemo(
     () => [
       { nameKey: 'nav.home' as const, icon: House, path: '/', end: true },
+      { nameKey: 'nav.discover' as const, icon: Compass, path: '/discover', end: false },
       {
         nameKey: 'nav.profile' as const,
         icon: User,
@@ -95,7 +97,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
         isActive: isProfileActive,
         skipPathMatch: true,
       },
-      { nameKey: 'nav.discover' as const, icon: Compass, path: '/discover', end: false },
     ],
     [profileHref, isProfileActive, t]
   );
@@ -113,7 +114,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
   };
 
   const userMenuPanelClass =
-    'absolute bottom-full left-0 right-0 mb-1 rounded-lg border border-neutral-200 bg-white p-1 z-50 shadow-lg';
+    'absolute bottom-full left-0 right-0 p-1 z-50';
   const userMenuItemClass =
     'w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-50 transition-colors flex items-center gap-2 text-neutral-800';
   const langSubmenuClass =
@@ -248,6 +249,15 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                   {t('nav.profile')}
                 </Link>
                 <Link
+                  to="/portfolio-tracker"
+                  role="menuitem"
+                  onClick={() => setUserMenuOpen(false)}
+                  className={userMenuItemClass}
+                >
+                  <BriefcaseBusiness size={14} className="shrink-0 text-neutral-500" />
+                  {t('nav.portfolioTracker')}
+                </Link>
+                <Link
                   to="/settings"
                   role="menuitem"
                   onClick={() => setUserMenuOpen(false)}
@@ -266,7 +276,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                   {t('nav.plan')}
                 </Link>
                 <Link
-                  to="/support"
+                  to="/docs/support"
                   role="menuitem"
                   onClick={() => setUserMenuOpen(false)}
                   className={userMenuItemClass}
@@ -290,7 +300,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                     />
                   </div>
                   <div
-                    className="pointer-events-none invisible absolute left-full top-0 z-[60] ml-0.5 pl-1 opacity-0 transition-[opacity,visibility] duration-150 group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100"
+                    className="pointer-events-none invisible absolute left-full top-0 z-[60] opacity-0 transition-[opacity,visibility] duration-150 group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100"
                     role="menu"
                     aria-label={t('nav.changeLanguage')}
                   >

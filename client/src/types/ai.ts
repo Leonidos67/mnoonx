@@ -7,11 +7,30 @@ export interface CoinMarketRow {
   market_cap: number | null;
   market_cap_rank: number | null;
   total_volume: number | null;
+  price_change_percentage_1h?: number | null;
   price_change_percentage_24h: number | null;
   price_change_percentage_7d?: number | null;
+  price_change_percentage_30d?: number | null;
   high_24h?: number | null;
   low_24h?: number | null;
+  circulating_supply?: number | null;
+  total_supply?: number | null;
+  max_supply?: number | null;
+  ath?: number | null;
+  ath_change_percentage?: number | null;
+  fully_diluted_valuation?: number | null;
+  sparkline_7d?: number[];
   score?: number | null;
+}
+
+export interface GlobalMetrics {
+  totalMarketCap: number;
+  totalVolume24h: number;
+  marketCapChange24h: number;
+  btcDominance: number;
+  ethDominance: number;
+  activeCryptocurrencies: number;
+  markets: number;
 }
 
 export interface MarketStats {
@@ -36,6 +55,7 @@ export interface MarketsResponse {
   markets: CoinMarketRow[];
   highTrust: CoinMarketRow[];
   trending: CoinMarketRow[];
+  globalMetrics?: GlobalMetrics | null;
   marketStats?: MarketStats;
   disclaimer: string;
 }
@@ -79,6 +99,7 @@ export interface CoinDetail {
   total_volume: number | null;
   high_24h: number | null;
   low_24h: number | null;
+  price_change_percentage_1h?: number | null;
   price_change_percentage_24h: number | null;
   price_change_percentage_7d: number | null;
   price_change_percentage_30d: number | null;

@@ -1,8 +1,15 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { File, Image, Smile, Sticker, X, type LucideIcon } from 'lucide-react';
+import { CandlestickChart, File, Image, Smile, Sticker, X, type LucideIcon } from 'lucide-react';
+import { useTranslation } from '../../i18n/useTranslation';
 
-export type AttachmentMenuAction = 'documents' | 'media' | 'animated-emoji' | 'stickers' | 'close';
+export type AttachmentMenuAction =
+  | 'documents'
+  | 'media'
+  | 'animated-emoji'
+  | 'stickers'
+  | 'coin'
+  | 'close';
 
 interface MessengerAttachmentMenuProps {
   onSelect: (action: AttachmentMenuAction) => void;
@@ -74,6 +81,8 @@ const MessengerAttachmentMenu: React.FC<MessengerAttachmentMenuProps> = ({
   onDocumentsSelected,
   onMediaSelected,
 }) => {
+  const { t } = useTranslation();
+
   return (
     <motion.div
       role="dialog"
@@ -102,7 +111,7 @@ const MessengerAttachmentMenu: React.FC<MessengerAttachmentMenuProps> = ({
             icon={File}
             bgClassName="bg-gradient-to-br from-violet-400 to-indigo-600"
           />
-          Documents
+          {t('messenger.attachmentMenu.documents')}
         </motion.label>
 
         <motion.label className={rowClass} variants={itemVariants}>
@@ -119,7 +128,7 @@ const MessengerAttachmentMenu: React.FC<MessengerAttachmentMenuProps> = ({
             }}
           />
           <MenuIconBadge icon={Image} bgClassName="bg-gradient-to-br from-emerald-400 to-green-600" />
-          Media
+          {t('messenger.attachmentMenu.media')}
         </motion.label>
 
         <motion.button
@@ -132,7 +141,7 @@ const MessengerAttachmentMenu: React.FC<MessengerAttachmentMenuProps> = ({
             icon={Smile}
             bgClassName="bg-gradient-to-br from-fuchsia-400 to-violet-600"
           />
-          Animated emoji
+          {t('messenger.attachmentMenu.animatedEmoji')}
         </motion.button>
 
         <motion.button
@@ -145,12 +154,25 @@ const MessengerAttachmentMenu: React.FC<MessengerAttachmentMenuProps> = ({
             icon={Sticker}
             bgClassName="bg-gradient-to-br from-amber-400 to-orange-500"
           />
-          Stickers
+          {t('messenger.attachmentMenu.stickers')}
+        </motion.button>
+
+        <motion.button
+          type="button"
+          className={rowClass}
+          variants={itemVariants}
+          onClick={() => onSelect('coin')}
+        >
+          <MenuIconBadge
+            icon={CandlestickChart}
+            bgClassName="bg-gradient-to-br from-sky-400 to-blue-600"
+          />
+          {t('messenger.attachmentMenu.coin')}
         </motion.button>
 
         <motion.button type="button" className={rowClass} variants={itemVariants} onClick={() => onSelect('close')}>
           <MenuIconBadge icon={X} bgClassName="bg-neutral-200" iconClassName="text-neutral-500" />
-          Close
+          {t('messenger.attachmentMenu.close')}
         </motion.button>
       </motion.div>
     </motion.div>

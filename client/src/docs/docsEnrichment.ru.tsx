@@ -1,7 +1,9 @@
 import React from 'react';
 import type { DocsArticleProps, DocSection, DocStep, DocsFaqItem } from '../components/Docs/DocsArticle';
 
-type PageKey = `${string}/${string}`;
+import type { DocsPageKey } from './docsPagesShared';
+
+type PageKey = DocsPageKey;
 
 interface SectionDef {
   heading: string;
@@ -569,7 +571,7 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
   },
 };
 
-export function applyDocsEnrichment(
+export function applyDocsEnrichmentRu(
   key: PageKey,
   base: Omit<DocsArticleProps, 'prev' | 'next'>
 ): Omit<DocsArticleProps, 'prev' | 'next'> {

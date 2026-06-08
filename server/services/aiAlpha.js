@@ -1,5 +1,6 @@
 const coingecko = require('./coingecko');
 const gemini = require('./gemini');
+const { buildCoinAnalysisTemplate } = require('./coinAnalysisTemplate');
 
 const DISCLAIMER = 'This is not financial advice. AI output can be wrong. Always DYOR.';
 
@@ -80,7 +81,93 @@ function parsePulseResponse(raw) {
   return { text: pulseText, sentiment };
 }
 
-async function runChat({ message, mode = 'analyze', previousResponse }) {
+const COIN_ENRICH_SYSTEM = `You are AI Alpha for MNOONX — a crypto intelligence assistant.
+
+The user receives a pre-filled market snapshot with exact numbers from CoinGecko. Your job is to ADD new sections using publicly available web information (news, ecosystem updates, narratives, regulatory context).
+
+Rules:
+- Write in the language requested (Russian or English).
+- Do NOT change, reformat, or repeat the snapshot numbers — only append new sections after it.
+- Add exactly these Markdown sections:
+  ## Recent developments
+  ## Market context & outlook
+  ## Key risks to watch
+- In Recent developments, cite 2–4 recent public sources briefly (outlet or topic, not long URLs).
+- Be specific to the asset; if little recent news exists, say so honestly.
+- Keep the full addition under ~350 words.
+- No price predictions or guaranteed outcomes.`;
+
+async function runCoinAnalyze({ message, coinContext, locale = 'en' }) {
+  const userMessage = String(message || '').trim();
+  if (!coinContext || typeof coinContext !== 'object') {
+    const err = new Error('Coin context is required');
+    err.status = 400;
+    throw err;
+  }
+
+  const lang = locale === 'ru' ? 'ru' : 'en';
+  const baseTemplate = buildCoinAnalysisTemplate(coinContext, lang);
+  const assetLabel = `${coinContext.name} (${String(coinContext.symbol || '').toUpperCase()})`;
+  const langLabel = lang === 'ru' ? 'Russian' : 'English';
+
+  const enrichPrompt = `User request: ${userMessage || `Analyze ${assetLabel}`}
+
+Pre-filled snapshot (keep these numbers unchanged — do not repeat this block in your reply):
+---
+${baseTemplate}
+---
+
+Using open public web sources, append the three sections listed in your instructions for ${assetLabel}.
+Write in ${langLabel}. Return ONLY the three new sections (## Recent developments, ## Market context & outlook, ## Key risks to watch).`;
+
+  let enrichment = '';
+  try {
+    enrichment = await gemini.chatCompletion({
+      messages: [
+        { role: 'system', content: COIN_ENRICH_SYSTEM },
+        { role: 'user', content: enrichPrompt },
+      ],
+      maxTokens: 1200,
+      temperature: 0.65,
+      useGoogleSearch: true,
+    });
+  } catch (searchErr) {
+    console.warn('Coin analyze: Google Search enrichment failed, falling back', searchErr.message);
+    try {
+      enrichment = await gemini.chatCompletion({
+        messages: [
+          { role: 'system', content: COIN_ENRICH_SYSTEM },
+          {
+            role: 'user',
+            content: `${enrichPrompt}\n\n(Web search unavailable — use general public knowledge and note that live news could not be fetched.)`,
+          },
+        ],
+        maxTokens: 1000,
+        temperature: 0.6,
+        useGoogleSearch: false,
+      });
+    } catch (fallbackErr) {
+      console.warn('Coin analyze: enrichment unavailable, returning snapshot only', fallbackErr.message);
+      enrichment = '';
+    }
+  }
+
+  const disclaimer =
+    lang === 'ru'
+      ? 'Не является финансовой рекомендацией. Ответ AI может содержать ошибки. Всегда проводите собственное исследование.'
+      : DISCLAIMER;
+
+  const reply = enrichment.trim()
+    ? `${baseTemplate}\n\n${enrichment.trim()}\n\n_${disclaimer}_`
+    : `${baseTemplate}\n\n_${disclaimer}_`;
+  return { reply, disclaimer };
+}
+
+async function runChat({ message, mode = 'analyze', previousResponse, coinContext, locale }) {
+  if (mode === 'coin_analyze') {
+    return runCoinAnalyze({ message, coinContext, locale });
+  }
+
   const userMessage = String(message || '').trim();
   if (!userMessage && mode !== 'rewrite') {
     const err = new Error('Message is required');
@@ -165,6 +252,7 @@ async function runPulse() {
 
 module.exports = {
   runChat,
+  runCoinAnalyze,
   runPulse,
   DISCLAIMER,
 };

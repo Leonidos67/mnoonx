@@ -1,9 +1,11 @@
 import React from 'react';
 import AnimojiPlayer from './AnimojiPlayer';
+import MessengerCoinMessageCard from './MessengerCoinMessageCard';
 import {
   formatMessagePreview,
   getMessageBody,
   isAnimojiOnlyMessage,
+  isCoinOnlyMessage,
   isStickerOnlyMessage,
   parseMessageParts,
   splitReplyMessage,
@@ -25,6 +27,7 @@ const MessengerMessageBody: React.FC<MessengerMessageBodyProps> = ({
   const parts = parseMessageParts(displayText);
   const animojiOnly = isAnimojiOnlyMessage(displayText);
   const stickerOnly = isStickerOnlyMessage(displayText);
+  const coinOnly = isCoinOnlyMessage(displayText);
 
   const quoteLabel =
     quoteBlock &&
@@ -69,6 +72,18 @@ const MessengerMessageBody: React.FC<MessengerMessageBodyProps> = ({
     );
   }
 
+  if (coinOnly && parts[0]?.type === 'coin') {
+    const part = parts[0];
+    return (
+      <div className={className}>
+        {quoteLabel ? (
+          <p className={`line-clamp-2 ${quoteClassName}`}>{formatMessagePreview(quoteLabel)}</p>
+        ) : null}
+        <MessengerCoinMessageCard coin={part} />
+      </div>
+    );
+  }
+
   return (
     <div className={className}>
       {quoteLabel ? (
@@ -101,6 +116,13 @@ const MessengerMessageBody: React.FC<MessengerMessageBodyProps> = ({
                 className="inline-block h-24 w-24 align-middle object-contain"
                 draggable={false}
               />
+            );
+          }
+          if (part.type === 'coin') {
+            return (
+              <span key={`coin-${index}`} className="my-1 block">
+                <MessengerCoinMessageCard coin={part} compact />
+              </span>
             );
           }
           if (!part.value) return null;

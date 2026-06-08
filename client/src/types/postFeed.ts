@@ -11,6 +11,7 @@ export interface PostComment {
   };
 }
 
+import type { PostCoinAttachment } from './postCoin';
 import type { PostLinkAttachment } from './postLink';
 
 export interface FeedPost {
@@ -35,6 +36,7 @@ export interface FeedPost {
   viewsCount?: number;
   media: string[];
   linkAttachment?: PostLinkAttachment | null;
+  coinAttachment?: PostCoinAttachment | null;
   createdAt: string;
   isLiked?: boolean;
   isReposted?: boolean;

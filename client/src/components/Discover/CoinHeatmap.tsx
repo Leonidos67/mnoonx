@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import type { CoinMarketRow } from '../../types/ai';
 import { formatPct } from '../AI/marketFormat';
 import { heatmapChangeBg, heatmapTextOnBg } from './heatmapColors';
+import { useTranslation } from '../../i18n/useTranslation';
 
 interface CoinHeatmapProps {
   coins: CoinMarketRow[];
@@ -10,6 +11,8 @@ interface CoinHeatmapProps {
 }
 
 const CoinHeatmap: React.FC<CoinHeatmapProps> = ({ coins, limit = 40, onSelect }) => {
+  const { t } = useTranslation();
+
   const tiles = useMemo(() => {
     return [...coins]
       .filter((c) => c.market_cap != null && c.market_cap > 0)
@@ -18,7 +21,7 @@ const CoinHeatmap: React.FC<CoinHeatmapProps> = ({ coins, limit = 40, onSelect }
   }, [coins, limit]);
 
   if (!tiles.length) {
-    return <p className="py-8 text-center text-sm text-neutral-500">Нет данных для карты</p>;
+    return <p className="py-8 text-center text-sm text-neutral-500">{t('discover.marketTab.heatmapNoData')}</p>;
   }
 
   const maxFlex = Math.sqrt(tiles[0]?.market_cap ?? 1);
@@ -57,15 +60,15 @@ const CoinHeatmap: React.FC<CoinHeatmapProps> = ({ coins, limit = 40, onSelect }
       </div>
       <div className="flex flex-wrap items-center justify-center gap-3 text-[10px] text-neutral-500">
         <span className="flex items-center gap-1">
-          <span className="h-2.5 w-6 rounded bg-red-600" /> &lt; −5%
+          <span className="h-2.5 w-6 rounded bg-red-600" /> {t('discover.marketTab.heatmapLegendNeg')}
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-2.5 w-6 rounded bg-neutral-500" /> 0%
+          <span className="h-2.5 w-6 rounded bg-neutral-500" /> {t('discover.marketTab.heatmapLegendZero')}
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-2.5 w-6 rounded bg-emerald-600" /> &gt; +5%
+          <span className="h-2.5 w-6 rounded bg-emerald-600" /> {t('discover.marketTab.heatmapLegendPos')}
         </span>
-        <span>Размер плитки ≈ рыночная капитализация · цвет = изменение 24ч</span>
+        <span>{t('discover.marketTab.heatmapLegendDesc')}</span>
       </div>
     </div>
   );

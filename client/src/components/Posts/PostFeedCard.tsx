@@ -201,6 +201,7 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
             <PostContentBody
               content={post.content}
               linkAttachment={post.linkAttachment}
+              coinAttachment={post.coinAttachment}
               contentClassName="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-neutral-900"
             />
           </div>

@@ -7,130 +7,97 @@ import {
   TrendingDown,
   TrendingUp,
   Volume2,
-  X,
 } from 'lucide-react';
 import CoinHeatmap from './CoinHeatmap';
+import { formatPct, formatUsd, pctClass } from '../AI/marketFormat';
 import type { CoinMarketRow } from '../../types/ai';
+import { useTranslation } from '../../i18n/useTranslation';
 
-export type MarketQuickToolId = 'heatmap' | 'movers' | 'trending' | 'volume';
+export type MarketQuickToolId = 'heatmap' | 'gainers' | 'losers' | 'trending' | 'volume';
 
 interface TokenRowProps {
   coin: CoinMarketRow;
   onSelect: (id: string, symbol: string, name: string) => void;
+  metric?: 'change' | 'volume';
 }
 
-const MiniTokenRow: React.FC<TokenRowProps> = ({ coin, onSelect }) => {
+const MarketTokenRow: React.FC<TokenRowProps> = ({ coin, onSelect, metric = 'change' }) => {
   const change = coin.price_change_percentage_24h;
-  const changeClass =
-    change == null ? 'text-neutral-500' : change > 0 ? 'text-emerald-600' : change < 0 ? 'text-red-600' : 'text-neutral-600';
 
   return (
     <button
       type="button"
       onClick={() => onSelect(coin.id, coin.symbol, coin.name)}
-      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-neutral-50"
+      className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left transition-colors hover:border-slate-200 hover:bg-slate-50"
     >
-      <img src={coin.image} alt="" className="h-7 w-7 rounded-full object-cover" />
-      <span className="min-w-0 flex-1 truncate text-sm font-medium">{coin.name}</span>
-      <span className={`text-xs font-semibold tabular-nums ${changeClass}`}>
-        {change != null ? `${change > 0 ? '+' : ''}${change.toFixed(2)}%` : '—'}
+      <span className="w-5 shrink-0 text-center text-xs font-medium tabular-nums text-slate-400">
+        {coin.market_cap_rank ?? '—'}
       </span>
+      <img src={coin.image} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold text-slate-900">{coin.name}</p>
+        <p className="text-xs uppercase text-slate-500">{coin.symbol}</p>
+      </div>
+      <div className="shrink-0 text-right">
+        {coin.current_price != null ? (
+          <p className="text-sm font-medium tabular-nums text-slate-900">{formatUsd(coin.current_price)}</p>
+        ) : null}
+        {metric === 'volume' ? (
+          <p className="text-xs font-semibold tabular-nums text-blue-700">
+            {formatUsd(coin.total_volume ?? 0, true)}
+          </p>
+        ) : (
+          <p className={`text-xs font-semibold tabular-nums ${pctClass(change)}`}>{formatPct(change)}</p>
+        )}
+      </div>
     </button>
   );
 };
 
-interface ToolPanelShellProps {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-}
-
-const ToolPanelShell: React.FC<ToolPanelShellProps> = ({ title, onClose, children }) => (
-  <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm">
-    <div className="mb-3 flex items-center justify-between gap-2">
-      <h3 className="text-sm font-bold text-neutral-900">{title}</h3>
-      <button
-        type="button"
-        onClick={onClose}
-        className="rounded-full p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
-        aria-label="Закрыть"
-      >
-        <X className="h-4 w-4" />
-      </button>
-    </div>
-    {children}
-  </div>
-);
-
-const actionBtnBase =
-  'inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-sm transition';
-
-interface MarketQuickToolsBarProps {
-  activeTool: MarketQuickToolId | null;
-  onToggleTool: (id: MarketQuickToolId) => void;
-  onAskAlpha: () => void;
-}
-
-export const MarketQuickToolsBar: React.FC<MarketQuickToolsBarProps> = ({
-  activeTool,
-  onToggleTool,
-  onAskAlpha,
-}) => {
-  const chip = (id: MarketQuickToolId) =>
-    activeTool === id
-      ? 'border-violet-300 bg-violet-50 text-violet-900'
-      : 'border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50';
-
-  return (
-    <div className="mb-6 flex flex-wrap gap-2">
-      <button
-        type="button"
-        onClick={onAskAlpha}
-        className={`${actionBtnBase} border-neutral-200 bg-white text-neutral-800 hover:bg-neutral-50`}
-      >
-        <Sparkles className="h-4 w-4 text-violet-600" />
-        Спросить MNOONX AI
-      </button>
-      <button
-        type="button"
-        onClick={() => onToggleTool('heatmap')}
-        className={`${actionBtnBase} ${chip('heatmap')}`}
-      >
-        <LayoutGrid className="h-4 w-4" />
-        Coin Heatmap
-      </button>
-      <button
-        type="button"
-        onClick={() => onToggleTool('movers')}
-        className={`${actionBtnBase} ${chip('movers')}`}
-      >
-        <TrendingUp className="h-4 w-4 text-emerald-600" />
-        <TrendingDown className="h-4 w-4 text-red-600" />
-        Top Gainers / Losers
-      </button>
-      <button
-        type="button"
-        onClick={() => onToggleTool('trending')}
-        className={`${actionBtnBase} ${chip('trending')}`}
-      >
-        <Flame className="h-4 w-4 text-orange-500" />
-        Trending
-      </button>
-      <button
-        type="button"
-        onClick={() => onToggleTool('volume')}
-        className={`${actionBtnBase} ${chip('volume')}`}
-      >
-        <Volume2 className="h-4 w-4 text-blue-600" />
-        Top Volume 24h
-      </button>
-    </div>
-  );
+const TOOL_META: Record<
+  MarketQuickToolId,
+  { icon: React.ComponentType<{ className?: string }>; iconClass: string }
+> = {
+  heatmap: { icon: LayoutGrid, iconClass: 'text-violet-600' },
+  gainers: { icon: TrendingUp, iconClass: 'text-emerald-600' },
+  losers: { icon: TrendingDown, iconClass: 'text-red-600' },
+  trending: { icon: Flame, iconClass: 'text-orange-500' },
+  volume: { icon: Volume2, iconClass: 'text-blue-600' },
 };
 
-interface MarketQuickToolPanelProps {
-  activeTool: MarketQuickToolId | null;
-  onClose: () => void;
+function panelTitle(id: MarketQuickToolId, t: (key: string) => string): string {
+  switch (id) {
+    case 'heatmap':
+      return t('discover.marketTab.panelHeatmapTitle');
+    case 'gainers':
+      return t('discover.marketTab.panelGainersTitle');
+    case 'losers':
+      return t('discover.marketTab.panelLosersTitle');
+    case 'trending':
+      return t('discover.marketTab.panelTrendingTitle');
+    case 'volume':
+      return t('discover.marketTab.panelVolumeTitle');
+  }
+}
+
+function panelDesc(id: MarketQuickToolId, t: (key: string) => string): string | null {
+  switch (id) {
+    case 'heatmap':
+      return t('discover.marketTab.heatmapLegendDesc');
+    case 'gainers':
+    case 'losers':
+      return t('discover.marketTab.panelListDesc24h');
+    case 'trending':
+      return t('discover.marketTab.panelTrendingDesc');
+    case 'volume':
+      return t('discover.marketTab.panelVolumeDesc');
+  }
+}
+
+interface MarketQuickToolsSectionProps {
+  activeTool: MarketQuickToolId;
+  onSelectTool: (id: MarketQuickToolId) => void;
+  onAskAlpha: () => void;
   allMarkets: CoinMarketRow[];
   gainers: CoinMarketRow[];
   losers: CoinMarketRow[];
@@ -139,9 +106,10 @@ interface MarketQuickToolPanelProps {
   onSelectCoin: (id: string, symbol: string, name: string) => void;
 }
 
-export const MarketQuickToolPanel: React.FC<MarketQuickToolPanelProps> = ({
+const MarketQuickToolsSection: React.FC<MarketQuickToolsSectionProps> = ({
   activeTool,
-  onClose,
+  onSelectTool,
+  onAskAlpha,
   allMarkets,
   gainers,
   losers,
@@ -149,72 +117,119 @@ export const MarketQuickToolPanel: React.FC<MarketQuickToolPanelProps> = ({
   topVolume,
   onSelectCoin,
 }) => {
-  if (!activeTool) return null;
+  const { t } = useTranslation();
 
-  if (activeTool === 'heatmap') {
-    return (
-      <ToolPanelShell title="Coin Heatmap — топ по капитализации" onClose={onClose}>
-        <CoinHeatmap coins={allMarkets} onSelect={onSelectCoin} />
-      </ToolPanelShell>
-    );
-  }
+  const tabs: { id: MarketQuickToolId; label: string }[] = [
+    { id: 'heatmap', label: t('discover.marketTab.toolHeatmap') },
+    { id: 'gainers', label: t('discover.marketTab.toolGainers') },
+    { id: 'losers', label: t('discover.marketTab.toolLosers') },
+    { id: 'trending', label: t('discover.marketTab.toolTrending') },
+    { id: 'volume', label: t('discover.marketTab.toolVolume') },
+  ];
 
-  if (activeTool === 'movers') {
-    return (
-      <ToolPanelShell title="Top Gainers / Top Losers (24h)" onClose={onClose}>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-emerald-700">
-              <TrendingUp className="h-3.5 w-3.5" /> Gainers
-            </p>
-            {gainers.length === 0 ? (
-              <p className="text-sm text-neutral-500">Нет данных</p>
-            ) : (
-              gainers.map((c) => <MiniTokenRow key={c.id} coin={c} onSelect={onSelectCoin} />)
-            )}
-          </div>
-          <div>
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-red-700">
-              <TrendingDown className="h-3.5 w-3.5" /> Losers
-            </p>
-            {losers.length === 0 ? (
-              <p className="text-sm text-neutral-500">Нет данных</p>
-            ) : (
-              losers.map((c) => <MiniTokenRow key={c.id} coin={c} onSelect={onSelectCoin} />)
-            )}
-          </div>
-        </div>
-      </ToolPanelShell>
-    );
-  }
+  const renderContent = () => {
+    if (activeTool === 'heatmap') {
+      return <CoinHeatmap coins={allMarkets} onSelect={onSelectCoin} />;
+    }
 
-  if (activeTool === 'trending') {
+    const listMap: Record<Exclude<MarketQuickToolId, 'heatmap'>, CoinMarketRow[]> = {
+      gainers,
+      losers,
+      trending,
+      volume: topVolume,
+    };
+
+    const coins = listMap[activeTool];
+    if (coins.length === 0) {
+      return (
+        <p className="py-10 text-center text-sm text-slate-500">
+          {activeTool === 'trending' ? t('discover.marketTab.panelEmptyList') : t('discover.marketTab.noData')}
+        </p>
+      );
+    }
+
     return (
-      <ToolPanelShell title="Trending — поиск CoinGecko" onClose={onClose}>
-        {trending.length === 0 ? (
-          <p className="text-sm text-neutral-500">Список пуст</p>
-        ) : (
-          <div className="grid gap-1 sm:grid-cols-2">
-            {trending.map((c) => (
-              <MiniTokenRow key={c.id} coin={c} onSelect={onSelectCoin} />
-            ))}
-          </div>
-        )}
-      </ToolPanelShell>
+      <div className="grid gap-1 sm:grid-cols-2">
+        {coins.map((coin) => (
+          <MarketTokenRow
+            key={coin.id}
+            coin={coin}
+            onSelect={onSelectCoin}
+            metric={activeTool === 'volume' ? 'volume' : 'change'}
+          />
+        ))}
+      </div>
     );
-  }
+  };
+
+  const desc = panelDesc(activeTool, t);
 
   return (
-    <ToolPanelShell title="Top Volume 24h" onClose={onClose}>
-      <p className="mb-3 flex items-center gap-1.5 text-xs text-neutral-500">
-        <BarChart3 className="h-3.5 w-3.5" />
-        Крупнейший торговый объём за сутки среди отслеживаемых монет
-      </p>
-      {topVolume.length === 0 ? (
-        <p className="text-sm text-neutral-500">Нет данных</p>
-      ) : (
-        topVolume.map((c) => <MiniTokenRow key={c.id} coin={c} onSelect={onSelectCoin} />)
-      )}
-    </ToolPanelShell>
+    <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3 sm:px-5">
+        <div>
+          <h2 className="text-base font-bold text-slate-900">{t('discover.marketTab.quickExploreTitle')}</h2>
+          <p className="mt-0.5 text-xs text-slate-500">{t('discover.marketTab.quickExploreDesc')}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onAskAlpha}
+          className="inline-flex shrink-0 items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900 transition hover:bg-violet-100"
+        >
+          <Sparkles className="h-4 w-4 text-violet-600" />
+          {t('discover.marketTab.toolAskAI')}
+        </button>
+      </div>
+
+      <div className="border-b border-slate-100">
+        <div
+          className="flex gap-1 overflow-x-auto px-2 py-1 sm:px-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          role="tablist"
+          aria-label={t('discover.marketTab.quickExploreTitle')}
+        >
+          {tabs.map(({ id, label }) => {
+            const { icon: Icon, iconClass } = TOOL_META[id];
+            const selected = activeTool === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => onSelectTool(id)}
+                className={`relative flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors sm:px-4 ${
+                  selected
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <Icon className={`h-4 w-4 ${selected ? 'text-white' : iconClass}`} />
+                <span className="whitespace-nowrap">{label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="px-4 py-4 sm:px-5 sm:py-5" role="tabpanel">
+        <div className="mb-4 flex items-start gap-2">
+          {activeTool === 'volume' ? (
+            <BarChart3 className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" aria-hidden />
+          ) : (
+            (() => {
+              const { icon: Icon, iconClass } = TOOL_META[activeTool];
+              return <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${iconClass}`} aria-hidden />;
+            })()
+          )}
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">{panelTitle(activeTool, t)}</h3>
+            {desc ? <p className="mt-0.5 text-xs text-slate-500">{desc}</p> : null}
+          </div>
+        </div>
+        {renderContent()}
+      </div>
+    </section>
   );
 };
+
+export default MarketQuickToolsSection;

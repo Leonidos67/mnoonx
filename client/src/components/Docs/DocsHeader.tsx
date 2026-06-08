@@ -9,6 +9,7 @@ import {
   isDocsHeaderNavActive,
 } from '../../docs/docsNav';
 import { PLATFORM_UPDATES_PATH } from '../../constants/platformUpdates';
+import { useLanguage } from '../../context/LanguageContext';
 import { useTranslation } from '../../i18n/useTranslation';
 
 function DocsHeaderNavLink({
@@ -36,6 +37,7 @@ function DocsHeaderNavLink({
 
 const DocsHeader: React.FC = () => {
   const { t } = useTranslation();
+  const { locale } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
   const isUpdatesPage = location.pathname === PLATFORM_UPDATES_PATH;
@@ -49,8 +51,8 @@ const DocsHeader: React.FC = () => {
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setHits(searchDocs(query));
-  }, [query]);
+    setHits(searchDocs(query, locale));
+  }, [query, locale]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -104,7 +106,7 @@ const DocsHeader: React.FC = () => {
           {navItems.map((item) => (
             <DocsHeaderNavLink
               key={item.id}
-              label={item.label}
+              label={t(item.labelKey)}
               to={item.to}
               active={item.active}
             />
@@ -138,7 +140,7 @@ const DocsHeader: React.FC = () => {
                 setSearchOpen(true);
               }}
               onFocus={() => setSearchOpen(true)}
-              placeholder="Поиск..."
+              placeholder={t('docs.header.searchPlaceholder')}
               className="w-full rounded-lg border border-stone-200 bg-white py-2 pl-10 pr-16 text-sm text-neutral-900 shadow-sm placeholder:text-neutral-400 focus:border-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500/20 sm:pr-20"
             />
             <span className="pointer-events-none absolute right-2 top-1/2 hidden -translate-y-1/2 items-center gap-0.5 rounded border border-stone-200 bg-stone-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 sm:flex">
@@ -170,7 +172,7 @@ const DocsHeader: React.FC = () => {
             to="/"
             className="rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-xs font-medium text-neutral-800 shadow-sm transition-colors hover:border-stone-400 hover:bg-stone-50 sm:px-3 sm:text-sm"
           >
-            На платформу
+            {t('docs.header.toPlatform')}
           </Link>
         </div>
       </div>

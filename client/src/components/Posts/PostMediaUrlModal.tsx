@@ -4,13 +4,17 @@ import { useTranslation } from '../../i18n/useTranslation';
 import { normalizePostMediaUrl } from '../../utils/postMedia';
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 
-interface PostMediaUrlModalProps {
-  open: boolean;
-  onClose: () => void;
+export interface PostMediaUrlFormProps {
   onAdd: (url: string) => void;
+  onCancel: () => void;
+  variant?: 'modal' | 'sheet';
 }
 
-const PostMediaUrlModal: React.FC<PostMediaUrlModalProps> = ({ open, onClose, onAdd }) => {
+export const PostMediaUrlForm: React.FC<PostMediaUrlFormProps> = ({
+  onAdd,
+  onCancel,
+  variant = 'modal',
+}) => {
   const { t } = useTranslation();
   const [urlInput, setUrlInput] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -25,23 +29,13 @@ const PostMediaUrlModal: React.FC<PostMediaUrlModalProps> = ({ open, onClose, on
   }, []);
 
   useEffect(() => {
-    if (!open) return;
     reset();
-  }, [open, reset]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open, onClose]);
+  }, [reset]);
 
   const normalized = normalizePostMediaUrl(urlInput);
 
   useEffect(() => {
-    if (!open || !normalized) {
+    if (!normalized) {
       setPreviewOk(null);
       setChecking(false);
       return;
@@ -66,7 +60,7 @@ const PostMediaUrlModal: React.FC<PostMediaUrlModalProps> = ({ open, onClose, on
     return () => {
       cancelled = true;
     };
-  }, [open, normalized]);
+  }, [normalized]);
 
   const handleSave = () => {
     const url = normalizePostMediaUrl(urlInput);
@@ -75,8 +69,86 @@ const PostMediaUrlModal: React.FC<PostMediaUrlModalProps> = ({ open, onClose, on
       return;
     }
     onAdd(url);
-    onClose();
   };
+
+  const footerClass =
+    variant === 'sheet' ? 'mt-5 flex justify-end gap-2' : 'mt-5 flex justify-end gap-2';
+
+  return (
+    <>
+      <label className="block text-sm font-medium text-neutral-700">{t('postMedia.urlLabel')}</label>
+      <input
+        type="url"
+        value={urlInput}
+        onChange={(e) => {
+          setUrlInput(e.target.value);
+          setError(null);
+        }}
+        placeholder={t('postMedia.urlPlaceholder')}
+        className="mt-1.5 w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm outline-none focus:border-black/30 focus:ring-2 focus:ring-black/5"
+        autoFocus
+      />
+      <p className="mt-1.5 text-xs text-neutral-500">{t('postMedia.urlHint')}</p>
+
+      {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+
+      {normalized ? (
+        <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
+          {checking ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-neutral-500">
+              <Loader2 size={18} className="animate-spin" />
+              {t('postMedia.urlChecking')}
+            </div>
+          ) : previewOk === true ? (
+            <img
+              src={resolveMediaUrl(normalized)}
+              alt=""
+              className="mx-auto max-h-40 w-full rounded-lg object-contain"
+            />
+          ) : previewOk === false ? (
+            <p className="py-4 text-center text-sm text-amber-700">{t('postMedia.urlPreviewFailed')}</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className={footerClass}>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded-full px-4 py-2 text-sm font-semibold transition-colors hover:bg-neutral-100"
+        >
+          {t('postComposer.cancel')}
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!normalized || checking}
+          className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-neutral-800 disabled:opacity-50"
+        >
+          {t('postMedia.urlAdd')}
+        </button>
+      </div>
+    </>
+  );
+};
+
+interface PostMediaUrlModalProps {
+  open: boolean;
+  onClose: () => void;
+  onAdd: (url: string) => void;
+}
+
+const PostMediaUrlModal: React.FC<PostMediaUrlModalProps> = ({ open, onClose, onAdd }) => {
+  const { t } = useTranslation();
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -105,59 +177,13 @@ const PostMediaUrlModal: React.FC<PostMediaUrlModalProps> = ({ open, onClose, on
             <X size={18} />
           </button>
         </div>
-
-        <label className="block text-sm font-medium text-neutral-700">{t('postMedia.urlLabel')}</label>
-        <input
-          type="url"
-          value={urlInput}
-          onChange={(e) => {
-            setUrlInput(e.target.value);
-            setError(null);
+        <PostMediaUrlForm
+          onAdd={(url) => {
+            onAdd(url);
+            onClose();
           }}
-          placeholder={t('postMedia.urlPlaceholder')}
-          className="mt-1.5 w-full rounded-xl border border-neutral-200 px-4 py-2.5 text-sm outline-none focus:border-black/30 focus:ring-2 focus:ring-black/5"
-          autoFocus
+          onCancel={onClose}
         />
-        <p className="mt-1.5 text-xs text-neutral-500">{t('postMedia.urlHint')}</p>
-
-        {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
-
-        {normalized ? (
-          <div className="mt-4 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
-            {checking ? (
-              <div className="flex items-center justify-center gap-2 py-8 text-sm text-neutral-500">
-                <Loader2 size={18} className="animate-spin" />
-                {t('postMedia.urlChecking')}
-              </div>
-            ) : previewOk === true ? (
-              <img
-                src={resolveMediaUrl(normalized)}
-                alt=""
-                className="mx-auto max-h-40 w-full rounded-lg object-contain"
-              />
-            ) : previewOk === false ? (
-              <p className="py-4 text-center text-sm text-amber-700">{t('postMedia.urlPreviewFailed')}</p>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full px-4 py-2 text-sm font-semibold transition-colors hover:bg-neutral-100"
-          >
-            {t('postComposer.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!normalized || checking}
-            className="rounded-full bg-black px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-neutral-800 disabled:opacity-50"
-          >
-            {t('postMedia.urlAdd')}
-          </button>
-        </div>
       </div>
     </div>
   );

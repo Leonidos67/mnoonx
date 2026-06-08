@@ -10,6 +10,10 @@ const LessonSchema = new mongoose.Schema(
     images: { type: [String], default: [] },
     attachments: { type: [String], default: [] },
     dripLabel: { type: String, default: 'Unlocks immediately' },
+    /** Owner-only private lesson; members see title but locked body */
+    isLocked: { type: Boolean, default: false },
+    /** Days after community join before lesson unlocks (0 = immediate) */
+    unlockAfterDays: { type: Number, default: 0 },
   },
   { _id: true }
 );
@@ -32,6 +36,11 @@ const CommunityCourseSchema = new mongoose.Schema(
     description: { type: String, default: '' },
     isHidden: { type: Boolean, default: false },
     coverUrl: { type: String, default: '' },
+    welcomeMessage: { type: String, default: '' },
+    completionMessage: { type: String, default: '' },
+    sequentialUnlock: { type: Boolean, default: false },
+    defaultLessonUnlockDays: { type: Number, default: 0 },
+    tags: { type: [String], default: [] },
     chapters: { type: [ChapterSchema], default: [] },
   },
   { timestamps: true }

@@ -16,3 +16,4 @@ export const MESSAGES_API = `${API_BASE}/messages`;
 export const AI_API = `${API_BASE}/ai`;
 export const ADMIN_API = `${API_BASE}/admin`;
 export const SUPPORT_API = `${API_BASE}/support`;
+export const PORTFOLIO_API = `${API_BASE}/portfolio`;

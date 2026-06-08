@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { ArrowLeft } from 'lucide-react';
 import PostMediaGallery from '../components/Posts/PostMediaGallery';
 import PostContentBody from '../components/Posts/PostContentBody';
+import type { PostCoinAttachment } from '../types/postCoin';
 import type { PostLinkAttachment } from '../types/postLink';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 
@@ -26,6 +27,7 @@ interface Post {
   viewsCount: number;
   media: string[];
   linkAttachment?: PostLinkAttachment | null;
+  coinAttachment?: PostCoinAttachment | null;
   createdAt: string;
   isLiked: boolean;
   isReposted: boolean;
@@ -206,6 +208,7 @@ const PostPage: React.FC = () => {
               <PostContentBody
                 content={post.content}
                 linkAttachment={post.linkAttachment}
+                coinAttachment={post.coinAttachment}
                 contentClassName="text-neutral-900 leading-relaxed whitespace-pre-wrap break-words text-[15px]"
               />
             </div>

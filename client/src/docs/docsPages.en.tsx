@@ -22,31 +22,9 @@ import {
   communityStorePath,
 } from '../constants/communityRoutes';
 import { docsPagePath } from './docsNav';
-import { applyDocsEnrichment } from './docsEnrichment';
+import { DocsCode as C, DocsLink as L, DocsUl as Ul, type DocsPageKey } from './docsPagesShared';
 
-const L: React.FC<{ to: string; children: React.ReactNode }> = ({ to, children }) => (
-  <Link to={to} className="font-medium text-[#315efb] hover:underline">
-    {children}
-  </Link>
-);
-
-const C: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <code className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[13px] font-medium text-neutral-700">
-    {children}
-  </code>
-);
-
-const Ul: React.FC<{ items: React.ReactNode[] }> = ({ items }) => (
-  <ul className="mt-2 list-disc space-y-1.5 pl-5">
-    {items.map((item, i) => (
-      <li key={i}>{item}</li>
-    ))}
-  </ul>
-);
-
-type PageKey = `${string}/${string}`;
-
-const PAGES: Record<PageKey, Omit<DocsArticleProps, 'prev' | 'next'>> = {
+export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next'>> = {
   'start/overview': {
     title: 'Документация MNOONX',
     lead:
@@ -1241,13 +1219,3 @@ const PAGES: Record<PageKey, Omit<DocsArticleProps, 'prev' | 'next'>> = {
     ],
   },
 };
-
-export function getDocsPageContent(
-  sectionId: string,
-  pageSlug: string
-): Omit<DocsArticleProps, 'prev' | 'next'> | null {
-  const key = `${sectionId}/${pageSlug}` as PageKey;
-  const base = PAGES[key];
-  if (!base) return null;
-  return applyDocsEnrichment(key, base);
-}

@@ -1,14 +1,21 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Image, Link2, Loader2, PlusCircle, SquareArrowOutUpRight, X } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { CandlestickChart, Image, Link2, Loader2, Plus, PlusCircle, SquareArrowOutUpRight, X } from 'lucide-react';
+import FloatingMenu, { type FloatingMenuAnchor } from '../Common/FloatingMenu';
+import MobileBottomSheet from '../Common/MobileBottomSheet';
 import PostMediaUpload, { PostMediaUploadHandle } from './PostMediaUpload';
-import PostLinkAttachmentModal from './PostLinkAttachmentModal';
-import PostMediaUrlModal from './PostMediaUrlModal';
+import PostCoinAttachmentModal, { PostCoinAttachmentForm } from './PostCoinAttachmentModal';
+import PostLinkAttachmentModal, { PostLinkAttachmentForm } from './PostLinkAttachmentModal';
+import PostMediaUrlModal, { PostMediaUrlForm } from './PostMediaUrlModal';
+import PostAttachSheetHeader from './PostAttachSheetHeader';
+import type { PostCoinAttachment } from '../../types/postCoin';
 import type { PostLinkAttachment } from '../../types/postLink';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useTranslation } from '../../i18n/useTranslation';
 import { MAX_POST_MEDIA } from '../../utils/postMedia';
 
 export type PostComposerVariant = 'home' | 'profile' | 'community';
+
+type MobileAttachView = 'menu' | 'link' | 'coin' | 'mediaUrl';
 
 interface PostComposerProps {
   isOpen: boolean;
@@ -19,6 +26,8 @@ interface PostComposerProps {
   onMediaChange: (urls: string[]) => void;
   linkAttachment?: PostLinkAttachment | null;
   onLinkAttachmentChange?: (link: PostLinkAttachment | null) => void;
+  coinAttachment?: PostCoinAttachment | null;
+  onCoinAttachmentChange?: (coin: PostCoinAttachment | null) => void;
   onCancel: () => void;
   onSubmit: () => void;
   isPosting: boolean;
@@ -37,6 +46,8 @@ const PostComposer: React.FC<PostComposerProps> = ({
   onMediaChange,
   linkAttachment = null,
   onLinkAttachmentChange,
+  coinAttachment = null,
+  onCoinAttachmentChange,
   onCancel,
   onSubmit,
   isPosting,
@@ -52,11 +63,25 @@ const PostComposer: React.FC<PostComposerProps> = ({
   const mediaUploadRef = useRef<PostMediaUploadHandle>(null);
   const [mediaUploading, setMediaUploading] = useState(false);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
+  const [coinModalOpen, setCoinModalOpen] = useState(false);
   const [mediaUrlModalOpen, setMediaUrlModalOpen] = useState(false);
+  const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+  const [attachMenuAnchor, setAttachMenuAnchor] = useState<FloatingMenuAnchor | null>(null);
+  const attachMenuBtnRef = useRef<HTMLButtonElement>(null);
+  const [mobileAttach, setMobileAttach] = useState<{
+    open: boolean;
+    view: MobileAttachView;
+    fromMenu: boolean;
+  }>({ open: false, view: 'menu', fromMenu: false });
 
   const hasLink = Boolean(linkAttachment?.title?.trim() && linkAttachment?.url?.trim());
+  const hasCoin = Boolean(
+    coinAttachment?.coinId?.trim() &&
+      coinAttachment?.name?.trim() &&
+      coinAttachment?.symbol?.trim()
+  );
   const canSubmit =
-    Boolean(content.trim()) || media.length > 0 || hasLink;
+    Boolean(content.trim()) || media.length > 0 || hasLink || hasCoin;
 
   const avatarSrc =
     userAvatar ||
@@ -80,13 +105,162 @@ const PostComposer: React.FC<PostComposerProps> = ({
     return () => document.documentElement.classList.remove('post-composer-mobile-open');
   }, [mobileFull]);
 
-  const handleAddPhotos = () => {
-    if (!token) {
-      window.dispatchEvent(new CustomEvent('openLogin'));
-      return;
+  const closeAttachMenu = useCallback(() => {
+    setAttachMenuOpen(false);
+    setAttachMenuAnchor(null);
+  }, []);
+
+  const closeMobileAttach = useCallback(() => {
+    setMobileAttach({ open: false, view: 'menu', fromMenu: false });
+  }, []);
+
+  const openMobileAttach = useCallback((view: MobileAttachView, fromMenu: boolean) => {
+    setMobileAttach({ open: true, view, fromMenu });
+  }, []);
+
+  const backMobileAttach = useCallback(() => {
+    setMobileAttach((prev) => {
+      if (prev.fromMenu) {
+        return { open: true, view: 'menu', fromMenu: false };
+      }
+      return { open: false, view: 'menu', fromMenu: false };
+    });
+  }, []);
+
+  const mobileAttachTitle = (() => {
+    switch (mobileAttach.view) {
+      case 'link':
+        return t('postLink.modalTitle');
+      case 'coin':
+        return t('postCoin.modalTitle');
+      case 'mediaUrl':
+        return t('postMedia.urlModalTitle');
+      default:
+        return t('postComposer.attachMenuLabel');
     }
+  })();
+
+  const requireAuth = () => {
+    if (token) return true;
+    window.dispatchEvent(new CustomEvent('openLogin'));
+    return false;
+  };
+
+  const handleAddPhotos = () => {
+    if (!requireAuth()) return;
+    if (isLgUp) closeAttachMenu();
+    else closeMobileAttach();
     mediaUploadRef.current?.openPicker();
   };
+
+  const handleAddImageUrl = () => {
+    if (!requireAuth()) return;
+    if (isLgUp) {
+      closeAttachMenu();
+      setMediaUrlModalOpen(true);
+      return;
+    }
+    openMobileAttach('mediaUrl', true);
+  };
+
+  const handleAddLink = () => {
+    if (!requireAuth()) return;
+    if (isLgUp) {
+      closeAttachMenu();
+      setLinkModalOpen(true);
+      return;
+    }
+    openMobileAttach('link', true);
+  };
+
+  const handleAddCoin = () => {
+    if (!requireAuth()) return;
+    if (isLgUp) {
+      closeAttachMenu();
+      setCoinModalOpen(true);
+      return;
+    }
+    openMobileAttach('coin', true);
+  };
+
+  const openLinkEditor = () => {
+    if (isLgUp) setLinkModalOpen(true);
+    else openMobileAttach('link', false);
+  };
+
+  const openCoinEditor = () => {
+    if (isLgUp) setCoinModalOpen(true);
+    else openMobileAttach('coin', false);
+  };
+
+  const toggleAttachMenu = () => {
+    if (isLgUp) {
+      if (attachMenuOpen) {
+        closeAttachMenu();
+        return;
+      }
+      if (attachMenuBtnRef.current) {
+        setAttachMenuAnchor({ rect: attachMenuBtnRef.current.getBoundingClientRect() });
+      }
+      setAttachMenuOpen(true);
+      return;
+    }
+    if (mobileAttach.open) closeMobileAttach();
+    else openMobileAttach('menu', false);
+  };
+
+  const attachUiActive = isLgUp ? attachMenuOpen : mobileAttach.open;
+
+  const attachMenuItemClass =
+    'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-neutral-900 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50';
+
+  const attachMenuSheetItemClass =
+    'flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-left text-sm font-medium text-neutral-900 transition-colors hover:bg-neutral-50 active:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50';
+
+  const renderAttachMenuItems = (itemClass: string) => (
+    <>
+      {media.length < MAX_POST_MEDIA ? (
+        <>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleAddPhotos}
+            disabled={mediaUploading}
+            className={itemClass}
+          >
+            {mediaUploading ? (
+              <Loader2 size={20} className="animate-spin text-neutral-500" aria-hidden />
+            ) : (
+              <Image size={20} className="text-neutral-500" aria-hidden />
+            )}
+            {mediaUploading ? t('postComposer.uploading') : t('postComposer.addPhotos')}
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={handleAddImageUrl}
+            disabled={mediaUploading}
+            className={itemClass}
+          >
+            <Link2 size={20} className="text-neutral-500" aria-hidden />
+            {t('postComposer.addImageUrl')}
+          </button>
+        </>
+      ) : null}
+      {onLinkAttachmentChange ? (
+        <button type="button" role="menuitem" onClick={handleAddLink} className={itemClass}>
+          <SquareArrowOutUpRight size={20} className="text-neutral-500" aria-hidden />
+          {hasLink ? t('postComposer.editLink') : t('postComposer.addLink')}
+        </button>
+      ) : null}
+      {onCoinAttachmentChange ? (
+        <button type="button" role="menuitem" onClick={handleAddCoin} className={itemClass}>
+          <CandlestickChart size={20} className="text-neutral-500" aria-hidden />
+          {hasCoin ? t('postComposer.editCoin') : t('postComposer.addCoin')}
+        </button>
+      ) : null}
+    </>
+  );
 
   const closedWrapperClass =
     variant === 'profile'
@@ -147,9 +321,6 @@ const PostComposer: React.FC<PostComposerProps> = ({
   const composerInner = (
     <>
       <div className={mobileFull ? 'flex min-h-0 flex-1 flex-col' : 'flex gap-3'}>
-        {!mobileFull && (
-          <img src={avatarSrc} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover" />
-        )}
         <div className={mobileFull ? 'flex min-h-0 flex-1 flex-col' : 'min-w-0 flex-1'}>
           <textarea
             ref={textareaRef}
@@ -179,7 +350,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
               <Link2 className="h-4 w-4 shrink-0 text-[#315efb]" aria-hidden />
               <button
                 type="button"
-                onClick={() => setLinkModalOpen(true)}
+                onClick={openLinkEditor}
                 className="min-w-0 flex-1 truncate text-left font-medium text-[#315efb] underline underline-offset-2"
               >
                 {linkAttachment!.title}
@@ -196,59 +367,59 @@ const PostComposer: React.FC<PostComposerProps> = ({
               ) : null}
             </div>
           ) : null}
+          {hasCoin ? (
+            <div className="mt-2 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+              <CandlestickChart className="h-4 w-4 shrink-0 text-amber-700" aria-hidden />
+              <button
+                type="button"
+                onClick={openCoinEditor}
+                className="min-w-0 flex-1 truncate text-left font-medium text-amber-900"
+              >
+                {coinAttachment!.name} ({coinAttachment!.symbol.toUpperCase()})
+              </button>
+              {onCoinAttachmentChange ? (
+                <button
+                  type="button"
+                  onClick={() => onCoinAttachmentChange(null)}
+                  className="rounded-full p-1 text-neutral-500 hover:bg-white/80"
+                  aria-label={t('postComposer.removeCoin')}
+                >
+                  <X size={16} aria-hidden />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
       <div className={`mt-3 flex shrink-0 items-center justify-between border-t pt-3 ${toolbarBorderClass}`}>
         <div className="flex flex-wrap items-center">
-          {media.length < MAX_POST_MEDIA ? (
-            <>
-              <button
-                type="button"
-                onClick={handleAddPhotos}
-                disabled={mediaUploading}
-                className="inline-flex items-center gap-2 rounded-full p-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50"
-              >
-                {mediaUploading ? (
-                  <Loader2 size={18} className="animate-spin" />
-                ) : (
-                  <Image size={18} />
-                )}
-                <span className="hidden lg:block">{mediaUploading ? t('postComposer.uploading') : t('postComposer.addPhotos')}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!token) {
-                    window.dispatchEvent(new CustomEvent('openLogin'));
-                    return;
-                  }
-                  setMediaUrlModalOpen(true);
-                }}
-                disabled={mediaUploading}
-                className="inline-flex items-center gap-2 rounded-full p-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50"
-              >
-                <Link2 size={18} aria-hidden />
-                <span className="hidden lg:block">{t('postComposer.addImageUrl')}</span>
-                <span className="block lg:hidden">Img</span>
-              </button>
-            </>
-          ) : null}
-          {onLinkAttachmentChange ? (
-            <button
-              type="button"
-              onClick={() => {
-                if (!token) {
-                  window.dispatchEvent(new CustomEvent('openLogin'));
-                  return;
-                }
-                setLinkModalOpen(true);
-              }}
-              className="inline-flex items-center gap-2 rounded-full p-2 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+          <button
+            ref={attachMenuBtnRef}
+            type="button"
+            onClick={toggleAttachMenu}
+            aria-expanded={attachUiActive}
+            aria-haspopup="menu"
+            aria-label={t('postComposer.attachMenuLabel')}
+            className={`inline-flex items-center justify-center rounded-full p-2 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 ${
+              attachUiActive ? 'bg-neutral-100 text-neutral-900' : ''
+            }`}
+          >
+            {mediaUploading ? (
+              <Loader2 size={20} className="animate-spin" aria-hidden />
+            ) : (
+              <Plus size={20} aria-hidden />
+            )}
+          </button>
+          {isLgUp ? (
+            <FloatingMenu
+              open={attachMenuOpen}
+              anchor={attachMenuAnchor}
+              onClose={closeAttachMenu}
+              width={220}
+              placement="top"
             >
-              <SquareArrowOutUpRight size={18} aria-hidden />
-              <span className="hidden lg:block">{hasLink ? t('postComposer.editLink') : t('postComposer.addLink')}</span>
-              <span className="block lg:hidden">{hasLink ? t('postComposer.editLink') : t('postComposer.addLink')}</span>
-            </button>
+              {renderAttachMenuItems(attachMenuItemClass)}
+            </FloatingMenu>
           ) : null}
         </div>
         <div className="flex items-center gap-2">
@@ -282,7 +453,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
   return (
     <>
       <div className={openWrapperClass}>{composerInner}</div>
-      {onLinkAttachmentChange ? (
+      {isLgUp && onLinkAttachmentChange ? (
         <PostLinkAttachmentModal
           open={linkModalOpen}
           onClose={() => setLinkModalOpen(false)}
@@ -291,15 +462,83 @@ const PostComposer: React.FC<PostComposerProps> = ({
           token={token}
         />
       ) : null}
-      <PostMediaUrlModal
-        open={mediaUrlModalOpen}
-        onClose={() => setMediaUrlModalOpen(false)}
-        onAdd={(url) => {
-          if (media.includes(url)) return;
-          if (media.length >= MAX_POST_MEDIA) return;
-          onMediaChange([...media, url]);
-        }}
-      />
+      {isLgUp && onCoinAttachmentChange ? (
+        <PostCoinAttachmentModal
+          open={coinModalOpen}
+          onClose={() => setCoinModalOpen(false)}
+          onSave={onCoinAttachmentChange}
+          initialValue={coinAttachment}
+        />
+      ) : null}
+      {isLgUp ? (
+        <PostMediaUrlModal
+          open={mediaUrlModalOpen}
+          onClose={() => setMediaUrlModalOpen(false)}
+          onAdd={(url) => {
+            if (media.includes(url)) return;
+            if (media.length >= MAX_POST_MEDIA) return;
+            onMediaChange([...media, url]);
+          }}
+        />
+      ) : null}
+      {!isLgUp ? (
+        <MobileBottomSheet
+          open={mobileAttach.open}
+          onClose={closeMobileAttach}
+          title={mobileAttachTitle}
+          padded
+        >
+          {mobileAttach.view === 'menu' ? (
+            <div className="flex flex-col gap-0.5 pb-1" role="menu">
+              {renderAttachMenuItems(attachMenuSheetItemClass)}
+            </div>
+          ) : null}
+          {mobileAttach.view === 'link' && onLinkAttachmentChange ? (
+            <div className="flex min-h-0 flex-col pb-1">
+              <PostAttachSheetHeader title={t('postLink.modalTitle')} onBack={backMobileAttach} />
+              <PostLinkAttachmentForm
+                variant="sheet"
+                initialValue={linkAttachment}
+                token={token}
+                onSave={(link) => {
+                  onLinkAttachmentChange(link);
+                  closeMobileAttach();
+                }}
+                onCancel={closeMobileAttach}
+              />
+            </div>
+          ) : null}
+          {mobileAttach.view === 'coin' && onCoinAttachmentChange ? (
+            <div className="flex min-h-0 max-h-[70dvh] flex-col pb-1">
+              <PostAttachSheetHeader title={t('postCoin.modalTitle')} onBack={backMobileAttach} />
+              <PostCoinAttachmentForm
+                variant="sheet"
+                initialValue={coinAttachment}
+                onSave={(coin) => {
+                  onCoinAttachmentChange(coin);
+                  closeMobileAttach();
+                }}
+                onCancel={closeMobileAttach}
+              />
+            </div>
+          ) : null}
+          {mobileAttach.view === 'mediaUrl' ? (
+            <div className="pb-1">
+              <PostAttachSheetHeader title={t('postMedia.urlModalTitle')} onBack={backMobileAttach} />
+              <PostMediaUrlForm
+                variant="sheet"
+                onAdd={(url) => {
+                  if (media.includes(url)) return;
+                  if (media.length >= MAX_POST_MEDIA) return;
+                  onMediaChange([...media, url]);
+                  closeMobileAttach();
+                }}
+                onCancel={closeMobileAttach}
+              />
+            </div>
+          ) : null}
+        </MobileBottomSheet>
+      ) : null}
     </>
   );
 };

@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { BookOpen, ChevronDown, ChevronsDownUp, X } from 'lucide-react';
-import { DOCS_DEFAULT_PATH, DOCS_SECTIONS, docsPagePath } from '../../docs/docsNav';
+import { buildDocsSections, DOCS_DEFAULT_PATH, docsPagePath } from '../../docs/docsNav';
+import { useLanguage } from '../../context/LanguageContext';
+import { useTranslation } from '../../i18n/useTranslation';
 
 const STORAGE_KEY = 'mnoonx-docs-sidebar-sections';
 
@@ -37,12 +39,15 @@ function activeSectionFromPath(pathname: string): string | null {
 
 const DocsSidebar: React.FC<DocsSidebarProps> = ({ mobileOpen, onCloseMobile }) => {
   const { pathname } = useLocation();
+  const { locale } = useLanguage();
+  const { t } = useTranslation();
+  const docsSections = useMemo(() => buildDocsSections(locale), [locale]);
   const activeSectionId = activeSectionFromPath(pathname);
 
   const [openSections, setOpenSections] = useState<Set<string>>(() => {
     const stored = loadStoredOpen();
     if (stored) return stored;
-    return new Set(DOCS_SECTIONS.map((s) => s.id));
+    return new Set(docsSections.map((s) => s.id));
   });
 
   useEffect(() => {
@@ -67,10 +72,10 @@ const DocsSidebar: React.FC<DocsSidebarProps> = ({ mobileOpen, onCloseMobile }) 
   }, []);
 
   const expandAll = useCallback(() => {
-    const all = new Set(DOCS_SECTIONS.map((s) => s.id));
+    const all = new Set(docsSections.map((s) => s.id));
     setOpenSections(all);
     saveStoredOpen(all);
-  }, []);
+  }, [docsSections]);
 
   const collapseAll = useCallback(() => {
     const next = activeSectionId ? new Set([activeSectionId]) : new Set<string>();
@@ -79,8 +84,8 @@ const DocsSidebar: React.FC<DocsSidebarProps> = ({ mobileOpen, onCloseMobile }) 
   }, [activeSectionId]);
 
   const allExpanded = useMemo(
-    () => openSections.size >= DOCS_SECTIONS.length,
-    [openSections]
+    () => openSections.size >= docsSections.length,
+    [openSections, docsSections.length]
   );
 
   const nav = (
@@ -95,10 +100,10 @@ const DocsSidebar: React.FC<DocsSidebarProps> = ({ mobileOpen, onCloseMobile }) 
           </span>
           <span>
             <span className="block text-[11px] font-medium uppercase tracking-wider text-neutral-400">
-              Справочник
+              {t('docs.sidebar.handbook')}
             </span>
             <span className="block text-sm font-semibold text-neutral-900 group-hover:text-orange-800">
-              Документация
+              {t('docs.sidebar.documentation')}
             </span>
           </span>
         </NavLink>
@@ -106,7 +111,7 @@ const DocsSidebar: React.FC<DocsSidebarProps> = ({ mobileOpen, onCloseMobile }) 
 
       <div className="mb-2 flex items-center justify-between gap-2 px-4">
         <span className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400">
-          Содержание
+          {t('docs.sidebar.contents')}
         </span>
         <button
           type="button"
@@ -114,20 +119,20 @@ const DocsSidebar: React.FC<DocsSidebarProps> = ({ mobileOpen, onCloseMobile }) 
           className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-orange-700 transition-colors hover:bg-orange-50"
         >
           <ChevronsDownUp className="h-3.5 w-3.5" aria-hidden />
-          {allExpanded ? 'Свернуть' : 'Раскрыть'}
+          {allExpanded ? t('docs.sidebar.collapseAll') : t('docs.sidebar.expandAll')}
         </button>
       </div>
 
       <div className="space-y-0.5 px-2">
-        {DOCS_SECTIONS.map((section, sectionIndex) => {
+        {docsSections.map((section, sectionIndex) => {
           const isOpen = openSections.has(section.id);
           const hasActiveChild = activeSectionId === section.id;
 
           return (
             <div
               key={section.id}
-              className={`overflow-hidden rounded-xl transition-colors ${
-                hasActiveChild ? 'bg-white/60 ring-1 ring-stone-200/60 shadow-sm' : ''
+              className={`overflow-hidden transition-colors ${
+                hasActiveChild ? 'bg-white/60' : ''
               }`}
             >
               {sectionIndex > 0 ? (
@@ -143,7 +148,7 @@ const DocsSidebar: React.FC<DocsSidebarProps> = ({ mobileOpen, onCloseMobile }) 
                 className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2.5 text-left text-[13px] font-semibold transition-colors ${
                   hasActiveChild
                     ? 'text-orange-900'
-                    : 'text-neutral-800 hover:bg-stone-100/70'
+                    : 'text-neutral-800'
                 }`}
                 aria-expanded={isOpen}
               >
@@ -197,7 +202,7 @@ const DocsSidebar: React.FC<DocsSidebarProps> = ({ mobileOpen, onCloseMobile }) 
         <button
           type="button"
           className="fixed inset-0 z-40 bg-neutral-900/40 backdrop-blur-[2px] lg:hidden"
-          aria-label="Закрыть меню"
+          aria-label={t('docs.sidebar.closeMenu')}
           onClick={onCloseMobile}
         />
       ) : null}
@@ -208,12 +213,12 @@ const DocsSidebar: React.FC<DocsSidebarProps> = ({ mobileOpen, onCloseMobile }) 
         }`}
       >
         <div className="flex items-center justify-between border-b border-stone-200/80 bg-white/50 px-4 py-3 backdrop-blur-sm lg:hidden">
-          <span className="text-sm font-semibold text-neutral-800">Навигация</span>
+          <span className="text-sm font-semibold text-neutral-800">{t('docs.sidebar.navigation')}</span>
           <button
             type="button"
             onClick={onCloseMobile}
             className="rounded-lg p-2 text-neutral-500 transition-colors hover:bg-stone-100"
-            aria-label="Закрыть"
+            aria-label={t('docs.sidebar.close')}
           >
             <X size={18} />
           </button>

@@ -1,26 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Search,
-  ShieldCheck,
-  X,
-} from 'lucide-react';
-// import AlphaPulse from '../AI/AlphaPulse';
+import { useNavigate } from 'react-router-dom';
+import { Search, ShieldCheck, X } from 'lucide-react';
 import MarketStatsStrip from './MarketStatsStrip';
-import {
-  MarketQuickToolPanel,
-  MarketQuickToolsBar,
-  type MarketQuickToolId,
-} from './MarketQuickTools';
+import MarketCoinTable, { type MarketSortKey } from './MarketCoinTable';
+import MarketQuickToolsSection, { type MarketQuickToolId } from './MarketQuickTools';
 import TradingViewChart from '../AI/TradingViewChart';
-import { formatPct, formatUsd, pctClass } from '../AI/marketFormat';
-import type { CoinDetail, CoinMarketRow, MarketsResponse, SearchCoinResult } from '../../types/ai';
+import type { CoinMarketRow, MarketsResponse, SearchCoinResult } from '../../types/ai';
 import { useAIChatPanel } from '../../context/AIChatPanelContext';
 import { useTranslation } from '../../i18n/useTranslation';
+import { formatPct, formatUsd, pctClass } from '../AI/marketFormat';
+import { marketCoinPath } from '../../constants/marketRoutes';
 
 import { AI_API as API_AI } from '../../config/api';
-const TABLE_PAGE_SIZE = 20;
+
+const TABLE_PAGE_SIZE = 50;
 
 interface TokenRowProps {
   coin: CoinMarketRow | SearchCoinResult;
@@ -37,20 +30,20 @@ const TokenRow: React.FC<TokenRowProps> = ({ coin, onSelect, showRank = true }) 
     <button
       type="button"
       onClick={() => onSelect(coin.id, coin.symbol, coin.name)}
-      className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors hover:bg-black/5"
+      className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-slate-50"
     >
-      <img src={image} alt="" className="h-8 w-8 rounded-full bg-neutral-100 object-cover" />
+      <img src={image} alt="" className="h-8 w-8 rounded-full bg-slate-100 object-cover" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-neutral-900">{coin.name}</p>
-        <p className="text-xs uppercase text-neutral-500">{coin.symbol}</p>
+        <p className="truncate text-sm font-semibold text-slate-900">{coin.name}</p>
+        <p className="text-xs uppercase text-slate-500">{coin.symbol}</p>
       </div>
       <div className="text-right">
-        {price != null && <p className="text-sm font-medium text-neutral-900">{formatUsd(price)}</p>}
+        {price != null && <p className="text-sm font-medium text-slate-900">{formatUsd(price)}</p>}
         {change != null && (
           <p className={`text-xs font-medium ${pctClass(change)}`}>{formatPct(change)}</p>
         )}
         {showRank && coin.market_cap_rank != null && price == null && (
-          <p className="text-xs text-neutral-500">#{coin.market_cap_rank}</p>
+          <p className="text-xs text-slate-500">#{coin.market_cap_rank}</p>
         )}
       </div>
     </button>
@@ -58,6 +51,7 @@ const TokenRow: React.FC<TokenRowProps> = ({ coin, onSelect, showRank = true }) 
 };
 
 const DiscoverMarketTab: React.FC = () => {
+  const navigate = useNavigate();
   const { askAI, openPanel } = useAIChatPanel();
   const { t } = useTranslation();
 
@@ -70,17 +64,10 @@ const DiscoverMarketTab: React.FC = () => {
   const [searchResults, setSearchResults] = useState<SearchCoinResult[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
 
-  const [selectedCoin, setSelectedCoin] = useState<CoinDetail | null>(null);
-  const [chartSymbol, setChartSymbol] = useState('BTC');
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState<string | null>(null);
-
   const [tablePage, setTablePage] = useState(0);
-  const [sortKey, setSortKey] = useState<'rank' | 'price' | 'change24h' | 'change7d' | 'marketCap'>(
-    'rank'
-  );
+  const [sortKey, setSortKey] = useState<MarketSortKey>('rank');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
-  const [activeTool, setActiveTool] = useState<MarketQuickToolId | null>(null);
+  const [activeTool, setActiveTool] = useState<MarketQuickToolId>('heatmap');
 
   const loadMarkets = useCallback(async () => {
     setMarketsLoading(true);
@@ -102,33 +89,8 @@ const DiscoverMarketTab: React.FC = () => {
   }, [t]);
 
   useEffect(() => {
-    let cancelled = false;
-    const run = async () => {
-      setMarketsLoading(true);
-      setMarketsError(null);
-      try {
-        const res = await fetch(`${API_AI}/markets?per_page=100`);
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error((body as { message?: string }).message || t('discover.marketTab.loadMarketsFailed'));
-        }
-        const data = (await res.json()) as MarketsResponse & { markets: CoinMarketRow[] };
-        if (cancelled) return;
-        setMarketsData(data);
-        setAllMarkets(data.markets ?? []);
-      } catch (e) {
-        if (!cancelled) {
-          setMarketsError(e instanceof Error ? e.message : t('discover.marketTab.loadMarketDataFailed'));
-        }
-      } finally {
-        if (!cancelled) setMarketsLoading(false);
-      }
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [t]);
+    void loadMarkets();
+  }, [loadMarkets]);
 
   useEffect(() => {
     const q = searchQuery.trim();
@@ -141,7 +103,7 @@ const DiscoverMarketTab: React.FC = () => {
       setSearchLoading(true);
       try {
         const res = await fetch(`${API_AI}/search?q=${encodeURIComponent(q)}`);
-        if (!res.ok) throw new Error('Search failed');
+        if (!res.ok) throw new Error(t('discover.marketTab.searchFailed'));
         const data = await res.json();
         setSearchResults(Array.isArray(data.coins) ? data.coins : []);
       } catch {
@@ -152,7 +114,7 @@ const DiscoverMarketTab: React.FC = () => {
     }, 350);
 
     return () => window.clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, t]);
 
   const onAskAboutToken = useCallback(
     (prompt: string) => {
@@ -162,33 +124,11 @@ const DiscoverMarketTab: React.FC = () => {
     [askAI, openPanel]
   );
 
-  const loadCoinDetail = useCallback(
-    async (id: string, symbol: string, name: string) => {
-      setDetailLoading(true);
-      setDetailError(null);
-      setSelectedCoin(null);
-      setChartSymbol(symbol);
-      onAskAboutToken(
-        t('discover.marketTab.aiAnalyzePrompt', {
-          symbol: `$${symbol.toUpperCase()}`,
-          name,
-        })
-      );
-      try {
-        const res = await fetch(`${API_AI}/coins/${encodeURIComponent(id)}`);
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          throw new Error((body as { message?: string }).message || t('discover.marketTab.loadTokenFailed'));
-        }
-        const data = (await res.json()) as CoinDetail;
-        setSelectedCoin(data);
-      } catch (e) {
-        setDetailError(e instanceof Error ? e.message : t('discover.marketTab.loadTokenFailed'));
-      } finally {
-        setDetailLoading(false);
-      }
+  const openCoinPage = useCallback(
+    (id: string) => {
+      navigate(marketCoinPath(id));
     },
-    [onAskAboutToken, t]
+    [navigate]
   );
 
   const showSearchDropdown = searchQuery.trim().length >= 2;
@@ -198,10 +138,7 @@ const DiscoverMarketTab: React.FC = () => {
     if (fromApi.length >= 8) return fromApi;
     return [...allMarkets]
       .filter((c) => c.price_change_percentage_24h != null)
-      .sort(
-        (a, b) =>
-          (b.price_change_percentage_24h ?? 0) - (a.price_change_percentage_24h ?? 0)
-      )
+      .sort((a, b) => (b.price_change_percentage_24h ?? 0) - (a.price_change_percentage_24h ?? 0))
       .slice(0, 12);
   }, [marketsData?.overview?.topGainers, allMarkets]);
 
@@ -210,10 +147,7 @@ const DiscoverMarketTab: React.FC = () => {
     if (fromApi.length >= 8) return fromApi;
     return [...allMarkets]
       .filter((c) => c.price_change_percentage_24h != null)
-      .sort(
-        (a, b) =>
-          (a.price_change_percentage_24h ?? 0) - (b.price_change_percentage_24h ?? 0)
-      )
+      .sort((a, b) => (a.price_change_percentage_24h ?? 0) - (b.price_change_percentage_24h ?? 0))
       .slice(0, 12);
   }, [marketsData?.overview?.topLosers, allMarkets]);
 
@@ -226,10 +160,6 @@ const DiscoverMarketTab: React.FC = () => {
     [allMarkets]
   );
 
-  const toggleTool = useCallback((id: MarketQuickToolId) => {
-    setActiveTool((current) => (current === id ? null : id));
-  }, []);
-
   const sortedTableRows = useMemo(() => {
     const rows = [...allMarkets];
     const dir = sortDir === 'asc' ? 1 : -1;
@@ -237,16 +167,20 @@ const DiscoverMarketTab: React.FC = () => {
       switch (sortKey) {
         case 'price':
           return ((a.current_price ?? 0) - (b.current_price ?? 0)) * dir;
+        case 'change1h':
+          return ((a.price_change_percentage_1h ?? 0) - (b.price_change_percentage_1h ?? 0)) * dir;
         case 'change24h':
-          return (
-            ((a.price_change_percentage_24h ?? 0) - (b.price_change_percentage_24h ?? 0)) * dir
-          );
+          return ((a.price_change_percentage_24h ?? 0) - (b.price_change_percentage_24h ?? 0)) * dir;
         case 'change7d':
-          return (
-            ((a.price_change_percentage_7d ?? 0) - (b.price_change_percentage_7d ?? 0)) * dir
-          );
+          return ((a.price_change_percentage_7d ?? 0) - (b.price_change_percentage_7d ?? 0)) * dir;
+        case 'change30d':
+          return ((a.price_change_percentage_30d ?? 0) - (b.price_change_percentage_30d ?? 0)) * dir;
         case 'marketCap':
           return ((a.market_cap ?? 0) - (b.market_cap ?? 0)) * dir;
+        case 'volume':
+          return ((a.total_volume ?? 0) - (b.total_volume ?? 0)) * dir;
+        case 'supply':
+          return ((a.circulating_supply ?? 0) - (b.circulating_supply ?? 0)) * dir;
         case 'rank':
         default:
           return ((a.market_cap_rank ?? 9999) - (b.market_cap_rank ?? 9999)) * dir;
@@ -255,13 +189,7 @@ const DiscoverMarketTab: React.FC = () => {
     return rows;
   }, [allMarkets, sortKey, sortDir]);
 
-  const tablePageCount = Math.max(1, Math.ceil(sortedTableRows.length / TABLE_PAGE_SIZE));
-  const tableSlice = sortedTableRows.slice(
-    tablePage * TABLE_PAGE_SIZE,
-    tablePage * TABLE_PAGE_SIZE + TABLE_PAGE_SIZE
-  );
-
-  const toggleSort = (key: typeof sortKey) => {
+  const toggleSort = (key: MarketSortKey) => {
     if (sortKey === key) {
       setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
@@ -270,7 +198,6 @@ const DiscoverMarketTab: React.FC = () => {
     }
     setTablePage(0);
   };
-
 
   return (
     <div className="w-full pb-12">
@@ -287,7 +214,9 @@ const DiscoverMarketTab: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('discover.marketTab.searchPlaceholder')}
-            className="w-full rounded-2xl border border-gray-200 bg-white py-3 pl-14 pr-12 focus:border-blue-500 focus:outline-none"
+            className={`w-full rounded-2xl border border-gray-200 bg-white py-3 pl-14 focus:border-blue-500 focus:outline-none ${
+              searchQuery ? 'pr-12' : 'pr-5'
+            }`}
           />
           {searchQuery && (
             <button
@@ -312,85 +241,40 @@ const DiscoverMarketTab: React.FC = () => {
               )}
               {!searchLoading &&
                 searchResults.map((coin) => (
-                  <TokenRow key={coin.id} coin={coin} onSelect={loadCoinDetail} showRank />
+                  <TokenRow key={coin.id} coin={coin} onSelect={(id) => openCoinPage(id)} showRank />
                 ))}
             </div>
           )}
         </div>
       </div>
 
-      <MarketStatsStrip stats={marketsData?.marketStats ?? null} loading={marketsLoading} />
-
-      <MarketQuickToolsBar
-        activeTool={activeTool}
-        onToggleTool={toggleTool}
-        onAskAlpha={() => onAskAboutToken(t('discover.marketTab.aiMarketOverviewPrompt'))}
+      <MarketStatsStrip
+        stats={marketsData?.marketStats ?? null}
+        globalMetrics={marketsData?.globalMetrics}
+        overview={marketsData?.overview}
+        loading={marketsLoading}
       />
 
-      <div className="mb-6">
-        <MarketQuickToolPanel
-          activeTool={activeTool}
-          onClose={() => setActiveTool(null)}
-          allMarkets={allMarkets}
-          gainers={topGainers}
-          losers={topLosers}
-          trending={marketsData?.trending ?? []}
-          topVolume={topVolume}
-          onSelectCoin={loadCoinDetail}
-        />
-      </div>
-
-      {(detailLoading || selectedCoin || detailError) && (
-        <div className="mb-6 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
-          {detailLoading && (
-            <div className="flex justify-center py-6">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-black" />
-            </div>
-          )}
-          {detailError && !detailLoading && <p className="text-center text-sm text-red-600">{detailError}</p>}
-          {selectedCoin && !detailLoading && (
-            <>
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  {selectedCoin.image && (
-                    <img src={selectedCoin.image} alt="" className="h-14 w-14 rounded-2xl object-cover" />
-                  )}
-                  <div>
-                    <h2 className="text-xl font-bold">{selectedCoin.name}</h2>
-                    <p className="text-sm uppercase text-neutral-500">{selectedCoin.symbol}</p>
-                  </div>
-                </div>
-                <button type="button" onClick={() => { setSelectedCoin(null); setDetailError(null); }} className="rounded-full p-2 hover:bg-neutral-100">
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() =>
-                  onAskAboutToken(
-                    t('discover.marketTab.aiAnalyzePrompt', {
-                      symbol: `$${selectedCoin.symbol.toUpperCase()}`,
-                      name: selectedCoin.name,
-                    })
-                  )
-                }
-                className="mt-4 w-full rounded-xl bg-black py-2.5 text-sm font-semibold text-white"
-              >
-                {t('discover.marketTab.aiAnalysis', { symbol: selectedCoin.symbol.toUpperCase() })}
-              </button>
-            </>
-          )}
-        </div>
-      )}
+      <MarketQuickToolsSection
+        activeTool={activeTool}
+        onSelectTool={setActiveTool}
+        onAskAlpha={() => onAskAboutToken(t('discover.marketTab.aiMarketOverviewPrompt'))}
+        allMarkets={allMarkets}
+        gainers={topGainers}
+        losers={topLosers}
+        trending={marketsData?.trending ?? []}
+        topVolume={topVolume}
+        onSelectCoin={(id) => openCoinPage(id)}
+      />
 
       {marketsLoading && (
         <div className="flex justify-center py-16">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-black" />
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
         </div>
       )}
 
       {marketsError && !marketsLoading && (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-center text-sm text-red-700">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center text-sm text-red-700">
           {marketsError}
           <button type="button" onClick={() => void loadMarkets()} className="ml-2 font-semibold underline">
             {t('discover.marketTab.retry')}
@@ -400,101 +284,44 @@ const DiscoverMarketTab: React.FC = () => {
 
       {marketsData && !marketsLoading && (
         <div className="space-y-6">
-          <div className="overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-              <div className="border-b border-neutral-100 px-4 py-3">
-                <h2 className="text-base font-bold text-neutral-900">{t('discover.marketTab.cryptocurrencies')}</h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[880px] text-sm">
-                  <thead>
-                    <tr className="border-b border-neutral-100 bg-neutral-50/90 text-xs font-semibold text-neutral-500">
-                      <th className="px-4 py-3 text-left">
-                        <button type="button" onClick={() => toggleSort('rank')}>#</button>
-                      </th>
-                      <th className="px-4 py-3 text-left">{t('discover.marketTab.colName')}</th>
-                      <th className="px-4 py-3 text-right">
-                        <button type="button" onClick={() => toggleSort('price')}>{t('discover.marketTab.colPrice')}</button>
-                      </th>
-                      <th className="px-4 py-3 text-right">
-                        <button type="button" onClick={() => toggleSort('change24h')}>{t('discover.marketTab.colChange24h')}</button>
-                      </th>
-                      <th className="px-4 py-3 text-right">
-                        <button type="button" onClick={() => toggleSort('change7d')}>{t('discover.marketTab.colChange7d')}</button>
-                      </th>
-                      <th className="px-4 py-3 text-right">
-                        <button type="button" onClick={() => toggleSort('marketCap')}>{t('discover.marketTab.colMarketCap')}</button>
-                      </th>
-                      <th className="px-4 py-3 text-right">{t('discover.marketTab.colVolume')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableSlice.map((coin) => (
-                      <tr
-                        key={coin.id}
-                        className="cursor-pointer border-b border-neutral-50 hover:bg-neutral-50/80"
-                        onClick={() => loadCoinDetail(coin.id, coin.symbol, coin.name)}
-                      >
-                        <td className="px-4 py-3 text-neutral-500">{coin.market_cap_rank ?? '—'}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <img src={coin.image} alt="" className="h-8 w-8 rounded-full" />
-                            <div>
-                              <p className="font-semibold">{coin.name}</p>
-                              <p className="text-xs uppercase text-neutral-500">{coin.symbol}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-right font-medium">{formatUsd(coin.current_price)}</td>
-                        <td className={`px-4 py-3 text-right font-medium ${pctClass(coin.price_change_percentage_24h)}`}>
-                          {formatPct(coin.price_change_percentage_24h)}
-                        </td>
-                        <td className={`px-4 py-3 text-right font-medium ${pctClass(coin.price_change_percentage_7d)}`}>
-                          {formatPct(coin.price_change_percentage_7d)}
-                        </td>
-                        <td className="px-4 py-3 text-right">{formatUsd(coin.market_cap, true)}</td>
-                        <td className="px-4 py-3 text-right">{formatUsd(coin.total_volume, true)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="flex items-center justify-between border-t border-neutral-100 px-4 py-3 text-sm">
-                <button type="button" disabled={tablePage === 0} onClick={() => setTablePage((p) => p - 1)} className="disabled:opacity-40">
-                  <ChevronLeft className="inline h-4 w-4" /> {t('discover.marketTab.prevPage')}
-                </button>
-                <span className="text-neutral-500">{tablePage + 1} / {tablePageCount}</span>
-                <button type="button" disabled={tablePage >= tablePageCount - 1} onClick={() => setTablePage((p) => p + 1)} className="disabled:opacity-40">
-                  {t('discover.marketTab.nextPage')} <ChevronRight className="inline h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          <div className="grid gap-6 xl:grid-cols-[1fr_320px] xl:items-stretch">
-            <div className="flex min-h-[480px] min-w-0 flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-              <div className="shrink-0 border-b border-neutral-100 px-4 py-3">
-                <h3 className="text-base font-bold text-neutral-900">
-                  {t('discover.marketTab.chartTitle', { symbol: chartSymbol.toUpperCase() })}
+          <MarketCoinTable
+            rows={sortedTableRows}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onToggleSort={toggleSort}
+            page={tablePage}
+            pageSize={TABLE_PAGE_SIZE}
+            onPageChange={setTablePage}
+            onSelectCoin={(id) => openCoinPage(id)}
+          />
+
+          <div className="grid gap-6 xl:grid-cols-[1fr_300px] xl:items-stretch">
+            <div className="flex min-h-[480px] min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div className="shrink-0 border-b border-slate-100 px-4 py-3">
+                <h3 className="text-base font-bold text-slate-900">
+                  {t('discover.marketTab.chartTitle', { symbol: 'BTC' })}
                 </h3>
               </div>
-              <TradingViewChart symbol={chartSymbol} fillParent className="min-h-0 flex-1" />
+              <TradingViewChart symbol="BTC" fillParent className="min-h-0 flex-1" />
             </div>
             <div className="space-y-4">
-            {/* <AlphaPulse variant="light" /> */}
-            <div className="rounded-xl border border-neutral-200 bg-white p-4">
-              <h3 className="mb-2 flex items-center gap-2 font-bold">
-                <ShieldCheck className="h-4 w-4 text-emerald-600" /> {t('discover.marketTab.highTrust')}
-              </h3>
-              {marketsData.highTrust.map((c) => (
-                <TokenRow key={c.id} coin={c} onSelect={loadCoinDetail} />
-              ))}
-            </div>
-            <div className="rounded-xl border border-neutral-200 bg-white p-4">
-              <h3 className="mb-2 font-bold">{t('discover.marketTab.trending')}</h3>
-              {marketsData.trending.map((c) => (
-                <TokenRow key={c.id} coin={c} onSelect={loadCoinDetail} />
-              ))}
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h3 className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-900">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  {t('discover.marketTab.highTrust')}
+                </h3>
+                {marketsData.highTrust.map((c) => (
+                  <TokenRow key={c.id} coin={c} onSelect={(id) => openCoinPage(id)} />
+                ))}
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h3 className="mb-2 text-sm font-bold text-slate-900">{t('discover.marketTab.trending')}</h3>
+                {marketsData.trending.map((c) => (
+                  <TokenRow key={c.id} coin={c} onSelect={(id) => openCoinPage(id)} />
+                ))}
+              </div>
             </div>
           </div>
-        </div>
         </div>
       )}
     </div>

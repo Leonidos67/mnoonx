@@ -10,7 +10,6 @@ import {
   X,
   GripVertical,
   Video,
-  Upload,
   Link as LinkIcon,
   ClipboardPaste,
   Lock,
@@ -22,16 +21,23 @@ import {
   Copy,
   Image as ImageIcon,
   Files,
+  Settings,
+  EyeOff,
+  Save,
+  Eye,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useTranslation } from '../../i18n/useTranslation';
 import ResponsiveDialogShell from '../Common/ResponsiveDialogShell';
 import { communityPath } from '../../constants/communityRoutes';
+import { DRIP_OPTIONS, dripLabelForDays, lessonShowsLocked } from '../../utils/courseAccess';
+import { parseYoutubeEmbedUrl, youtubeThumbnailUrl } from '../../utils/courseYoutube';
 
 import { COMMUNITIES_API as API } from '../../config/api';
 
-const Z_OVERLAY = 10000;
+// const Z_OVERLAY = 10000;
 const Z_MENU = 10001;
 
 export interface CourseListItem {
@@ -52,6 +58,9 @@ interface Lesson {
   images: string[];
   attachments: string[];
   dripLabel: string;
+  isLocked?: boolean;
+  unlockAfterDays?: number;
+  isAccessible?: boolean;
 }
 
 interface Chapter {
@@ -63,6 +72,64 @@ interface Chapter {
 
 interface CourseFull extends CourseListItem {
   chapters: Chapter[];
+  welcomeMessage?: string;
+  completionMessage?: string;
+  sequentialUnlock?: boolean;
+  defaultLessonUnlockDays?: number;
+  tags?: string[];
+  createdAt?: string;
+}
+
+function isTempCourseId(id: unknown): boolean {
+  return String(id).startsWith('temp-');
+}
+
+function chaptersForSave(chapters: Chapter[]): Chapter[] {
+  return chapters.map((ch, chIdx) => {
+    const lessons = ch.lessons.map((ls) => {
+      if (isTempCourseId(ls._id)) {
+        const { _id: _omit, ...rest } = ls;
+        return rest as Lesson;
+      }
+      return ls;
+    });
+    if (isTempCourseId(ch._id)) {
+      const { _id: _omit, ...rest } = ch;
+      return { ...rest, order: chIdx, lessons } as Chapter;
+    }
+    return { ...ch, order: chIdx, lessons };
+  });
+}
+
+function coursePatchPayload(course: CourseFull, instanceId: string) {
+  return {
+    instanceId,
+    name: course.name,
+    description: course.description,
+    isHidden: course.isHidden,
+    coverUrl: course.coverUrl,
+    welcomeMessage: course.welcomeMessage ?? '',
+    completionMessage: course.completionMessage ?? '',
+    sequentialUnlock: Boolean(course.sequentialUnlock),
+    defaultLessonUnlockDays: Math.max(0, Number(course.defaultLessonUnlockDays) || 0),
+    tags: course.tags ?? [],
+    chapters: chaptersForSave(course.chapters),
+  };
+}
+
+function normalizeCourseFull(data: CourseFull, tr: (k: string) => string): CourseFull {
+  return {
+    ...data,
+    welcomeMessage: data.welcomeMessage ?? '',
+    completionMessage: data.completionMessage ?? '',
+    sequentialUnlock: Boolean(data.sequentialUnlock),
+    defaultLessonUnlockDays: Math.max(0, Number(data.defaultLessonUnlockDays) || 0),
+    tags: Array.isArray(data.tags) ? data.tags : [],
+    chapters: (data.chapters || []).map((ch) => ({
+      ...ch,
+      lessons: (ch.lessons || []).map((ls) => normalizeLesson(ls, tr)),
+    })),
+  };
 }
 
 interface CommunityCoursesPanelProps {
@@ -93,32 +160,17 @@ function sameId(a: unknown, b: unknown): boolean {
   return String(a) === String(b);
 }
 
-/** Returns YouTube embed URL or null */
-function parseYoutubeEmbedUrl(url: string): string | null {
-  const u = url.trim();
-  if (!u) return null;
-  if (/^[\w-]{11}$/.test(u)) return `https://www.youtube.com/embed/${u}`;
-  try {
-    const parsed = new URL(u);
-    const host = parsed.hostname.replace(/^www\./, '');
-    if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'music.youtube.com') {
-      if (parsed.pathname.startsWith('/embed/')) {
-        const id = parsed.pathname.split('/')[2];
-        if (id) return `https://www.youtube.com/embed/${id}`;
-      }
-      const v = parsed.searchParams.get('v');
-      if (v && /^[\w-]{11}$/.test(v)) return `https://www.youtube.com/embed/${v}`;
-      const shorts = parsed.pathname.match(/^\/shorts\/([\w-]+)/);
-      if (shorts?.[1]) return `https://www.youtube.com/embed/${shorts[1]}`;
-    }
-    if (host === 'youtu.be') {
-      const id = parsed.pathname.replace(/^\//, '').split('/')[0];
-      if (id && /^[\w-]{11}$/.test(id)) return `https://www.youtube.com/embed/${id}`;
-    }
-  } catch {
-    return null;
-  }
-  return null;
+function normalizeLesson(ls: Lesson, t: (k: string) => string): Lesson {
+  const isLocked = Boolean(ls.isLocked);
+  const unlockAfterDays = Math.max(0, Number(ls.unlockAfterDays) || 0);
+  return {
+    ...ls,
+    images: Array.isArray(ls.images) ? ls.images : [],
+    attachments: Array.isArray(ls.attachments) ? ls.attachments : [],
+    isLocked,
+    unlockAfterDays,
+    dripLabel: ls.dripLabel || dripLabelForDays(unlockAfterDays, isLocked, t),
+  };
 }
 
 function reorderChapters(chapters: Chapter[], fromId: string, toId: string): Chapter[] {
@@ -141,14 +193,23 @@ function reorderLessons(lessons: Lesson[], fromId: string, toId: string): Lesson
   return next;
 }
 
-const emptyLesson = (): Omit<Lesson, '_id'> => ({
+let tempCourseIdSeq = 0;
+
+function tempCourseId(kind: 'chapter' | 'lesson'): string {
+  tempCourseIdSeq += 1;
+  return `temp-${kind}-${Date.now()}-${tempCourseIdSeq}`;
+}
+
+const emptyLesson = (tr: (k: string) => string, defaultDays = 0): Omit<Lesson, '_id'> => ({
   title: 'New lesson',
   lessonType: 'multimedia',
   videoEmbedUrl: '',
   content: '',
   images: [],
   attachments: [],
-  dripLabel: 'Unlocks immediately',
+  isLocked: false,
+  unlockAfterDays: defaultDays,
+  dripLabel: dripLabelForDays(defaultDays, false, tr),
 });
 
 const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
@@ -161,7 +222,8 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
   const { token } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
-  const [view, setView] = useState<'list' | 'editor'>('list');
+  const { t } = useTranslation();
+  const [view, setView] = useState<'list' | 'editor' | 'settings'>('list');
   const [courses, setCourses] = useState<CourseListItem[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [editorCourseId, setEditorCourseId] = useState<string | null>(null);
@@ -176,8 +238,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
   const [expandedChapters, setExpandedChapters] = useState<Record<string, boolean>>({});
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const saveTimerRef = useRef<number | null>(null);
+  const [saveState, setSaveState] = useState<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>('idle');
   const coverInputRef = useRef<HTMLInputElement | null>(null);
   const lessonImageInputRef = useRef<HTMLInputElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
@@ -187,12 +248,11 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
   const [chapterDragId, setChapterDragId] = useState<string | null>(null);
   const [lessonDragKey, setLessonDragKey] = useState<string | null>(null);
   const [lessonImageUrlDraft, setLessonImageUrlDraft] = useState('');
+  const [quickCreateBusy, setQuickCreateBusy] = useState(false);
+  const editorCoverInputRef = useRef<HTMLInputElement | null>(null);
 
-  const cancelScheduledSave = useCallback(() => {
-    if (saveTimerRef.current != null) {
-      window.clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
+  const markCourseDirty = useCallback(() => {
+    setSaveState((s) => (s === 'saving' ? s : 'dirty'));
   }, []);
 
   const loadList = useCallback(async () => {
@@ -234,7 +294,6 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
   const persistCourseNow = useCallback(
     async (next: CourseFull): Promise<CourseFull | null> => {
       if (!isOwner || !token || !handle || !instanceId || !editorCourseId) return null;
-      cancelScheduledSave();
       setSaveState('saving');
       try {
         const res = await fetch(`${API}/${encodeURIComponent(handle)}/courses/${editorCourseId}`, {
@@ -243,30 +302,24 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            instanceId,
-            name: next.name,
-            description: next.description,
-            isHidden: next.isHidden,
-            coverUrl: next.coverUrl,
-            chapters: next.chapters,
-          }),
+          body: JSON.stringify(coursePatchPayload(next, instanceId)),
         });
         if (!res.ok) {
           setSaveState('error');
           return null;
         }
         const saved = (await res.json()) as CourseFull;
-        setCourseFull(saved);
+        const normalized = normalizeCourseFull(saved, t);
+        setCourseFull(normalized);
         setSaveState('saved');
         window.setTimeout(() => setSaveState((s) => (s === 'saved' ? 'idle' : s)), 2000);
-        return saved;
+        return normalized;
       } catch {
         setSaveState('error');
         return null;
       }
     },
-    [isOwner, token, handle, instanceId, editorCourseId, cancelScheduledSave]
+    [isOwner, token, handle, instanceId, editorCourseId, t]
   );
 
   const openEditor = useCallback(
@@ -286,17 +339,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
           return;
         }
         const data = (await res.json()) as CourseFull;
-        const normalized: CourseFull = {
-          ...data,
-          chapters: (data.chapters || []).map((ch) => ({
-            ...ch,
-            lessons: (ch.lessons || []).map((ls) => ({
-              ...ls,
-              images: Array.isArray(ls.images) ? ls.images : [],
-              attachments: Array.isArray(ls.attachments) ? ls.attachments : [],
-            })),
-          })),
-        };
+        const normalized = normalizeCourseFull(data, t);
         setCourseFull(normalized);
         const firstCh = normalized.chapters?.[0];
         const firstLs = firstCh?.lessons?.[0];
@@ -307,11 +350,12 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
           exp[String(c._id)] = true;
         });
         setExpandedChapters(exp);
+        setSaveState('idle');
       } finally {
         setLoadingCourse(false);
       }
     },
-    [token, handle, instanceId]
+    [token, handle, instanceId, t]
   );
 
   const activeLesson = useMemo(() => {
@@ -330,44 +374,20 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
     [activeLesson?.videoEmbedUrl]
   );
 
-  const scheduleSave = useCallback(
-    (next: CourseFull) => {
-      if (!isOwner || !token || !handle || !instanceId || !editorCourseId) return;
-      setSaveState('saving');
-      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = window.setTimeout(async () => {
-        saveTimerRef.current = null;
-        try {
-          const res = await fetch(`${API}/${encodeURIComponent(handle)}/courses/${editorCourseId}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              instanceId,
-              name: next.name,
-              description: next.description,
-              isHidden: next.isHidden,
-              coverUrl: next.coverUrl,
-              chapters: next.chapters,
-            }),
-          });
-          if (!res.ok) {
-            setSaveState('error');
-            return;
-          }
-          const saved = (await res.json()) as CourseFull;
-          setCourseFull(saved);
-          setSaveState('saved');
-          window.setTimeout(() => setSaveState((s) => (s === 'saved' ? 'idle' : s)), 2000);
-        } catch {
-          setSaveState('error');
-        }
-      }, 650);
-    },
-    [isOwner, token, handle, instanceId, editorCourseId]
+  const youtubeThumb = useMemo(
+    () => (activeLesson?.videoEmbedUrl ? youtubeThumbnailUrl(activeLesson.videoEmbedUrl) : null),
+    [activeLesson?.videoEmbedUrl]
   );
+
+  const activeLessonLocked = useMemo(
+    () => (activeLesson ? lessonShowsLocked(activeLesson, isOwner) : false),
+    [activeLesson, isOwner]
+  );
+
+  const lessonCount = useMemo(() => {
+    if (!courseFull) return 0;
+    return courseFull.chapters.reduce((n, ch) => n + (ch.lessons?.length || 0), 0);
+  }, [courseFull]);
 
   const updateLesson = useCallback(
     (patch: Partial<Lesson>) => {
@@ -381,56 +401,130 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
       });
       const next = { ...courseFull, chapters };
       setCourseFull(next);
-      scheduleSave(next);
+      markCourseDirty();
     },
-    [courseFull, activeChapterId, activeLessonId, isOwner, scheduleSave]
+    [courseFull, activeChapterId, activeLessonId, isOwner, markCourseDirty]
+  );
+
+  const handleSaveNow = useCallback(async () => {
+    if (!courseFull || !isOwner) return;
+    const chIdx = activeChapterId
+      ? courseFull.chapters.findIndex((c) => sameId(c._id, activeChapterId))
+      : -1;
+    const lsIdx =
+      chIdx >= 0 && activeLessonId
+        ? courseFull.chapters[chIdx].lessons.findIndex((l) => sameId(l._id, activeLessonId))
+        : -1;
+    const saved = await persistCourseNow(courseFull);
+    if (saved) {
+      if (chIdx >= 0 && saved.chapters[chIdx]) {
+        setActiveChapterId(String(saved.chapters[chIdx]._id));
+        if (lsIdx >= 0 && saved.chapters[chIdx].lessons[lsIdx]) {
+          setActiveLessonId(String(saved.chapters[chIdx].lessons[lsIdx]._id));
+        }
+      }
+      void loadList();
+      showToast(t('community.coursesPanel.saved'), 'success');
+    } else {
+      showToast(t('community.coursesPanel.saveFailed'), 'error');
+    }
+  }, [
+    courseFull,
+    isOwner,
+    activeChapterId,
+    activeLessonId,
+    persistCourseNow,
+    loadList,
+    showToast,
+    t,
+  ]);
+
+  const updateCourseMeta = useCallback(
+    (
+      patch: Partial<
+        Pick<
+          CourseFull,
+          | 'name'
+          | 'description'
+          | 'isHidden'
+          | 'coverUrl'
+          | 'welcomeMessage'
+          | 'completionMessage'
+          | 'sequentialUnlock'
+          | 'defaultLessonUnlockDays'
+          | 'tags'
+        >
+      >
+    ) => {
+      if (!courseFull || !isOwner) return;
+      const next = { ...courseFull, ...patch };
+      setCourseFull(next);
+      markCourseDirty();
+    },
+    [courseFull, isOwner, markCourseDirty]
+  );
+
+  const applyLessonPrivacy = useCallback(
+    (patch: { isLocked?: boolean; unlockAfterDays?: number }) => {
+      if (!activeLesson) return;
+      const isLocked = patch.isLocked ?? activeLesson.isLocked ?? false;
+      const unlockAfterDays =
+        patch.unlockAfterDays ?? Math.max(0, Number(activeLesson.unlockAfterDays) || 0);
+      updateLesson({
+        isLocked,
+        unlockAfterDays: isLocked ? 0 : unlockAfterDays,
+        dripLabel: dripLabelForDays(isLocked ? 0 : unlockAfterDays, isLocked, t),
+      });
+    },
+    [activeLesson, updateLesson, t]
   );
 
   const addChapter = useCallback(() => {
     if (!courseFull || !isOwner) return;
     const order = courseFull.chapters.length;
-    const newChapter = {
+    const chapterId = tempCourseId('chapter');
+    const lessonId = tempCourseId('lesson');
+    const newChapter: Chapter = {
+      _id: chapterId,
       title: `Chapter ${order + 1}`,
       order,
-      lessons: [{ ...emptyLesson(), title: 'Lesson 1' }],
+      lessons: [
+        {
+          _id: lessonId,
+          ...emptyLesson(t, courseFull.defaultLessonUnlockDays ?? 0),
+          title: 'Lesson 1',
+        },
+      ],
     };
-    const next = { ...courseFull, chapters: [...courseFull.chapters, newChapter as unknown as Chapter] };
-    void (async () => {
-      const saved = await persistCourseNow(next);
-      if (!saved?.chapters?.length) return;
-      const last = saved.chapters[saved.chapters.length - 1];
-      const firstL = last.lessons?.[0];
-      if (last._id) setExpandedChapters((e) => ({ ...e, [String(last._id)]: true }));
-      if (last._id && firstL?._id) {
-        setActiveChapterId(String(last._id));
-        setActiveLessonId(String(firstL._id));
-      }
-    })();
-  }, [courseFull, isOwner, persistCourseNow]);
+    const next = { ...courseFull, chapters: [...courseFull.chapters, newChapter] };
+    setCourseFull(next);
+    markCourseDirty();
+    setExpandedChapters((e) => ({ ...e, [chapterId]: true }));
+    setActiveChapterId(chapterId);
+    setActiveLessonId(lessonId);
+  }, [courseFull, isOwner, markCourseDirty, t]);
 
   const addLesson = useCallback(
     (chapterId: string) => {
       if (!courseFull || !isOwner) return;
+      const lessonId = tempCourseId('lesson');
       const chapters = courseFull.chapters.map((ch) => {
         if (!sameId(ch._id, chapterId)) return ch;
         return {
           ...ch,
-          lessons: [...ch.lessons, { ...emptyLesson() } as unknown as Lesson],
+          lessons: [
+            ...ch.lessons,
+            { _id: lessonId, ...emptyLesson(t, courseFull.defaultLessonUnlockDays ?? 0) },
+          ],
         };
       });
       const next = { ...courseFull, chapters };
-      void (async () => {
-        const saved = await persistCourseNow(next);
-        if (!saved) return;
-        const ch = saved.chapters.find((c) => sameId(c._id, chapterId));
-        const last = ch?.lessons[ch.lessons.length - 1];
-        if (last?._id) {
-          setActiveChapterId(String(chapterId));
-          setActiveLessonId(String(last._id));
-        }
-      })();
+      setCourseFull(next);
+      markCourseDirty();
+      setActiveChapterId(String(chapterId));
+      setActiveLessonId(lessonId);
     },
-    [courseFull, isOwner, persistCourseNow]
+    [courseFull, isOwner, markCourseDirty, t]
   );
 
   const requestDeleteChapter = useCallback(
@@ -452,16 +546,17 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
             .filter((c) => !sameId(c._id, chapterId))
             .map((c, i) => ({ ...c, order: i }));
           const next = { ...courseFull, chapters };
-          const saved = await persistCourseNow(next);
-          if (saved && sameId(activeChapterId, chapterId)) {
-            const first = saved.chapters[0];
+          setCourseFull(next);
+          markCourseDirty();
+          if (sameId(activeChapterId, chapterId)) {
+            const first = next.chapters[0];
             setActiveChapterId(first ? String(first._id) : null);
             setActiveLessonId(first?.lessons?.[0]?._id != null ? String(first.lessons[0]._id) : null);
           }
         },
       });
     },
-    [courseFull, isOwner, persistCourseNow, activeChapterId]
+    [courseFull, isOwner, markCourseDirty, activeChapterId, showToast]
   );
 
   const requestDeleteLesson = useCallback(
@@ -491,16 +586,17 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
             };
           });
           const next = { ...courseFull, chapters };
-          const saved = await persistCourseNow(next);
-          if (saved && sameId(activeChapterId, chapterId) && sameId(activeLessonId, lessonId)) {
-            const updatedCh = saved.chapters.find((c) => sameId(c._id, chapterId));
+          setCourseFull(next);
+          markCourseDirty();
+          if (sameId(activeChapterId, chapterId) && sameId(activeLessonId, lessonId)) {
+            const updatedCh = next.chapters.find((c) => sameId(c._id, chapterId));
             const first = updatedCh?.lessons[0];
             if (first?._id) setActiveLessonId(String(first._id));
           }
         },
       });
     },
-    [courseFull, isOwner, persistCourseNow, activeChapterId, activeLessonId]
+    [courseFull, isOwner, markCourseDirty, activeChapterId, activeLessonId, showToast]
   );
 
   const duplicateLesson = useCallback(
@@ -512,21 +608,26 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
         const idx = ch.lessons.findIndex((l) => sameId(l._id, lessonId));
         if (idx < 0) return ch;
         const src = ch.lessons[idx];
-        const copy = {
+        const copy: Lesson = {
+          _id: tempCourseId('lesson'),
           title: `${src.title} (copy)`,
           lessonType: src.lessonType,
           videoEmbedUrl: src.videoEmbedUrl,
           content: src.content,
           images: [...(src.images || [])],
           attachments: [...(src.attachments || [])],
+          isLocked: Boolean(src.isLocked),
+          unlockAfterDays: Math.max(0, Number(src.unlockAfterDays) || 0),
           dripLabel: src.dripLabel,
         };
-        const lessons = [...ch.lessons.slice(0, idx + 1), copy as unknown as Lesson, ...ch.lessons.slice(idx + 1)];
+        const lessons = [...ch.lessons.slice(0, idx + 1), copy, ...ch.lessons.slice(idx + 1)];
         return { ...ch, lessons };
       });
-      void persistCourseNow({ ...courseFull, chapters });
+      const next = { ...courseFull, chapters };
+      setCourseFull(next);
+      markCourseDirty();
     },
-    [courseFull, isOwner, persistCourseNow]
+    [courseFull, isOwner, markCourseDirty]
   );
 
   const onChapterDrop = useCallback(
@@ -536,9 +637,10 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
       const fromId = e.dataTransfer.getData('text/x-chapter-id');
       if (!fromId || !courseFull || !isOwner || sameId(fromId, targetChapterId)) return;
       const chapters = reorderChapters(courseFull.chapters, fromId, targetChapterId);
-      void persistCourseNow({ ...courseFull, chapters });
+      setCourseFull({ ...courseFull, chapters });
+      markCourseDirty();
     },
-    [courseFull, isOwner, persistCourseNow]
+    [courseFull, isOwner, markCourseDirty]
   );
 
   const onLessonDrop = useCallback(
@@ -557,12 +659,13 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
           if (!sameId(ch._id, chapterId)) return ch;
           return { ...ch, lessons: reorderLessons(ch.lessons, fromLs, targetLessonId) };
         });
-        void persistCourseNow({ ...courseFull, chapters });
+        setCourseFull({ ...courseFull, chapters });
+        markCourseDirty();
       } catch {
         /* ignore */
       }
     },
-    [courseFull, isOwner, persistCourseNow]
+    [courseFull, isOwner, markCourseDirty]
   );
 
   useEffect(() => {
@@ -592,6 +695,82 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) void loadList();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const quickCreateCourse = async () => {
+    if (!token || !handle || !instanceId || !isOwner || quickCreateBusy) return;
+    setQuickCreateBusy(true);
+    try {
+      const res = await fetch(`${API}/${encodeURIComponent(handle)}/courses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          instanceId,
+          name: t('community.coursesPanel.newCourse'),
+          description: '',
+          isHidden: true,
+          coverUrl: '',
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        showToast((d as { message?: string }).message || t('community.coursesPanel.quickCreateFailed'), 'error');
+        return;
+      }
+      const created = (await res.json()) as CourseFull;
+      void loadList();
+      await openEditor(created._id);
+    } finally {
+      setQuickCreateBusy(false);
+    }
+  };
+
+  const duplicateCourse = async (courseId: string) => {
+    if (!token || !handle || !instanceId || !isOwner) return;
+    try {
+      const q = new URLSearchParams({ instanceId });
+      const res = await fetch(`${API}/${encodeURIComponent(handle)}/courses/${courseId}?${q}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const src = (await res.json()) as CourseFull;
+      const createRes = await fetch(`${API}/${encodeURIComponent(handle)}/courses`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          instanceId,
+          name: `${src.name} (copy)`,
+          description: src.description,
+          isHidden: true,
+          coverUrl: src.coverUrl,
+        }),
+      });
+      if (!createRes.ok) return;
+      const created = (await createRes.json()) as CourseFull;
+      const patchRes = await fetch(`${API}/${encodeURIComponent(handle)}/courses/${created._id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          instanceId,
+          chapters: src.chapters,
+        }),
+      });
+      if (patchRes.ok) {
+        void loadList();
+        showToast(t('community.coursesPanel.saved'), 'success');
+      }
     } catch {
       /* ignore */
     }
@@ -646,8 +825,34 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
 
   const copyCourseLink = () => {
     if (!editorCourseId) return;
-    const url = `${window.location.origin}${communityPath(handle)}`;
-    void navigator.clipboard.writeText(url);
+    const url = `${window.location.origin}${communityPath(handle)}?courses=${editorCourseId}`;
+    void navigator.clipboard.writeText(url).then(() => {
+      showToast(t('community.coursesPanel.linkCopied'), 'success');
+    });
+  };
+
+  const readEditorCoverFile = (file: File | null) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const r = String(reader.result || '');
+      if (r.length > 400_000) {
+        showToast('Image is too large. Use a smaller file or paste an image URL instead.', 'info');
+        return;
+      }
+      updateCourseMeta({ coverUrl: r });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const pasteYoutubeFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) return;
+      updateLesson({ videoEmbedUrl: text.trim(), lessonType: 'video' });
+    } catch {
+      showToast(t('community.coursesPanel.youtubeInvalid'), 'info');
+    }
   };
 
   const readCoverFile = (file: File | null) => {
@@ -687,9 +892,8 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
             }),
           };
         });
-        const next = { ...prev, chapters };
-        scheduleSave(next);
-        return next;
+        markCourseDirty();
+        return { ...prev, chapters };
       });
     };
     reader.readAsDataURL(file);
@@ -718,9 +922,8 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
             }),
           };
         });
-        const next = { ...prev, chapters };
-        scheduleSave(next);
-        return next;
+        markCourseDirty();
+        return { ...prev, chapters };
       });
     };
     reader.readAsDataURL(file);
@@ -754,9 +957,8 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
           }),
         };
       });
-      const next = { ...prev, chapters };
-      scheduleSave(next);
-      return next;
+      markCourseDirty();
+      return { ...prev, chapters };
     });
     setLessonImageUrlDraft('');
   };
@@ -927,7 +1129,9 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
     return (
       <div className="flex h-full flex-col overflow-hidden rounded-xl border border-[#e7e7e7] bg-white">
         {headerChrome}
-        <div className="flex flex-1 items-center justify-center p-8 text-sm text-neutral-500">Sign in to use Courses.</div>
+        <div className="flex flex-1 items-center justify-center p-8 text-sm text-neutral-500">
+          {t('community.coursesPanel.signIn')}
+        </div>
       </div>
     );
   }
@@ -946,13 +1150,25 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
               {isOwner && (
                 <button
                   type="button"
-                  onClick={() => setCreateOpen(true)}
-                  className="flex min-h-[160px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-200 bg-white px-4 py-8 text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
+                  disabled={quickCreateBusy}
+                  onClick={() => void quickCreateCourse()}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setCreateOpen(true);
+                  }}
+                  title={t('community.coursesPanel.addCourse')}
+                  className="flex min-h-[160px] flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-200 bg-white px-4 py-8 text-neutral-600 transition-colors hover:border-[#315efb]/40 hover:bg-[#f8faff] disabled:opacity-50"
                 >
-                  <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-neutral-300">
-                    <Plus className="h-7 w-7 text-neutral-400" strokeWidth={1.25} />
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-neutral-300 bg-white">
+                    {quickCreateBusy ? (
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-neutral-200 border-t-[#315efb]" />
+                    ) : (
+                      <Plus className="h-7 w-7 text-[#315efb]" strokeWidth={1.25} />
+                    )}
                   </span>
-                  <span className="mt-4 text-sm font-medium text-neutral-700">Add course</span>
+                  <span className="mt-4 text-sm font-medium text-neutral-800">
+                    {quickCreateBusy ? t('community.coursesPanel.creating') : t('community.coursesPanel.addCourse')}
+                  </span>
                 </button>
               )}
               {courses.map((c) => (
@@ -976,18 +1192,39 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                     </div>
                     <div className="flex flex-1 flex-col p-3">
                       <p className="line-clamp-2 font-semibold text-neutral-900">{c.name}</p>
-                      {c.isHidden && <span className="mt-1 text-xs text-amber-600">Hidden</span>}
+                      {c.isHidden && (
+                        <span className="mt-1 inline-flex items-center gap-1 text-xs text-amber-700">
+                          <EyeOff className="h-3 w-3" />
+                          {t('community.coursesPanel.hidden')}
+                        </span>
+                      )}
                     </div>
                   </button>
                   {isOwner && (
-                    <button
-                      type="button"
-                      onClick={() => void deleteCourse(c._id)}
-                      className="absolute right-2 top-2 rounded-lg bg-white/90 p-1.5 text-neutral-500 opacity-0 shadow-sm transition-opacity hover:text-red-600 group-hover:opacity-100"
-                      title="Delete course"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void duplicateCourse(c._id);
+                        }}
+                        className="rounded-lg bg-white/90 p-1.5 text-neutral-500 shadow-sm hover:text-[#315efb]"
+                        title={t('community.coursesPanel.duplicateCourse')}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void deleteCourse(c._id);
+                        }}
+                        className="rounded-lg bg-white/90 p-1.5 text-neutral-500 shadow-sm hover:text-red-600"
+                        title={t('community.coursesPanel.deleteCourse')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -1114,6 +1351,349 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
     );
   }
 
+  const editorActionBar = (
+    <div className="flex items-center gap-2">
+      <span className="hidden text-sm text-neutral-400 sm:inline">
+        {saveState === 'saving' && t('community.coursesPanel.saving')}
+        {saveState === 'saved' && t('community.coursesPanel.saved')}
+        {saveState === 'error' && t('community.coursesPanel.saveFailed')}
+        {saveState === 'dirty' && t('community.coursesPanel.unsavedChanges')}
+        {saveState === 'idle' && '\u00a0'}
+      </span>
+      {isOwner && (
+        <button
+          type="button"
+          onClick={() => setView('settings')}
+          className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+            view === 'settings'
+              ? 'border-[#315efb] bg-[#eef2ff] text-[#315efb]'
+              : 'border-neutral-200 text-neutral-800 hover:bg-neutral-50'
+          }`}
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <Settings className="h-3.5 w-3.5" />
+            {t('community.coursesPanel.settings')}
+          </span>
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={copyCourseLink}
+        className="rounded-full border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50"
+      >
+        <span className="inline-flex items-center gap-1.5">
+          <Copy className="h-3.5 w-3.5" />
+          {t('community.coursesPanel.copyLink')}
+        </span>
+      </button>
+      {isOwner && (
+        <button
+          type="button"
+          onClick={() => void handleSaveNow()}
+          disabled={saveState === 'saving'}
+          className="rounded-full bg-black px-3 py-1.5 text-xs font-semibold text-white hover:bg-black/80 disabled:opacity-50"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            {/* <Save className="h-3.5 w-3.5" /> */}
+            {t('community.coursesPanel.save')}
+          </span>
+        </button>
+      )}
+    </div>
+  );
+
+  if (view === 'settings' && courseFull && isOwner) {
+    const formattedUpdated = courseFull.updatedAt
+      ? new Date(courseFull.updatedAt).toLocaleString()
+      : '—';
+
+    return (
+      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[#e7e7e7] bg-white">
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-200 bg-white px-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setView('editor')}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100"
+              aria-label={t('community.coursesPanel.backToEditor')}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-white">
+              <Settings className="h-5 w-5" strokeWidth={2} />
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xs text-neutral-500">{courseFull.name}</p>
+              <h1 className="truncate text-lg font-semibold text-neutral-900">
+                {t('community.coursesPanel.settingsPageTitle')}
+              </h1>
+            </div>
+          </div>
+          {editorActionBar}
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto bg-neutral-50/60 p-4 sm:p-6">
+          <div className="mx-auto max-w-3xl space-y-5">
+            <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+                {t('community.coursesPanel.settingsGeneral')}
+              </h2>
+              <div className="mt-4 space-y-4">
+                <label className="block text-sm font-medium text-neutral-800">
+                  {t('community.coursesPanel.courseName')}
+                  <input
+                    value={courseFull.name}
+                    onChange={(e) => updateCourseMeta({ name: e.target.value })}
+                    className="mt-1.5 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-neutral-800">
+                  {t('community.coursesPanel.description')}
+                  <textarea
+                    value={courseFull.description}
+                    onChange={(e) => updateCourseMeta({ description: e.target.value })}
+                    placeholder={t('community.coursesPanel.descriptionPlaceholder')}
+                    rows={4}
+                    className="mt-1.5 w-full resize-none rounded-lg border border-neutral-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-neutral-800">
+                  {t('community.coursesPanel.tags')}
+                  <p className="text-xs font-normal text-neutral-500">{t('community.coursesPanel.tagsHint')}</p>
+                  <input
+                    value={(courseFull.tags ?? []).join(', ')}
+                    onChange={(e) =>
+                      updateCourseMeta({
+                        tags: e.target.value
+                          .split(',')
+                          .map((s) => s.trim())
+                          .filter(Boolean)
+                          .slice(0, 20),
+                      })
+                    }
+                    placeholder={t('community.coursesPanel.tagsPlaceholder')}
+                    className="mt-1.5 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+                {t('community.coursesPanel.settingsMessages')}
+              </h2>
+              <div className="mt-4 space-y-4">
+                <label className="block text-sm font-medium text-neutral-800">
+                  {t('community.coursesPanel.welcomeMessage')}
+                  <p className="text-xs font-normal text-neutral-500">{t('community.coursesPanel.welcomeMessageHint')}</p>
+                  <textarea
+                    value={courseFull.welcomeMessage ?? ''}
+                    onChange={(e) => updateCourseMeta({ welcomeMessage: e.target.value })}
+                    placeholder={t('community.coursesPanel.welcomeMessagePlaceholder')}
+                    rows={3}
+                    className="mt-1.5 w-full resize-none rounded-lg border border-neutral-200 px-3 py-2 text-sm"
+                  />
+                </label>
+                <label className="block text-sm font-medium text-neutral-800">
+                  {t('community.coursesPanel.completionMessage')}
+                  <p className="text-xs font-normal text-neutral-500">{t('community.coursesPanel.completionMessageHint')}</p>
+                  <textarea
+                    value={courseFull.completionMessage ?? ''}
+                    onChange={(e) => updateCourseMeta({ completionMessage: e.target.value })}
+                    placeholder={t('community.coursesPanel.completionMessagePlaceholder')}
+                    rows={3}
+                    className="mt-1.5 w-full resize-none rounded-lg border border-neutral-200 px-3 py-2 text-sm"
+                  />
+                </label>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+                {t('community.coursesPanel.settingsAppearance')}
+              </h2>
+              <div className="mt-4 flex flex-wrap gap-4">
+                <div className="flex h-32 w-48 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-neutral-200 bg-neutral-50">
+                  {courseFull.coverUrl ? (
+                    <img src={courseFull.coverUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <Film className="h-10 w-10 text-neutral-300" />
+                  )}
+                </div>
+                <div className="min-w-[200px] flex-1">
+                  <p className="text-sm font-medium text-neutral-800">{t('community.coursesPanel.cover')}</p>
+                  <p className="mt-1 text-xs text-neutral-500">{t('community.coursesPanel.coverHint')}</p>
+                  <input
+                    ref={editorCoverInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => readEditorCoverFile(e.target.files?.[0] ?? null)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => editorCoverInputRef.current?.click()}
+                    className="mt-3 rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+                  >
+                    {t('community.coursesPanel.changeCover')}
+                  </button>
+                  {courseFull.coverUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => updateCourseMeta({ coverUrl: '' })}
+                      className="ml-2 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+                    >
+                      {t('community.coursesPanel.remove')}
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+                {t('community.coursesPanel.settingsAccess')}
+              </h2>
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900">{t('community.coursesPanel.publishCourse')}</p>
+                    <p className="text-xs text-neutral-500">{t('community.coursesPanel.publishCourseHint')}</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!courseFull.isHidden}
+                    onClick={() => updateCourseMeta({ isHidden: !courseFull.isHidden })}
+                    className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                      !courseFull.isHidden ? 'bg-[#315efb]' : 'bg-neutral-200'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                        !courseFull.isHidden ? 'translate-x-5' : ''
+                      }`}
+                    />
+                  </button>
+                </div>
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-neutral-900">{t('community.coursesPanel.sequentialUnlock')}</p>
+                    <p className="text-xs text-neutral-500">{t('community.coursesPanel.sequentialUnlockHint')}</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={Boolean(courseFull.sequentialUnlock)}
+                    onClick={() => updateCourseMeta({ sequentialUnlock: !courseFull.sequentialUnlock })}
+                    className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                      courseFull.sequentialUnlock ? 'bg-[#315efb]' : 'bg-neutral-200'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                        courseFull.sequentialUnlock ? 'translate-x-5' : ''
+                      }`}
+                    />
+                  </button>
+                </div>
+                {!courseFull.isHidden ? (
+                  <p className="flex items-center gap-2 text-xs text-emerald-700">
+                    <Eye className="h-3.5 w-3.5" />
+                    {t('community.coursesPanel.publishCourseHint')}
+                  </p>
+                ) : (
+                  <p className="flex items-center gap-2 text-xs text-amber-700">
+                    <EyeOff className="h-3.5 w-3.5" />
+                    {t('community.coursesPanel.hiddenCourseHint')}
+                  </p>
+                )}
+              </div>
+            </section>
+
+            <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+                {t('community.coursesPanel.settingsDefaults')}
+              </h2>
+              <label className="mt-4 block text-sm font-medium text-neutral-800">
+                {t('community.coursesPanel.defaultLessonUnlock')}
+                <p className="text-xs font-normal text-neutral-500">{t('community.coursesPanel.defaultLessonUnlockHint')}</p>
+                <select
+                  value={String(courseFull.defaultLessonUnlockDays ?? 0)}
+                  onChange={(e) =>
+                    updateCourseMeta({ defaultLessonUnlockDays: Number(e.target.value) })
+                  }
+                  className="mt-1.5 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm"
+                >
+                  {DRIP_OPTIONS.map((opt) => (
+                    <option key={opt.key} value={String(opt.days)}>
+                      {t(`community.coursesPanel.drip.${opt.key}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </section>
+
+            <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+                {t('community.coursesPanel.settingsOverview')}
+              </h2>
+              <dl className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl bg-neutral-50 px-4 py-3">
+                  <dt className="text-xs text-neutral-500">{t('community.coursesPanel.chaptersLabel')}</dt>
+                  <dd className="mt-1 text-2xl font-semibold text-neutral-900">{courseFull.chapters.length}</dd>
+                </div>
+                <div className="rounded-xl bg-neutral-50 px-4 py-3">
+                  <dt className="text-xs text-neutral-500">{t('community.coursesPanel.lessonsLabel')}</dt>
+                  <dd className="mt-1 text-2xl font-semibold text-neutral-900">{lessonCount}</dd>
+                </div>
+                <div className="rounded-xl bg-neutral-50 px-4 py-3">
+                  <dt className="text-xs text-neutral-500">{t('community.coursesPanel.lastUpdated')}</dt>
+                  <dd className="mt-1 text-sm font-medium text-neutral-900">{formattedUpdated}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section className="rounded-2xl border border-red-200 bg-red-50/50 p-5">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-red-700">
+                {t('community.coursesPanel.settingsDanger')}
+              </h2>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => editorCourseId && void duplicateCourse(editorCourseId)}
+                  className="rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
+                >
+                  {t('community.coursesPanel.duplicateCourse')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => editorCourseId && void deleteCourse(editorCourseId).then(() => setView('list'))}
+                  className="rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                >
+                  {t('community.coursesPanel.deleteFromSettings')}
+                </button>
+              </div>
+            </section>
+
+            <div className="flex justify-end pb-4">
+              <button
+                type="button"
+                onClick={() => void handleSaveNow()}
+                disabled={saveState === 'saving'}
+                className="inline-flex items-center gap-2 rounded-xl bg-[#315efb] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#2547c4] disabled:opacity-50"
+              >
+                <Save className="h-4 w-4" />
+                {t('community.coursesPanel.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+        {confirmPortal}
+      </div>
+    );
+  }
+
   /* editor */
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[#e7e7e7] bg-white">
@@ -1135,24 +1715,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
             <h1 className="truncate text-lg font-semibold text-neutral-900">{activeLesson?.title ?? 'Lesson'}</h1>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="hidden text-sm text-neutral-400 sm:inline">
-            {saveState === 'saving' && 'Saving…'}
-            {saveState === 'saved' && 'Saved'}
-            {saveState === 'error' && 'Save failed'}
-            {saveState === 'idle' && '\u00a0'}
-          </span>
-          <button
-            type="button"
-            onClick={copyCourseLink}
-            className="rounded-full border border-neutral-200 px-3 py-1.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50"
-          >
-            <span className="inline-flex items-center gap-1.5">
-              <Copy className="h-3.5 w-3.5" />
-              Copy link
-            </span>
-          </button>
-        </div>
+        {editorActionBar}
       </div>
 
       {loadingCourse || !courseFull ? (
@@ -1191,7 +1754,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                       <span
                         role="button"
                         tabIndex={0}
-                        className={`shrink-0 rounded p-0.5 text-neutral-400 ${isOwner ? 'cursor-grab active:cursor-grabbing hover:bg-neutral-100' : ''}`}
+                        className={`shrink-0 rounded p-0.5 text-neutral-300 ${isOwner ? 'cursor-grab active:cursor-grabbing hover:bg-neutral-100' : ''}`}
                         draggable={isOwner}
                         onDragStart={(e) => {
                           if (!isOwner) return;
@@ -1282,7 +1845,13 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                               }}
                               className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-1.5 pl-1 pr-1 text-left text-sm"
                             >
-                              <Video className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                              {lessonShowsLocked(ls, isOwner) ? (
+                                <Lock className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                              ) : ls.videoEmbedUrl ? (
+                                <Video className="h-3.5 w-3.5 shrink-0 opacity-60" />
+                              ) : (
+                                <Files className="h-3.5 w-3.5 shrink-0 opacity-50" />
+                              )}
                               <span className="min-w-0 flex-1 truncate">{ls.title}</span>
                             </button>
                             {isOwner && (
@@ -1310,22 +1879,46 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                   className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-neutral-300 py-2.5 text-sm font-medium text-neutral-700 hover:bg-white"
                 >
                   <Plus className="h-4 w-4" />
-                  Add new chapter
+                  {t('community.coursesPanel.addChapter')}
                 </button>
               </div>
             )}
           </aside>
 
           <main className="min-h-0 overflow-y-auto bg-white p-6">
+            {!isOwner && courseFull?.welcomeMessage?.trim() ? (
+              <div className="mx-auto mb-6 max-w-2xl rounded-xl border border-[#315efb]/15 bg-[#f8faff] px-4 py-3 text-sm leading-relaxed text-neutral-800">
+                {courseFull.welcomeMessage.trim()}
+              </div>
+            ) : null}
+
             {activeLesson && (
               <div className="mx-auto max-w-2xl space-y-8">
                 {!isOwner ? (
                   <>
                     <p className="rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
-                      Lesson viewer — only the community owner can edit this course.
+                      {t('community.coursesPanel.viewerNotice')}
                     </p>
+                    {activeLessonLocked ? (
+                      <section className="flex flex-col items-center rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 px-6 py-14 text-center">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-neutral-200/80">
+                          <Lock className="h-7 w-7 text-neutral-500" />
+                        </div>
+                        <h3 className="mt-4 text-lg font-semibold text-neutral-900">
+                          {t('community.coursesPanel.lockedTitle')}
+                        </h3>
+                        <p className="mt-2 max-w-sm text-sm text-neutral-600">
+                          {activeLesson.isLocked
+                            ? t('community.coursesPanel.lockedPrivate')
+                            : t('community.coursesPanel.lockedDrip')}
+                        </p>
+                        <p className="mt-1 text-xs text-neutral-500">{activeLesson.dripLabel}</p>
+                        <p className="mt-4 text-xs text-neutral-400">{t('community.coursesPanel.lockedCta')}</p>
+                      </section>
+                    ) : (
+                      <>
                     <section className="rounded-xl border border-neutral-200 p-6">
-                      <h3 className="text-base font-semibold text-neutral-900">Video</h3>
+                      <h3 className="text-base font-semibold text-neutral-900">{t('community.coursesPanel.video')}</h3>
                       {youtubeEmbed ? (
                         <div className="mt-3 aspect-video overflow-hidden rounded-lg border border-neutral-200 bg-black">
                           <iframe
@@ -1343,14 +1936,14 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                           rel="noopener noreferrer"
                           className="mt-3 inline-flex text-sm font-medium text-[#315efb] hover:underline"
                         >
-                          Open video link
+                          {t('community.coursesPanel.openVideo')}
                         </a>
                       ) : (
-                        <p className="mt-3 text-sm text-neutral-400">No video for this lesson.</p>
+                        <p className="mt-3 text-sm text-neutral-400">{t('community.coursesPanel.noVideo')}</p>
                       )}
                     </section>
                     <section>
-                      <h3 className="text-sm font-semibold text-neutral-900">Images</h3>
+                      <h3 className="text-sm font-semibold text-neutral-900">{t('community.coursesPanel.images')}</h3>
                       {(activeLesson.images || []).length > 0 ? (
                         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                           {(activeLesson.images || []).map((src, idx) => (
@@ -1363,11 +1956,11 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                           ))}
                         </div>
                       ) : (
-                        <p className="mt-2 text-sm text-neutral-400">No images in this lesson.</p>
+                        <p className="mt-2 text-sm text-neutral-400">{t('community.coursesPanel.noImages')}</p>
                       )}
                     </section>
                     <section>
-                      <h3 className="text-sm font-semibold text-neutral-900">Attachments</h3>
+                      <h3 className="text-sm font-semibold text-neutral-900">{t('community.coursesPanel.attachments')}</h3>
                       {(activeLesson.attachments || []).length > 0 ? (
                         <ul className="mt-3 space-y-2">
                           {(activeLesson.attachments || []).map((att, idx) => (
@@ -1382,64 +1975,85 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                                 rel="noreferrer"
                                 className="shrink-0 text-[#315efb] hover:underline"
                               >
-                                Open
+                                {t('community.coursesPanel.open')}
                               </a>
                             </li>
                           ))}
                         </ul>
                       ) : (
-                        <p className="mt-2 text-sm text-neutral-400">No attachments.</p>
+                        <p className="mt-2 text-sm text-neutral-400">{t('community.coursesPanel.noAttachments')}</p>
                       )}
                     </section>
                     <section>
-                      <h3 className="text-sm font-semibold text-neutral-900">Availability</h3>
+                      <h3 className="text-sm font-semibold text-neutral-900">{t('community.coursesPanel.availability')}</h3>
                       <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-800">
                         <Lock className="h-4 w-4 text-neutral-500" aria-hidden />
                         {activeLesson.dripLabel}
                       </div>
                     </section>
                     <section>
-                      <h3 className="text-sm font-semibold text-neutral-900">Content</h3>
+                      <h3 className="text-sm font-semibold text-neutral-900">{t('community.coursesPanel.content')}</h3>
                       <div className="mt-2 min-h-[120px] whitespace-pre-wrap rounded-lg border border-neutral-200 bg-neutral-50/80 px-3 py-3 text-sm leading-relaxed text-neutral-800">
                         {activeLesson.content?.trim() ? activeLesson.content : '—'}
                       </div>
                     </section>
+                      </>
+                    )}
                   </>
                 ) : (
                   <>
                 <section className="rounded-xl border border-neutral-200 p-6">
-                  <h3 className="text-base font-semibold text-neutral-900">Add a video to this lesson</h3>
-                  <p className="mt-1 text-xs text-neutral-500">
-                    Paste a YouTube link (watch, youtu.be, Shorts) — preview appears below. Other hosts: paste direct
-                    embed URL if supported.
-                  </p>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-lg border border-neutral-100 bg-neutral-50/80 p-4 text-center">
-                      <Upload className="mx-auto h-6 w-6 text-neutral-400" />
-                      <p className="mt-2 text-sm font-medium text-neutral-800">Upload video</p>
-                      <p className="mt-1 text-xs text-neutral-500">Host file elsewhere, paste URL</p>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-semibold text-neutral-900">{t('community.coursesPanel.youtubeTitle')}</h3>
+                      <p className="mt-1 text-xs text-neutral-500">{t('community.coursesPanel.youtubeHint')}</p>
                     </div>
-                    <div className="rounded-lg border border-neutral-100 bg-neutral-50/80 p-4 text-center">
-                      <LinkIcon className="mx-auto h-6 w-6 text-neutral-400" />
-                      <p className="mt-2 text-sm font-medium text-neutral-800">YouTube</p>
-                      <p className="mt-1 text-xs text-neutral-500">youtube.com or youtu.be</p>
-                    </div>
-                    <div className="rounded-lg border border-neutral-100 bg-neutral-50/80 p-4 text-center">
-                      <ClipboardPaste className="mx-auto h-6 w-6 text-neutral-400" />
-                      <p className="mt-2 text-sm font-medium text-neutral-800">Paste video</p>
-                      <p className="mt-1 text-xs text-neutral-500">From another lesson</p>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void pasteYoutubeFromClipboard()}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50"
+                      >
+                        <ClipboardPaste className="h-3.5 w-3.5" />
+                        {t('community.coursesPanel.pasteYoutube')}
+                      </button>
+                      {activeLesson.videoEmbedUrl.trim() ? (
+                        <button
+                          type="button"
+                          onClick={() => updateLesson({ videoEmbedUrl: '', lessonType: 'multimedia' })}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          {t('community.coursesPanel.clearVideo')}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                   <label className="mt-4 block text-sm font-medium text-neutral-700">
-                    Video URL
+                    <span className="inline-flex items-center gap-2">
+                      <LinkIcon className="h-4 w-4 text-red-600" />
+                      YouTube
+                    </span>
                     <input
                       value={activeLesson.videoEmbedUrl}
-                      onChange={(e) => updateLesson({ videoEmbedUrl: e.target.value })}
-                      placeholder="https://www.youtube.com/watch?v=…"
-                      className="mt-1.5 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
+                      onChange={(e) =>
+                        updateLesson({
+                          videoEmbedUrl: e.target.value,
+                          lessonType: e.target.value.trim() ? 'video' : 'multimedia',
+                        })
+                      }
+                      onPaste={(e) => {
+                        const text = e.clipboardData.getData('text');
+                        if (!text.trim()) return;
+                        window.setTimeout(() => {
+                          updateLesson({ videoEmbedUrl: text.trim(), lessonType: 'video' });
+                        }, 0);
+                      }}
+                      placeholder={t('community.coursesPanel.youtubePlaceholder')}
+                      className="mt-1.5 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:border-[#315efb] focus:outline-none focus:ring-2 focus:ring-[#315efb]/15"
                     />
                   </label>
-                  {youtubeEmbed && (
+                  {youtubeEmbed ? (
                     <div className="mt-4 aspect-video overflow-hidden rounded-lg border border-neutral-200 bg-black">
                       <iframe
                         title="Lesson video preview"
@@ -1449,13 +2063,67 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                         allowFullScreen
                       />
                     </div>
-                  )}
+                  ) : youtubeThumb ? (
+                    <div className="relative mt-4 aspect-video overflow-hidden rounded-lg border border-neutral-200">
+                      <img src={youtubeThumb} alt="" className="h-full w-full object-cover opacity-80" />
+                    </div>
+                  ) : null}
                   {activeLesson.videoEmbedUrl.trim() && !youtubeEmbed && (
-                    <p className="mt-2 text-xs text-amber-700">
-                      Preview is available for YouTube links. For other providers, paste a direct embed URL or open the
-                      link in a new tab.
-                    </p>
+                    <p className="mt-2 text-xs text-amber-700">{t('community.coursesPanel.youtubeInvalid')}</p>
                   )}
+                </section>
+
+                <section className="rounded-xl border border-neutral-200 p-5">
+                  <h3 className="text-sm font-semibold text-neutral-900">{t('community.coursesPanel.privacy')}</h3>
+                  <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900">{t('community.coursesPanel.privateLesson')}</p>
+                      <p className="text-xs text-neutral-500">{t('community.coursesPanel.privateLessonHint')}</p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={Boolean(activeLesson.isLocked)}
+                      onClick={() => applyLessonPrivacy({ isLocked: !activeLesson.isLocked })}
+                      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
+                        activeLesson.isLocked ? 'bg-[#315efb]' : 'bg-neutral-200'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                          activeLesson.isLocked ? 'translate-x-5' : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <label className="mt-4 block text-sm font-medium text-neutral-800">
+                    {t('community.coursesPanel.dripSchedule')}
+                    <p className="text-xs font-normal text-neutral-500">{t('community.coursesPanel.dripHint')}</p>
+                    <select
+                      value={String(activeLesson.isLocked ? -1 : Math.max(0, Number(activeLesson.unlockAfterDays) || 0))}
+                      disabled={Boolean(activeLesson.isLocked)}
+                      onChange={(e) => {
+                        const v = Number(e.target.value);
+                        if (v < 0) {
+                          applyLessonPrivacy({ isLocked: true });
+                          return;
+                        }
+                        applyLessonPrivacy({ isLocked: false, unlockAfterDays: v });
+                      }}
+                      className="mt-1.5 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm disabled:cursor-not-allowed disabled:bg-neutral-100"
+                    >
+                      <option value="-1">{t('community.coursesPanel.drip.private')}</option>
+                      {DRIP_OPTIONS.map((opt) => (
+                        <option key={opt.key} value={String(opt.days)}>
+                          {t(`community.coursesPanel.drip.${opt.key}`)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800">
+                    <Lock className="h-4 w-4 text-neutral-500" aria-hidden />
+                    {activeLesson.dripLabel}
+                  </div>
                 </section>
 
                 <section>
@@ -1591,29 +2259,11 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                 </section>
 
                 <section>
-                  <h3 className="text-sm font-semibold text-neutral-900">Drip feeding settings</h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next =
-                        activeLesson.dripLabel === 'Unlocks immediately'
-                          ? 'Unlocks 7 days after join'
-                          : 'Unlocks immediately';
-                      updateLesson({ dripLabel: next });
-                    }}
-                    className="mt-2 inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-800 hover:bg-neutral-50"
-                  >
-                    <Lock className="h-4 w-4 text-neutral-500" />
-                    {activeLesson.dripLabel}
-                  </button>
-                </section>
-
-                <section>
-                  <h3 className="text-sm font-semibold text-neutral-900">Content</h3>
+                  <h3 className="text-sm font-semibold text-neutral-900">{t('community.coursesPanel.content')}</h3>
                   <textarea
                     value={activeLesson.content}
                     onChange={(e) => updateLesson({ content: e.target.value })}
-                    placeholder="Lesson text, notes, instructions…"
+                    placeholder={t('community.coursesPanel.contentPlaceholder')}
                     rows={10}
                     className="mt-2 w-full resize-y rounded-lg border border-neutral-200 px-3 py-2 text-sm leading-relaxed text-neutral-800 placeholder:text-neutral-400"
                   />
@@ -1621,7 +2271,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
 
                 <div className="flex flex-wrap gap-3 border-t border-neutral-100 pt-6">
                     <label className="text-sm text-neutral-600">
-                      Lesson title
+                      {t('community.coursesPanel.lessonTitle')}
                       <input
                         value={activeLesson.title}
                         onChange={(e) => updateLesson({ title: e.target.value })}
@@ -1629,7 +2279,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                       />
                     </label>
                     <label className="text-sm text-neutral-600">
-                      Chapter title
+                      {t('community.coursesPanel.chapterTitle')}
                       <input
                         value={activeChapter?.title ?? ''}
                         onChange={(e) => {
@@ -1639,7 +2289,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                           );
                           const next = { ...courseFull, chapters };
                           setCourseFull(next);
-                          scheduleSave(next);
+                          markCourseDirty();
                         }}
                         className="mt-1 block w-full min-w-[200px] rounded-lg border border-neutral-200 px-3 py-2 text-sm"
                       />

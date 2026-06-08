@@ -182,14 +182,40 @@ function mapMarketRow(c) {
     market_cap: c.market_cap,
     market_cap_rank: c.market_cap_rank,
     total_volume: c.total_volume,
+    price_change_percentage_1h:
+      c.price_change_percentage_1h_in_currency?.usd ?? c.price_change_percentage_1h ?? null,
     price_change_percentage_24h: c.price_change_percentage_24h,
-    price_change_percentage_7d: c.price_change_percentage_7d_in_currency?.usd ?? c.price_change_percentage_7d ?? null,
+    price_change_percentage_7d:
+      c.price_change_percentage_7d_in_currency?.usd ?? c.price_change_percentage_7d ?? null,
+    price_change_percentage_30d:
+      c.price_change_percentage_30d_in_currency?.usd ?? c.price_change_percentage_30d ?? null,
     high_24h: c.high_24h,
     low_24h: c.low_24h,
+    circulating_supply: c.circulating_supply ?? null,
+    total_supply: c.total_supply ?? null,
+    max_supply: c.max_supply ?? null,
+    ath: c.ath ?? null,
+    ath_change_percentage: c.ath_change_percentage ?? null,
+    fully_diluted_valuation: c.fully_diluted_valuation ?? null,
+    sparkline_7d: Array.isArray(c.sparkline_in_7d?.price) ? c.sparkline_in_7d.price : [],
   };
 }
 
-function buildMarketsPayload(markets, trendingRaw) {
+function mapGlobalMetrics(globalRaw) {
+  const data = globalRaw?.data;
+  if (!data) return null;
+  return {
+    totalMarketCap: data.total_market_cap?.usd ?? 0,
+    totalVolume24h: data.total_volume?.usd ?? 0,
+    marketCapChange24h: data.market_cap_change_percentage_24h_usd ?? 0,
+    btcDominance: data.market_cap_percentage?.btc ?? 0,
+    ethDominance: data.market_cap_percentage?.eth ?? 0,
+    activeCryptocurrencies: data.active_cryptocurrencies ?? 0,
+    markets: data.markets ?? 0,
+  };
+}
+
+function buildMarketsPayload(markets, trendingRaw, globalRaw) {
   const rows = (markets || []).map(mapMarketRow);
 
   const changes = rows
@@ -247,6 +273,7 @@ function buildMarketsPayload(markets, trendingRaw) {
     markets: rows,
     highTrust,
     trending,
+    globalMetrics: mapGlobalMetrics(globalRaw),
     disclaimer: 'This is not financial advice. DYOR.',
   };
 }
@@ -265,6 +292,7 @@ function mapCoinDetail(coin) {
     total_volume: md.total_volume?.usd ?? null,
     high_24h: md.high_24h?.usd ?? null,
     low_24h: md.low_24h?.usd ?? null,
+    price_change_percentage_1h: md.price_change_percentage_1h_in_currency?.usd ?? null,
     price_change_percentage_24h: md.price_change_percentage_24h ?? null,
     price_change_percentage_7d: md.price_change_percentage_7d_in_currency?.usd ?? null,
     price_change_percentage_30d: md.price_change_percentage_30d_in_currency?.usd ?? null,
@@ -286,5 +314,6 @@ module.exports = {
   getGlobal,
   getGlobalMarketCapChart,
   buildMarketsPayload,
+  mapGlobalMetrics,
   mapCoinDetail,
 };
