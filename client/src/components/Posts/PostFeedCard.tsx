@@ -97,7 +97,7 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
   return (
     <article
       onClick={() => onSelect?.(post)}
-      className={`group/article cursor-pointer border-b border-neutral-200 p-4 transition-colors hover:bg-neutral-50 ${
+      className={`post-feed-card group/article cursor-pointer border-b border-neutral-200 p-4 transition-colors ${
         isSelected ? 'bg-neutral-50' : ''
       }`}
     >
@@ -143,10 +143,10 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
                   e.stopPropagation();
                   onMenuToggle(postId, e);
                 }}
-                className={`rounded-full p-1 transition-all ${
+                className={`post-feed-card-menu rounded-full p-1 transition-all ${
                   menuOpenPostId === postId
                     ? 'bg-black/10 text-black opacity-100'
-                    : 'text-neutral-500 opacity-0 hover:bg-black/5 group-hover/article:opacity-100'
+                    : 'text-neutral-500 opacity-60 hover:bg-black/5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/article:opacity-100'
                 }`}
                 aria-expanded={menuOpenPostId === postId}
                 aria-haspopup="menu"

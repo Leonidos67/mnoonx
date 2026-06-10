@@ -766,7 +766,7 @@ const UserProfileComponent: React.FC = () => {
       <article
         key={postId}
         onClick={() => setSelectedPost(post)}
-        className={`max-w-full overflow-x-hidden p-4 hover:bg-neutral-50 transition-colors border-b border-neutral-200 group/article cursor-pointer ${
+        className={`post-feed-card max-w-full overflow-x-hidden p-4 transition-colors border-b border-neutral-200 group/article cursor-pointer ${
           selectedPost?._id === post._id ? 'bg-neutral-50' : ''
         }`}
       >
@@ -810,7 +810,7 @@ const UserProfileComponent: React.FC = () => {
               <div className="ml-auto relative" ref={menuOpenPostId === postId ? menuRef : null}>
                 <button
                   onClick={(e) => { e.stopPropagation(); setMenuOpenPostId(menuOpenPostId === postId ? null : postId); }}
-                  className={`p-1 rounded-full transition-all ${menuOpenPostId === postId ? 'bg-black/10 text-black opacity-100' : 'text-neutral-500 opacity-0 group-hover/article:opacity-100 hover:bg-black/5'}`}
+                  className={`post-feed-card-menu p-1 rounded-full transition-all ${menuOpenPostId === postId ? 'bg-black/10 text-black opacity-100' : 'text-neutral-500 opacity-60 hover:bg-black/5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/article:opacity-100'}`}
                 >
                   <MoreHorizontal size={16} />
                 </button>
@@ -1029,17 +1029,17 @@ const UserProfileComponent: React.FC = () => {
                 className="truncate text-base font-bold text-neutral-900"
                 style={nameColor ? { color: nameColor } : undefined}
               >
-                {displayName}
+                @{displayName}
               </span>
-              {statusIconUrl ? (
+              {/* {statusIconUrl ? (
                 <img
                   src={statusIconUrl}
                   alt=""
                   className="h-8 w-8 shrink-0 object-contain"
                   draggable={false}
                 />
-              ) : null}
-              {isOwnProfile ? (
+              ) : null} */}
+              {/* {isOwnProfile ? (
                 <button
                   type="button"
                   onClick={() => setPremiumModalOpen(true)}
@@ -1048,7 +1048,7 @@ const UserProfileComponent: React.FC = () => {
                   <Sparkles className="h-3 w-3 shrink-0 text-violet-600" aria-hidden />
                   {t('userProfile.premiumStatus')}
                 </button>
-              ) : null}
+              ) : null} */}
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               {isOwnProfile ? (
@@ -1197,70 +1197,80 @@ const UserProfileComponent: React.FC = () => {
               </>
             )}
           </div>
-          {profile.bio && (
-            <p className="mt-3 break-words text-neutral-900 leading-relaxed">{profile.bio}</p>
-          )}
-          <div className="flex flex-wrap gap-4 mt-2 text-sm text-neutral-500">
-            {profile.location && (<div className="flex items-center gap-1"><MapPin size={16} /><span>{profile.location}</span></div>)}
-            {profile.website && (
-              <div className="flex min-w-0 max-w-full items-center gap-1">
-                <LinkIcon size={16} className="shrink-0" />
-                <a
-                  href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="min-w-0 break-all text-blue-500 hover:underline"
-                >
-                  {profile.website.replace(/^https?:\/\//, '')}
-                </a>
-              </div>
-            )}
+          {profile.bio ? (
+            <p className="mt-3 break-words text-[15px] leading-relaxed text-neutral-900 sm:text-base">
+              {profile.bio}
+            </p>
+          ) : null}
+          
+          <div className="my-2 flex gap-4 text-md">
+            <div
+              className="cursor-default"
+            >
+              <span className="font-bold text-neutral-900">{formatCount(profile.followingCount || 0)}</span>
+              <span className="ml-1 text-neutral-500">{t('userProfile.following')}</span>
+            </div>
+            <div
+              className="cursor-default"
+            >
+              <span className="font-bold text-neutral-900">{formatCount(profile.followersCount || 0)}</span>
+              <span className="ml-1 text-neutral-500">{t('userProfile.followers')}</span>
+            </div>
           </div>
-          {(hasAnySocialLink(profile.socialLinks) || isOwnProfile) && (
-            <div className="mt-3">
+
+          <div className="flex text-sm items-center gap-1"><Calendar size={14} /><span>{t('userProfile.joinedLine', { date: formatDate(profile.createdAt) })}</span></div>
+          </div>
+
+          {(profile.location ||
+            profile.website ||
+            hasAnySocialLink(profile.socialLinks) ||
+            isOwnProfile) && (
+            <div className="mt-3 min-w-0 space-y-1 rounded-2xl border border-neutral-100 bg-neutral-50/80 p-1">
+              {(profile.location || profile.website) && (
+                <div className="flex min-w-0 flex-col gap-1 text-sm text-neutral-600">
+                  {profile.location ? (
+                    <div className="flex min-w-0 items-start gap-1">
+                      <MapPin size={16} className="mt-0.5 shrink-0 text-neutral-400" aria-hidden />
+                      <span className="min-w-0 break-words">{profile.location}</span>
+                    </div>
+                  ) : null}
+                  {profile.website ? (
+                    <div className="flex min-w-0 items-start gap-1">
+                      <LinkIcon size={16} className="mt-0.5 shrink-0 text-neutral-400" aria-hidden />
+                      <a
+                        href={
+                          profile.website.startsWith('http')
+                            ? profile.website
+                            : `https://${profile.website}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="min-w-0 break-all text-blue-600 hover:underline"
+                      >
+                        {profile.website.replace(/^https?:\/\//, '')}
+                      </a>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
               {hasAnySocialLink(profile.socialLinks) ? (
-                <ProfileSocialLinks links={profile.socialLinks} />
+                <ProfileSocialLinks
+                  links={profile.socialLinks}
+                  showHeading={Boolean(profile.location || profile.website)}
+                />
               ) : isOwnProfile ? (
                 <button
                   type="button"
                   onClick={() => navigate('/settings?section=connected')}
-                  className="text-sm font-medium text-blue-600 hover:underline"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white px-3 py-2.5 text-sm font-medium text-blue-600 transition-colors hover:border-blue-300 hover:bg-blue-50/50 active:scale-[0.99] sm:w-auto sm:justify-start"
                 >
+                  <LinkIcon size={16} className="shrink-0" aria-hidden />
                   {t('userProfile.addSocialLinks')}
                 </button>
               ) : null}
             </div>
           )}
-          <div className="mb-2 flex gap-5 text-md">
-            <button
-              type="button"
-              className="hover:underline"
-              onClick={() => {
-                if (!isLgUp) {
-                  setConnectionsTab('following');
-                  setFollowingSheetOpen(true);
-                }
-              }}
-            >
-              <span className="font-bold text-neutral-900">{formatCount(profile.followingCount || 0)}</span>
-              <span className="ml-1 text-neutral-500">{t('userProfile.following')}</span>
-            </button>
-            <button
-              type="button"
-              className="hover:underline"
-              onClick={() => {
-                if (!isLgUp) {
-                  setConnectionsTab('followers');
-                  setFollowersSheetOpen(true);
-                }
-              }}
-            >
-              <span className="font-bold text-neutral-900">{formatCount(profile.followersCount || 0)}</span>
-              <span className="ml-1 text-neutral-500">{t('userProfile.followers')}</span>
-            </button>
-          </div>
-          <div className="flex text-sm items-center gap-1"><Calendar size={14} /><span>{t('userProfile.joinedLine', { date: formatDate(profile.createdAt) })}</span></div>
-          </div>
         </div>
         <div ref={profileHeaderEndRef} className="h-px w-full shrink-0" aria-hidden />
 

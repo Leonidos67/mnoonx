@@ -177,3 +177,23 @@ input[type="search"]::-webkit-search-results-button {
   animation: messenger-message-jump-highlight 1.1s ease-out;
   border-radius: 1rem;
 }
+
+/* Post feed cards: avoid iOS "first tap = hover, second tap = click" */
+.post-feed-card {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .post-feed-card:hover {
+    @apply bg-neutral-50;
+  }
+
+  .post-feed-card:hover .post-feed-card-menu {
+    opacity: 1;
+  }
+}
+
+.post-feed-card:active {
+  @apply bg-neutral-50;
+}

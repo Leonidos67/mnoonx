@@ -21,7 +21,7 @@ const SocialLinksEditor: React.FC<SocialLinksEditorProps> = ({ value, onChange }
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
               <SocialPlatformIcon platform={platform} className="h-4 w-4" />
             </span>
-            <span>{t(`settings.social.${platform}`)}</span>
+            <span>{platform === 'twitter' ? 'X' : t(`settings.social.${platform}`)}</span>
           </label>
           <input
             type="text"

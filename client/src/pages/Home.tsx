@@ -906,7 +906,7 @@ const Home: React.FC = () => {
               <article 
                 key={post._id}
                 onClick={() => setSelectedPost(post)}
-                className={`p-4 hover:bg-neutral-50 transition-colors border-b border-neutral-200 group/article cursor-pointer
+                className={`post-feed-card p-4 transition-colors border-b border-neutral-200 group/article cursor-pointer
                   ${selectedPost?._id === post._id ? 'bg-neutral-50' : ''}
                 `}
               >
@@ -948,10 +948,10 @@ const Home: React.FC = () => {
                       <div className="ml-auto relative" ref={menuOpenPostId === post._id ? menuRef : null}>
                         <button 
                           onClick={(e) => { e.stopPropagation(); setMenuOpenPostId(menuOpenPostId === post._id ? null : post._id); }}
-                          className={`p-1 rounded-full transition-all ${
+                          className={`post-feed-card-menu p-1 rounded-full transition-all ${
                             menuOpenPostId === post._id 
                               ? 'bg-black/10 text-black opacity-100' 
-                              : 'text-neutral-500 opacity-0 group-hover/article:opacity-100 hover:bg-black/5'
+                              : 'text-neutral-500 opacity-60 hover:bg-black/5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/article:opacity-100'
                           }`}
                         >
                           <MoreHorizontal size={16} />
