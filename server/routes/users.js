@@ -7,6 +7,11 @@ const Follow = require('../models/Follow');
 const Post = require('../models/Post');
 const auth = require('../middleware/auth');
 const { serializeFeedPost } = require('../services/postSerialize');
+const {
+  normalizeSocialLinks,
+  serializeSocialLinks,
+  profilePayload,
+} = require('../services/socialLinks');
 
 async function serializePostWithAuthor(post, viewerUserId) {
   return serializeFeedPost(post, viewerUserId);
@@ -156,6 +161,84 @@ const ALLOWED_PROFILE_BG_EMOJIS = new Set([
   '🐾',
 ]);
 
+// GET /api/users/me/profile — editable profile fields for settings
+router.get('/me/profile', auth, async (req, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    const user = await User.findById(req.userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json(profilePayload(user));
+  } catch (error) {
+    console.error('Get my profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PATCH /api/users/me/profile — bio, links, location, etc.
+router.patch('/me/profile', auth, async (req, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const { fullName, bio, location, website, socialLinks, username } = req.body || {};
+
+    if (fullName !== undefined) {
+      user.fullName = typeof fullName === 'string' ? fullName.trim().slice(0, 100) : '';
+    }
+    if (bio !== undefined) {
+      user.bio = typeof bio === 'string' ? bio.trim().slice(0, 500) : '';
+    }
+    if (location !== undefined) {
+      user.location = typeof location === 'string' ? location.trim().slice(0, 100) : '';
+    }
+    if (website !== undefined) {
+      user.website = typeof website === 'string' ? website.trim().slice(0, 200) : '';
+    }
+    if (socialLinks !== undefined) {
+      const normalized = normalizeSocialLinks(socialLinks);
+      if (!user.socialLinks) user.socialLinks = {};
+      for (const [platform, value] of Object.entries(normalized)) {
+        user.socialLinks[platform] = value;
+        user.markModified(`socialLinks.${platform}`);
+      }
+      user.markModified('socialLinks');
+    }
+    if (username !== undefined) {
+      const nextUsername =
+        typeof username === 'string' ? username.trim().toLowerCase().replace(/^@/, '') : '';
+      if (nextUsername.length < 3 || nextUsername.length > 30) {
+        return res.status(400).json({ message: 'Username must be 3–30 characters' });
+      }
+      if (!/^[a-z0-9_]+$/.test(nextUsername)) {
+        return res.status(400).json({ message: 'Username may only contain letters, numbers, and underscores' });
+      }
+      if (nextUsername !== user.username) {
+        const taken = await User.findOne({ username: nextUsername });
+        if (taken) {
+          return res.status(400).json({ message: 'Username already taken' });
+        }
+        user.username = nextUsername;
+      }
+    }
+
+    await user.save();
+    res.json(profilePayload(user));
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // PATCH /api/users/me/profile-customization
 router.patch('/me/profile-customization', auth, async (req, res) => {
   try {
@@ -263,8 +346,10 @@ router.get('/:username', auth, async (req, res) => {
       posts.map((post) => serializePostWithAuthor(post, req.userId))
     );
 
+    const json = user.toJSON();
     res.json({
-      ...user.toJSON(),
+      ...json,
+      socialLinks: serializeSocialLinks(user.socialLinks),
       isFollowing,
       posts: postsWithAuthor,
     });

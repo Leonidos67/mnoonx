@@ -55,6 +55,9 @@ import { tryAwardActivity } from '../utils/awardActivity';
 
 import { USERS_API as API_URL, POSTS_API as POSTS_API_URL, MESSAGES_API } from '../config/api';
 import { useTranslation } from '../i18n/useTranslation';
+import ProfileSocialLinks from '../components/Profile/ProfileSocialLinks';
+import type { SocialLinks } from '../types/socialLinks';
+import { hasAnySocialLink } from '../utils/socialLinks';
 
 type Post = FeedPost;
 
@@ -67,6 +70,7 @@ interface UserProfile {
   banner: string;
   location: string;
   website: string;
+  socialLinks?: Partial<SocialLinks>;
   followersCount: number;
   followingCount: number;
   postsCount: number;
@@ -1212,6 +1216,21 @@ const UserProfileComponent: React.FC = () => {
               </div>
             )}
           </div>
+          {(hasAnySocialLink(profile.socialLinks) || isOwnProfile) && (
+            <div className="mt-3">
+              {hasAnySocialLink(profile.socialLinks) ? (
+                <ProfileSocialLinks links={profile.socialLinks} />
+              ) : isOwnProfile ? (
+                <button
+                  type="button"
+                  onClick={() => navigate('/settings?section=connected')}
+                  className="text-sm font-medium text-blue-600 hover:underline"
+                >
+                  {t('userProfile.addSocialLinks')}
+                </button>
+              ) : null}
+            </div>
+          )}
           <div className="mb-2 flex gap-5 text-md">
             <button
               type="button"

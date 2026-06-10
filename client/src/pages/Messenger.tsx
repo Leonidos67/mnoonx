@@ -675,20 +675,48 @@ const Messenger: React.FC = () => {
           variant: 'danger',
         });
         if (!ok) return;
-        setMessages((prev) => prev.filter((m) => m.id !== message.id));
-        if (pinnedIdSet.has(message.id)) {
-          const current = getPinnedMessageIds(messagePins, selectedId);
-          persistMessagePins({
-            ...messagePins,
-            [selectedId]: current.filter((id) => id !== message.id),
-          });
+
+        if (!token) {
+          showToast(t('messenger.messageActions.deleteFailed'), 'error');
+          return;
         }
-        if (editingMessage?.id === message.id) {
-          setEditingMessage(null);
-          setNewMessage('');
+
+        try {
+          const res = await fetch(
+            `${MSG_API}/conversations/${selectedId}/messages/${message.id}`,
+            {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            showToast(
+              (body as { message?: string }).message || t('messenger.messageActions.deleteFailed'),
+              'error'
+            );
+            return;
+          }
+
+          setMessages((prev) => prev.filter((m) => m.id !== message.id));
+          if (pinnedIdSet.has(message.id)) {
+            const current = getPinnedMessageIds(messagePins, selectedId);
+            persistMessagePins({
+              ...messagePins,
+              [selectedId]: current.filter((id) => id !== message.id),
+            });
+          }
+          if (editingMessage?.id === message.id) {
+            setEditingMessage(null);
+            setNewMessage('');
+          }
+          if (replyTo?.id === message.id) setReplyTo(null);
+          void loadChats({ silent: true });
+          void refreshUnreads();
+          showToast(t('messenger.messageActions.deleted'));
+        } catch {
+          showToast(t('messenger.messageActions.deleteFailed'), 'error');
         }
-        if (replyTo?.id === message.id) setReplyTo(null);
-        showToast(t('messenger.messageActions.deleted'));
       }
     },
     [
@@ -700,6 +728,9 @@ const Messenger: React.FC = () => {
       pinnedIdSet,
       editingMessage?.id,
       replyTo?.id,
+      token,
+      loadChats,
+      refreshUnreads,
       showToast,
       t,
       confirm,

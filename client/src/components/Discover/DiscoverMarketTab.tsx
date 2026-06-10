@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, ShieldCheck, X } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
+import DiscoverTabHeader from './DiscoverTabHeader';
 import MarketStatsStrip from './MarketStatsStrip';
 import MarketCoinTable, { type MarketSortKey } from './MarketCoinTable';
 import MarketQuickToolsSection, { type MarketQuickToolId } from './MarketQuickTools';
@@ -201,37 +202,16 @@ const DiscoverMarketTab: React.FC = () => {
 
   return (
     <div className="w-full pb-12">
-      <div className="mb-2 mt-4 text-center">
-        <h1 className="text-4xl font-bold text-gray-900">{t('discover.market')}</h1>
-        <p className="mt-1 text-gray-600">{t('discover.marketTab.tagline')}</p>
-      </div>
-
-      <div className="mb-10 flex justify-center">
-        <div className="relative w-full max-w-xl">
-          <Search className="pointer-events-none absolute left-5 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t('discover.marketTab.searchPlaceholder')}
-            className={`w-full rounded-2xl border border-gray-200 bg-white py-3 pl-14 focus:border-blue-500 focus:outline-none ${
-              searchQuery ? 'pr-12' : 'pr-5'
-            }`}
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery('');
-                setSearchResults([]);
-              }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1 text-gray-400 hover:bg-gray-100"
-              aria-label={t('discover.marketTab.clearSearch')}
-            >
-              <X className="h-5 w-5" />
-            </button>
-          )}
-          {showSearchDropdown && (
+      <DiscoverTabHeader
+        title={t('discover.market')}
+        tagline={t('discover.marketTab.tagline')}
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+        searchPlaceholder={t('discover.marketTab.searchPlaceholder')}
+        clearSearchAriaLabel={t('discover.marketTab.clearSearch')}
+        onClearSearch={() => setSearchResults([])}
+        searchDropdown={
+          showSearchDropdown ? (
             <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 max-h-72 overflow-y-auto rounded-2xl border border-gray-200 bg-white p-2 shadow-lg">
               {searchLoading && (
                 <p className="px-4 py-3 text-sm text-gray-500">{t('discover.marketTab.searching')}</p>
@@ -244,9 +224,9 @@ const DiscoverMarketTab: React.FC = () => {
                   <TokenRow key={coin.id} coin={coin} onSelect={(id) => openCoinPage(id)} showRank />
                 ))}
             </div>
-          )}
-        </div>
-      </div>
+          ) : null
+        }
+      />
 
       <MarketStatsStrip
         stats={marketsData?.marketStats ?? null}

@@ -9,6 +9,7 @@ import {
   Clock,
   Heart,
   Layout,
+  LayoutGrid,
   ListTodo,
   MessageSquare,
   PenLine,
@@ -29,6 +30,7 @@ import ActivityAwardsPanel from '../components/Activity/ActivityAwardsPanel';
 import ActivityBalanceCard from '../components/Activity/ActivityBalanceCard';
 import ActivityCoinsMobileBlock from '../components/Activity/ActivityCoinsMobileBlock';
 import ActivityFeedPanel from '../components/Activity/ActivityFeedPanel';
+import ActivityOverviewPanel from '../components/Activity/ActivityOverviewPanel';
 import ActivityStorePanel from '../components/Activity/ActivityStorePanel';
 import ActivityVkTaskRow from '../components/Activity/ActivityVkTaskRow';
 import { activityPage } from '../components/Activity/activityUi';
@@ -61,10 +63,11 @@ const RULE_ICONS: Record<ActivityRuleId, LucideIcon> = {
   dailyVisit: CalendarCheck,
 };
 
-type TabId = 'missions' | 'store' | 'history' | 'levels' | 'feed' | 'awards';
+type TabId = 'overview' | 'missions' | 'store' | 'history' | 'levels' | 'feed' | 'awards';
 type CategoryFilter = 'all' | ActivityRuleCategory;
 
 const TAB_ICONS: Record<TabId, LucideIcon> = {
+  overview: LayoutGrid,
   missions: ListTodo,
   store: ShoppingBag,
   history: Clock,
@@ -99,7 +102,7 @@ const Activity: React.FC = () => {
   } = useActivityPoints();
   const { purchasedIds, purchaseItem } = useActivityPurchases(refresh);
   const isDesktop = useMediaQuery('(min-width: 1024px)');
-  const [tab, setTab] = useState<TabId>('missions');
+  const [tab, setTab] = useState<TabId>('overview');
   const [mobileView, setMobileView] = useState<'menu' | 'content'>('menu');
   const [category, setCategory] = useState<CategoryFilter>('all');
 
@@ -162,6 +165,7 @@ const Activity: React.FC = () => {
   }, [claimableRules, log, locale]);
 
   const tabs: { id: TabId; label: string }[] = [
+    { id: 'overview', label: t('activity.tabs.overview') },
     { id: 'missions', label: t('activity.tabs.missions') },
     { id: 'store', label: t('activity.tabs.store') },
     { id: 'feed', label: t('activity.tabs.feed') },
@@ -199,8 +203,34 @@ const Activity: React.FC = () => {
   const showMenu = isDesktop || mobileView === 'menu';
   const showContent = isDesktop || mobileView === 'content';
 
+  const missionsDone = rules.filter((r) => r.completed).length;
+  const missionsTotal = rules.length;
+  const purchasedCount = purchasedIds.size;
+
   const renderContent = () => {
     switch (tab) {
+      case 'overview':
+        return (
+          <ActivityOverviewPanel
+            balance={balance}
+            levelName={t(`activity.levels.${level.id}.name`)}
+            levelProgress={level.progress}
+            levelProgressLabel={levelProgressLabel}
+            weekPoints={weekPoints}
+            weekActions={weekActions}
+            streak={streak}
+            unclaimedCount={unclaimedRuleIds.length}
+            missionsDone={missionsDone}
+            missionsTotal={missionsTotal}
+            purchasedCount={purchasedCount}
+            recentLog={log}
+            onGoTab={selectTab}
+            onClaimAll={handleClaimAll}
+            locale={locale}
+            t={t}
+            ruleTitle={(id) => t(`activity.rules.${id}.title`)}
+          />
+        );
       case 'store':
         return (
           <ActivityStorePanel
@@ -212,18 +242,28 @@ const Activity: React.FC = () => {
         );
       case 'missions':
         return (
-          <div className="mx-auto w-full max-w-2xl space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h2 className="text-xl font-bold text-slate-900">{t('activity.missionsTitle')}</h2>
-                        {unclaimedRuleIds.length > 0 ? (
-                          <button type="button" onClick={handleClaimAll} className={activityPage.claimBtn}>
-                            {t('activity.claimAll')}
-                            <Heart className="h-3.5 w-3.5 fill-white" aria-hidden />
-                          </button>
-                        ) : null}
-                      </div>
+          <div className="mx-auto w-full max-w-3xl space-y-5">
+            <div className={`${activityPage.card} p-5`}>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">{t('activity.overview.missionsHeader')}</h2>
+                  <p className={`mt-1 text-sm ${activityPage.muted}`}>
+                    {t('activity.overview.missionsHeaderHint')}
+                  </p>
+                  <p className="mt-3 text-sm font-semibold text-indigo-600">
+                    {t('activity.missionsProgress', { done: missionsDone, total: missionsTotal })}
+                  </p>
+                </div>
+                {unclaimedRuleIds.length > 0 ? (
+                  <button type="button" onClick={handleClaimAll} className={activityPage.claimBtn}>
+                    {t('activity.claimAll')}
+                    <Heart className="h-3.5 w-3.5 fill-white" aria-hidden />
+                  </button>
+                ) : null}
+              </div>
+            </div>
 
-                      <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
                         {categoryFilters.map((f) => (
                           <button
                             key={f.id}
@@ -438,10 +478,11 @@ const Activity: React.FC = () => {
   };
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-[1200px]">
+    <div className={activityPage.shell}>
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1200px]">
       <div className="flex h-full min-h-0 w-full flex-1">
         <aside
-          className={`flex h-full min-h-0 flex-col border-neutral-200 lg:w-72 lg:shrink-0 lg:border-r ${
+          className={`flex h-full min-h-0 flex-col border-slate-200/80 bg-white/60 backdrop-blur-sm lg:w-72 lg:shrink-0 lg:border-r ${
             showMenu ? 'w-full max-lg:flex' : 'max-lg:hidden'
           }`}
         >
@@ -490,19 +531,26 @@ const Activity: React.FC = () => {
               {tabs.map((item) => {
                 const Icon = TAB_ICONS[item.id];
                 const isActive = tab === item.id;
+                const badge =
+                  item.id === 'missions' && unclaimedRuleIds.length > 0
+                    ? unclaimedRuleIds.length
+                    : null;
                 return (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => selectTab(item.id)}
                     className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all active:scale-[0.99] lg:py-2.5 ${
-                      isActive && isDesktop
-                        ? 'bg-black/10 font-medium'
-                        : 'hover:bg-black/5 max-lg:active:bg-black/5'
-                    }`}
+                      isActive && isDesktop ? activityPage.navActive : activityPage.navIdle
+                    } ${isActive && !isDesktop ? 'bg-slate-100 font-medium' : ''}`}
                   >
                     <Icon className="h-5 w-5 shrink-0 text-neutral-700" aria-hidden />
                     <span className="min-w-0 flex-1 font-medium text-neutral-900">{item.label}</span>
+                    {badge ? (
+                      <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                        {badge}
+                      </span>
+                    ) : null}
                     <ChevronRight className="h-5 w-5 shrink-0 text-neutral-400 lg:hidden" aria-hidden />
                   </button>
                 );
@@ -537,8 +585,8 @@ const Activity: React.FC = () => {
 
           <div className="flex-1 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:p-8">
             <h2
-              className={`mb-6 hidden text-2xl font-bold text-neutral-900 lg:mb-8 lg:block ${
-                tab === 'store' ? 'lg:hidden' : ''
+              className={`mb-2 hidden text-2xl font-bold text-neutral-900 lg:block ${
+                tab === 'store' || tab === 'overview' ? 'lg:hidden' : ''
               }`}
             >
               {activeTab.label}
@@ -547,6 +595,7 @@ const Activity: React.FC = () => {
             <p className="mt-8 text-center text-xs text-neutral-400">{t('activity.footerNote')}</p>
           </div>
         </main>
+      </div>
       </div>
     </div>
   );

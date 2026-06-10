@@ -18,6 +18,22 @@ const DirectMessageSchema = new mongoose.Schema({
     default: null,
   },
   body: { type: String, required: true },
+  /** Links mirrored copies in DM inboxes (sender + recipient). */
+  clientMessageId: {
+    type: String,
+    default: null,
+    index: true,
+  },
+  deletedAt: {
+    type: Date,
+    default: null,
+    index: true,
+  },
+  deletedByUserId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
   createdAt: { type: Date, default: Date.now, index: true },
 });
 

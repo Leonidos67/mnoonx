@@ -1,4 +1,5 @@
 const express = require('express');
+const { randomUUID } = require('crypto');
 const router = express.Router();
 const Conversation = require('../models/Conversation');
 const DirectMessage = require('../models/DirectMessage');
@@ -9,6 +10,8 @@ const {
   ensureUserMessaging,
   countUnreadMessages,
   getOrCreateDmConversation,
+  syncConversationLastMessage,
+  ACTIVE_MESSAGE_FILTER,
 } = require('../services/messaging');
 const {
   getInstalledStickerPacksForUser,
@@ -45,7 +48,7 @@ async function unreadCountForConversation(conv, userId) {
     userId,
   }).lean();
   const lastRead = state?.lastReadAt || null;
-  const q = { conversationId: conv._id };
+  const q = { conversationId: conv._id, ...ACTIVE_MESSAGE_FILTER };
   if (conv.kind === 'dm') {
     q.senderType = 'user';
     q.senderUserId = conv.peerUserId;
@@ -127,7 +130,7 @@ router.get('/conversations', async (req, res) => {
         let senderType = c.lastMessageSenderType;
         let senderUserId = c.lastMessageSenderUserId;
         if (c.lastMessageText && !senderType) {
-          const lastMsg = await DirectMessage.findOne({ conversationId: c._id })
+          const lastMsg = await DirectMessage.findOne({ conversationId: c._id, ...ACTIVE_MESSAGE_FILTER })
             .sort({ createdAt: -1 })
             .select('senderType senderUserId')
             .lean();
@@ -191,7 +194,7 @@ router.get('/conversations/:id', async (req, res) => {
     }).lean();
     if (!conv) return res.status(404).json({ message: 'Conversation not found' });
 
-    const messages = await DirectMessage.find({ conversationId: conv._id })
+    const messages = await DirectMessage.find({ conversationId: conv._id, ...ACTIVE_MESSAGE_FILTER })
       .sort({ createdAt: 1 })
       .lean();
 
@@ -259,6 +262,7 @@ router.post('/conversations/:id/read', async (req, res) => {
 
     const latestIncoming = await DirectMessage.findOne({
       conversationId: conv._id,
+      ...ACTIVE_MESSAGE_FILTER,
       ...(conv.kind === 'dm'
         ? { senderType: 'user', senderUserId: conv.peerUserId }
         : { senderType: 'system' }),
@@ -302,11 +306,13 @@ router.post('/conversations/:id/messages', async (req, res) => {
     }
 
     const text = String(body).trim();
+    const clientMessageId = randomUUID();
     const msg = await DirectMessage.create({
       conversationId: conv._id,
       senderType: 'user',
       senderUserId: req.userId,
       body: text,
+      clientMessageId,
     });
 
     conv.lastMessageText = text.slice(0, 200);
@@ -327,6 +333,8 @@ router.post('/conversations/:id/messages', async (req, res) => {
           senderType: 'user',
           senderUserId: req.userId,
           body: text,
+          clientMessageId,
+          createdAt: msg.createdAt,
         });
         peerConv.lastMessageText = text.slice(0, 200);
         peerConv.lastMessageAt = msg.createdAt;
@@ -378,6 +386,87 @@ router.post('/conversations/:id/messages', async (req, res) => {
     });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+async function findPeerDmMirrorMessage(conv, message) {
+  if (conv.kind !== 'dm' || !conv.peerUserId) return null;
+
+  const peerConv = await Conversation.findOne({
+    ownerUserId: conv.peerUserId,
+    kind: 'dm',
+    peerUserId: conv.ownerUserId,
+  });
+  if (!peerConv) return null;
+
+  if (message.clientMessageId) {
+    return DirectMessage.findOne({
+      conversationId: peerConv._id,
+      clientMessageId: message.clientMessageId,
+      deletedAt: null,
+    });
+  }
+
+  const createdAt = new Date(message.createdAt);
+  const windowMs = 5000;
+  return DirectMessage.findOne({
+    conversationId: peerConv._id,
+    senderType: 'user',
+    senderUserId: message.senderUserId,
+    body: message.body,
+    deletedAt: null,
+    createdAt: {
+      $gte: new Date(createdAt.getTime() - windowMs),
+      $lte: new Date(createdAt.getTime() + windowMs),
+    },
+  });
+}
+
+router.delete('/conversations/:conversationId/messages/:messageId', async (req, res) => {
+  try {
+    const conv = await Conversation.findOne({
+      _id: req.params.conversationId,
+      ownerUserId: req.userId,
+    });
+    if (!conv) return res.status(404).json({ message: 'Conversation not found' });
+    if (conv.kind === 'system_mnoonx') {
+      return res.status(403).json({ message: 'This channel is read-only' });
+    }
+
+    const message = await DirectMessage.findOne({
+      _id: req.params.messageId,
+      conversationId: conv._id,
+      deletedAt: null,
+    });
+    if (!message) return res.status(404).json({ message: 'Message not found' });
+
+    if (message.senderType !== 'user') {
+      return res.status(403).json({ message: 'Cannot delete this message' });
+    }
+    if (message.senderUserId?.toString() !== req.userId.toString()) {
+      return res.status(403).json({ message: 'You can only delete your own messages' });
+    }
+
+    const now = new Date();
+    message.deletedAt = now;
+    message.deletedByUserId = req.userId;
+    await message.save();
+
+    const peerMirror = await findPeerDmMirrorMessage(conv, message);
+    if (peerMirror) {
+      peerMirror.deletedAt = now;
+      peerMirror.deletedByUserId = req.userId;
+      await peerMirror.save();
+      const peerConv = await Conversation.findById(peerMirror.conversationId);
+      if (peerConv) await syncConversationLastMessage(peerConv);
+    }
+
+    await syncConversationLastMessage(conv);
+
+    res.json({ ok: true, id: message._id.toString() });
+  } catch (err) {
+    console.error('Delete message error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

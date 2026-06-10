@@ -49,6 +49,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  socialLinks: {
+    twitter: { type: String, default: '', maxlength: 120 },
+    telegram: { type: String, default: '', maxlength: 120 },
+    instagram: { type: String, default: '', maxlength: 120 },
+    youtube: { type: String, default: '', maxlength: 120 },
+    tiktok: { type: String, default: '', maxlength: 120 },
+    discord: { type: String, default: '', maxlength: 120 },
+  },
   followersCount: {
     type: Number,
     default: 0

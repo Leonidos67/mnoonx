@@ -54,17 +54,6 @@ const MarketTokenRow: React.FC<TokenRowProps> = ({ coin, onSelect, metric = 'cha
   );
 };
 
-const TOOL_META: Record<
-  MarketQuickToolId,
-  { icon: React.ComponentType<{ className?: string }>; iconClass: string }
-> = {
-  heatmap: { icon: LayoutGrid, iconClass: 'text-violet-600' },
-  gainers: { icon: TrendingUp, iconClass: 'text-emerald-600' },
-  losers: { icon: TrendingDown, iconClass: 'text-red-600' },
-  trending: { icon: Flame, iconClass: 'text-orange-500' },
-  volume: { icon: Volume2, iconClass: 'text-blue-600' },
-};
-
 function panelTitle(id: MarketQuickToolId, t: (key: string) => string): string {
   switch (id) {
     case 'heatmap':
@@ -188,7 +177,6 @@ const MarketQuickToolsSection: React.FC<MarketQuickToolsSectionProps> = ({
           aria-label={t('discover.marketTab.quickExploreTitle')}
         >
           {tabs.map(({ id, label }) => {
-            const { icon: Icon, iconClass } = TOOL_META[id];
             const selected = activeTool === id;
             return (
               <button
@@ -197,13 +185,12 @@ const MarketQuickToolsSection: React.FC<MarketQuickToolsSectionProps> = ({
                 role="tab"
                 aria-selected={selected}
                 onClick={() => onSelectTool(id)}
-                className={`relative flex shrink-0 items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors sm:px-4 ${
+                className={`relative flex shrink-0 items-center gap-2 text-black border border-slate-100 rounded-2xl py-1.5 text-sm font-semibold transition-colors sm:px-4 ${
                   selected
-                    ? 'bg-slate-900 text-white shadow-sm'
-                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    ? 'bg-slate-100 shadow-sm'
+                    : 'hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
-                <Icon className={`h-4 w-4 ${selected ? 'text-white' : iconClass}`} />
                 <span className="whitespace-nowrap">{label}</span>
               </button>
             );
@@ -213,14 +200,6 @@ const MarketQuickToolsSection: React.FC<MarketQuickToolsSectionProps> = ({
 
       <div className="px-4 py-4 sm:px-5 sm:py-5" role="tabpanel">
         <div className="mb-4 flex items-start gap-2">
-          {activeTool === 'volume' ? (
-            <BarChart3 className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" aria-hidden />
-          ) : (
-            (() => {
-              const { icon: Icon, iconClass } = TOOL_META[activeTool];
-              return <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${iconClass}`} aria-hidden />;
-            })()
-          )}
           <div>
             <h3 className="text-sm font-bold text-slate-900">{panelTitle(activeTool, t)}</h3>
             {desc ? <p className="mt-0.5 text-xs text-slate-500">{desc}</p> : null}

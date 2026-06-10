@@ -93,6 +93,30 @@ async function ensureUserMessaging(userId) {
   }
 }
 
+const ACTIVE_MESSAGE_FILTER = { deletedAt: null };
+
+async function syncConversationLastMessage(conv) {
+  const last = await DirectMessage.findOne({
+    conversationId: conv._id,
+    ...ACTIVE_MESSAGE_FILTER,
+  })
+    .sort({ createdAt: -1 })
+    .lean();
+
+  if (!last) {
+    conv.lastMessageText = '';
+    conv.lastMessageAt = conv.createdAt || new Date();
+    conv.lastMessageSenderType = null;
+    conv.lastMessageSenderUserId = null;
+  } else {
+    conv.lastMessageText = String(last.body).slice(0, 200);
+    conv.lastMessageAt = last.createdAt;
+    conv.lastMessageSenderType = last.senderType;
+    conv.lastMessageSenderUserId = last.senderUserId;
+  }
+  await conv.save();
+}
+
 async function countUnreadMessages(userId) {
   const ownerId = toOwnerId(userId);
   const convs = await Conversation.find({ ownerUserId: ownerId }).lean();
@@ -107,7 +131,7 @@ async function countUnreadMessages(userId) {
   let total = 0;
   for (const conv of convs) {
     const lastRead = readMap.get(conv._id.toString()) || null;
-    const q = { conversationId: conv._id };
+    const q = { conversationId: conv._id, ...ACTIVE_MESSAGE_FILTER };
     if (conv.kind === 'dm') {
       q.senderType = 'user';
       q.senderUserId = conv.peerUserId;
@@ -162,6 +186,8 @@ module.exports = {
   dedupeSystemConversations,
   countUnreadMessages,
   getOrCreateDmConversation,
+  syncConversationLastMessage,
+  ACTIVE_MESSAGE_FILTER,
   MNOONX_WELCOME,
   SUPPORT_WELCOME,
 };

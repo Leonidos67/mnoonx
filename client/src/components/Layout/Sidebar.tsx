@@ -16,6 +16,7 @@ import {
   HeartHandshake,
   BookMarked,
   BriefcaseBusiness,
+  Wallet,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -254,7 +255,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                   onClick={() => setUserMenuOpen(false)}
                   className={userMenuItemClass}
                 >
-                  <BriefcaseBusiness size={14} className="shrink-0 text-neutral-500" />
+                  <Wallet size={14} className="shrink-0 text-neutral-500" />
                   {t('nav.portfolioTracker')}
                 </Link>
                 <Link

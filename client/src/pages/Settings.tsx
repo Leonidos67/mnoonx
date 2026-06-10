@@ -1,9 +1,15 @@
 // pages/Settings.tsx
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useTranslation } from '../i18n/useTranslation';
+import SocialLinksEditor from '../components/Profile/SocialLinksEditor';
+import { USERS_API } from '../config/api';
+import type { SocialLinks, SocialPlatform } from '../types/socialLinks';
+import { EMPTY_SOCIAL_LINKS } from '../types/socialLinks';
+import { normalizeSocialLinksInput } from '../utils/socialLinks';
 import {
   User,
   Edit,
@@ -39,15 +45,19 @@ type MenuItem = {
 };
 
 const Settings: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
+  const { showToast } = useToast();
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const isDesktop = useMediaQuery('(min-width: 1024px)');
   const [activeSection, setActiveSection] = useState<SettingsSectionId>('edit-profile');
   const [mobileView, setMobileView] = useState<'menu' | 'content'>('menu');
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
-    name: user?.fullName || 'MakTraxer',
-    username: user?.username || 'maktraxer',
+    name: user?.fullName || '',
+    username: user?.username || '',
     bio: '',
     day: '',
     month: '',
@@ -55,6 +65,7 @@ const Settings: React.FC = () => {
     location: '',
     website: '',
   });
+  const [socialLinks, setSocialLinks] = useState<SocialLinks>({ ...EMPTY_SOCIAL_LINKS });
 
   const menuItems: MenuItem[] = useMemo(
     () => [
@@ -75,6 +86,46 @@ const Settings: React.FC = () => {
     if (isDesktop) setMobileView('menu');
   }, [isDesktop]);
 
+  useEffect(() => {
+    const section = searchParams.get('section');
+    if (section === 'connected') {
+      setActiveSection('connected');
+      if (!isDesktop) setMobileView('content');
+    }
+  }, [searchParams, isDesktop]);
+
+  const loadProfile = useCallback(async () => {
+    if (!token) {
+      setProfileLoading(false);
+      return;
+    }
+    try {
+      setProfileLoading(true);
+      const res = await fetch(`${USERS_API}/me/profile`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('load failed');
+      const data = await res.json();
+      setFormData((prev) => ({
+        ...prev,
+        name: data.fullName || '',
+        username: data.username || '',
+        bio: data.bio || '',
+        location: data.location || '',
+        website: data.website || '',
+      }));
+      setSocialLinks(normalizeSocialLinksInput(data.socialLinks));
+    } catch {
+      showToast(t('settings.profileLoadFailed'), 'error');
+    } finally {
+      setProfileLoading(false);
+    }
+  }, [token, showToast, t]);
+
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
+
   const activeItem = menuItems.find((item) => item.id === activeSection) ?? menuItems[1];
 
   const selectSection = (id: SettingsSectionId) => {
@@ -86,6 +137,54 @@ const Settings: React.FC = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleSocialChange = (platform: SocialPlatform, value: string) => {
+    setSocialLinks((prev) => ({ ...prev, [platform]: value }));
+  };
+
+  const saveProfile = async (options?: { socialOnly?: boolean }) => {
+    if (!token) return;
+    try {
+      setSaving(true);
+      const body = options?.socialOnly
+        ? { socialLinks }
+        : {
+            fullName: formData.name,
+            username: formData.username,
+            bio: formData.bio,
+            location: formData.location,
+            website: formData.website,
+            socialLinks,
+          };
+      const res = await fetch(`${USERS_API}/me/profile`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast((data as { message?: string }).message || t('settings.saveFailed'), 'error');
+        return;
+      }
+      setFormData((prev) => ({
+        ...prev,
+        name: data.fullName || prev.name,
+        username: data.username || prev.username,
+        bio: data.bio || '',
+        location: data.location || '',
+        website: data.website || '',
+      }));
+      setSocialLinks(normalizeSocialLinksInput(data.socialLinks));
+      showToast(t('settings.saveSuccess'));
+    } catch {
+      showToast(t('settings.saveFailed'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/');
@@ -93,10 +192,43 @@ const Settings: React.FC = () => {
 
   const renderContent = () => {
     switch (activeSection) {
+      case 'connected':
+        return (
+          <div className="mx-auto w-full max-w-2xl">
+            <h2 className="mb-2 hidden text-2xl font-bold lg:block">{t('settings.connectedHeading')}</h2>
+            <p className="mb-6 hidden text-sm text-neutral-500 lg:block">{t('settings.connectedHint')}</p>
+            {profileLoading ? (
+              <div className="flex h-48 items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-black" />
+              </div>
+            ) : (
+              <>
+                <SocialLinksEditor value={socialLinks} onChange={handleSocialChange} />
+                <div className="mt-8 pb-4">
+                  <button
+                    type="button"
+                    onClick={() => void saveProfile({ socialOnly: true })}
+                    disabled={saving}
+                    className="w-full rounded-xl bg-black py-3 font-medium text-white transition-colors hover:bg-neutral-800 active:scale-[0.99] disabled:opacity-50"
+                  >
+                    {saving ? t('settings.saving') : t('settings.saveChanges')}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        );
+
       case 'edit-profile':
         return (
           <div className="mx-auto w-full max-w-2xl">
             <h2 className="mb-6 hidden text-2xl font-bold lg:mb-8 lg:block">{t('settings.editProfileHeading')}</h2>
+            {profileLoading ? (
+              <div className="flex h-48 items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-black" />
+              </div>
+            ) : (
+              <>
 
             <div className="mb-8 flex items-center space-x-4 rounded-xl bg-neutral-50 p-4">
               <div className="relative shrink-0">
@@ -242,14 +374,35 @@ const Settings: React.FC = () => {
               </div>
             </div>
 
+            <div className="mt-8 border-t border-neutral-200 pt-6">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">{t('settings.connectedAccounts')}</h3>
+                  <p className="mt-1 text-sm text-neutral-500">{t('settings.connectedShortHint')}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => selectSection('connected')}
+                  className="shrink-0 rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-800 transition-colors hover:bg-neutral-50"
+                >
+                  {t('settings.manageLinks')}
+                </button>
+              </div>
+              <SocialLinksEditor value={socialLinks} onChange={handleSocialChange} />
+            </div>
+
             <div className="mt-8 pb-4">
               <button
                 type="button"
-                className="w-full rounded-xl bg-black py-3 font-medium text-white transition-colors hover:bg-neutral-800 active:scale-[0.99]"
+                onClick={() => void saveProfile()}
+                disabled={saving}
+                className="w-full rounded-xl bg-black py-3 font-medium text-white transition-colors hover:bg-neutral-800 active:scale-[0.99] disabled:opacity-50"
               >
-                {t('settings.saveChanges')}
+                {saving ? t('settings.saving') : t('settings.saveChanges')}
               </button>
             </div>
+              </>
+            )}
           </div>
         );
 

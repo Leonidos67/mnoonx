@@ -49,6 +49,7 @@ import { COMMUNITY_SETTINGS_SEGMENT, COMMUNITY_STORE_SEGMENT } from './constants
 import AdminRoutes from './pages/admin/AdminRoutes';
 import DocsRoutes from './pages/docs/DocsRoutes';
 import TonConnectAppProvider from './components/Portfolio/TonConnectAppProvider';
+import OfflineOverlay from './components/Common/OfflineOverlay';
 
 function App() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
@@ -202,6 +203,8 @@ function App() {
             setIsLoginOpen(true);
           }} 
         />
+
+        <OfflineOverlay />
       </Router>
       </TonConnectAppProvider>
       </UnreadsProvider>
