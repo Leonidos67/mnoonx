@@ -77,3 +77,18 @@ server/uploads/
 # Editor folders
 .vs/
 .vsc/
+
+# Markdown files
+README.md
+ABOUT.md
+AGENTS.md
+FAQ.md
+GOVERNANCE.md
+INTEGRATIONS.md
+LICENSE.md
+PARTNERS.md
+PRIVACY.md
+SECURITY.md
+TERMS.md
+TRANSLATIONS.md
+UPDATES.md
