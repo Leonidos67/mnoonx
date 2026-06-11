@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  MenuIcon,
   Settings,
   CreditCard,
   HeartHandshake,
@@ -43,8 +42,7 @@ const MobileUserMenu: React.FC = () => {
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        <span className="mr-1">Menu</span>
-        {/* <MenuIcon className="h-4 w-4" aria-hidden /> */}
+        <span className='px-1'>Menu</span>
       </button>
 
       <AuthModalShell isOpen={open} onClose={close} title={t('header.menuTitle')}>

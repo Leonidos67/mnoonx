@@ -99,7 +99,7 @@ const MessengerChatDesktopMenu: React.FC<MessengerChatDesktopMenuProps> = ({
       ref={menuRef}
       role="menu"
       aria-label={labels.sheetTitle}
-      className="fixed z-[200] hidden min-w-[220px] overflow-hidden rounded-xl border border-neutral-200/90 bg-white py-1 shadow-xl lg:block"
+      className="fixed z-[200] hidden min-w-[220px] overflow-hidden rounded-lg border border-neutral-200/90 bg-white p-1 shadow-lg lg:block"
       style={{ top, left, width: menuWidth }}
     >
       <MessengerChatActionMenuList rows={rows} onAction={onAction} variant="desktop" />

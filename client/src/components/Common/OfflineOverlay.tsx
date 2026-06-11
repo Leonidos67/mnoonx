@@ -11,13 +11,13 @@ const OfflineOverlay: React.FC = () => {
 
   return (
     <div
-      className="fixed inset-0 z-[250] flex items-center justify-center bg-neutral-900/40 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[250] flex items-center justify-center bg-white p-4"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="offline-overlay-title"
       aria-describedby="offline-overlay-desc"
     >
-      <div className="w-full max-w-md rounded-3xl border border-neutral-200 bg-white p-6 shadow-2xl sm:p-8">
+      <div className="w-full max-w-md rounded-3xl bg-white p-6 sm:p-8">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
           <WifiOff className="h-7 w-7" strokeWidth={1.75} aria-hidden />
         </div>

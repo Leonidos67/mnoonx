@@ -374,7 +374,7 @@ const Settings: React.FC = () => {
               </div>
             </div>
 
-            <div className="mt-8 border-t border-neutral-200 pt-6">
+            <div className="mt-8 border-t border-neutral-200 pt-4">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold">{t('settings.connectedAccounts')}</h3>
@@ -388,7 +388,33 @@ const Settings: React.FC = () => {
                   {t('settings.manageLinks')}
                 </button>
               </div>
-              <SocialLinksEditor value={socialLinks} onChange={handleSocialChange} />
+              <div className="py-4 border-t flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">{t('settings.connectedAccounts')}</h3>
+                  <p className="mt-1 text-sm text-neutral-500">{t('settings.connectedShortHint')}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => selectSection('connected')}
+                  className="shrink-0 rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-800 transition-colors hover:bg-neutral-50"
+                >
+                  {t('settings.manageLinks')}
+                </button>
+              </div>
+              <div className="py-4 border-t flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">{t('settings.connectedAccounts')}</h3>
+                  <p className="mt-1 text-sm text-neutral-500">{t('settings.connectedShortHint')}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => selectSection('connected')}
+                  className="shrink-0 rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-800 transition-colors hover:bg-neutral-50"
+                >
+                  {t('settings.manageLinks')}
+                </button>
+              </div>
+              {/* <SocialLinksEditor value={socialLinks} onChange={handleSocialChange} /> */}
             </div>
 
             <div className="mt-8 pb-4">

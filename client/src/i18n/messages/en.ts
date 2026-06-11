@@ -165,12 +165,12 @@ export const en = {
       marketLabel: 'Market',
       marketTitle: 'Heatmap • AI Alpha • Live Analytics',
       marketDescription:
-        'Follow the market in real time, see where it is "burning" and immediately ask the AI.',
+        'Keep an eye on the market, find the "hot" zones and immediately ask the AI.',
       marketCta: 'Go to Market',
       discoverLabel: 'Discover',
       discoverTitle: 'Communities • Creators',
       discoverDescription:
-        'Find the best crypto communities, follow top creators and never miss real alpha again.',
+        'Find the best crypto communities and subscribe to the authors.',
       discoverCta: 'Go to Discover',
       prevSlide: 'Previous slide',
       nextSlide: 'Next slide',
