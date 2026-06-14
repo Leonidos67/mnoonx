@@ -55,7 +55,7 @@ export const en = {
     profile: 'Profile',
     discover: 'Discover',
     settings: 'Settings',
-    plan: 'Plan',
+    // plan: 'Plan',
     docs: 'Docs',
     portfolioTracker: 'Wallet',
     notifications: 'Notifications',
@@ -360,6 +360,14 @@ export const en = {
   notFound: {
     title: 'Page not found',
     goHome: 'Go Home',
+    message1: 'Are you sure this is MNOONX',
+    message2: 'Yes',
+    message3: 'Why so sure ?',
+    message4: 'Well, only MNOONX has this kind of design',
+    message5: 'So where\'s the page ?',
+    message6: '404 - page not found . Maybe it went on vacation to Bali . Or someone ate it',
+    message7: 'Seriously ?',
+    message8: 'The only serious thing is that the button below works . Press it',
   },
   plan: {
     title: 'Plan',

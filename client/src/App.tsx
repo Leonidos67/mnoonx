@@ -164,7 +164,7 @@ function App() {
               </AppLayout>
             }
           />
-          <Route path="/plan" element={<AppLayout><Plan /></AppLayout>} />
+          {/* <Route path="/plan" element={<AppLayout><Plan /></AppLayout>} /> */}
           <Route path="/updates" element={<AppLayout><PlatformUpdates /></AppLayout>} />
           <Route path="" element={<AppLayout><OfflineOverlay /></AppLayout>} />
           <Route

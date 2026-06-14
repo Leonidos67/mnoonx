@@ -55,7 +55,7 @@ export const ru = {
     profile: 'Профиль',
     discover: 'Обзор',
     settings: 'Настройки',
-    plan: 'Тариф',
+    // plan: 'Тариф',
     docs: 'Документация',
     portfolioTracker: 'Кошелёк',
     notifications: 'Уведомления',
@@ -360,6 +360,14 @@ export const ru = {
   notFound: {
     title: 'Страница не найдена',
     goHome: 'На главную',
+    message1: 'Это точно MNOONX',
+    message2: 'Да',
+    message3: 'Почему такая уверенность ?',
+    message4: 'Ну такой дизайн только у MNOONX',
+    message5: 'А где страница ?',
+    message6: '404 - страница не найдена . Возможно , ушла в отпуск на Бали . Или её кто-то съел',
+    message7: 'Серьёзно ?',
+    message8: 'Серьёзно только то , что кнопка ниже работает . Жми',
   },
   plan: {
     title: 'Тариф',

@@ -267,7 +267,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                   <Settings size={14} className="shrink-0 text-neutral-500" />
                   {t('nav.settings')}
                 </Link>
-                <Link
+                {/* <Link
                   to="/plan"
                   role="menuitem"
                   onClick={() => setUserMenuOpen(false)}
@@ -275,7 +275,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                 >
                   <CreditCard size={14} className="shrink-0 text-neutral-500" />
                   {t('nav.plan')}
-                </Link>
+                </Link> */}
                 <Link
                   to="/docs/support"
                   role="menuitem"

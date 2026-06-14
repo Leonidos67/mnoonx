@@ -18,7 +18,6 @@ import {
   Trash,
   Unlink2,
   Zap,
-  Sparkles,
   Globe,
   Lock,
 } from 'lucide-react';
@@ -124,6 +123,7 @@ const UserProfileComponent: React.FC = () => {
   const [premiumModalOpen, setPremiumModalOpen] = useState(false);
   const [styleSaving, setStyleSaving] = useState(false);
   const [hasProPlan, setHasProPlan] = useState(hasProSubscription);
+  const [messagingId, setMessagingId] = useState<string | null>(null); // Добавлено для отслеживания загрузки сообщения
 
   const [newPostContent, setNewPostContent] = useState('');
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
@@ -164,6 +164,33 @@ const UserProfileComponent: React.FC = () => {
     onPostDeleted,
     patchPostInLists,
   } = postDetail;
+
+  // Функция для начала сообщения (полностью как в Users.tsx)
+  const startMessage = async (targetUsername: string) => {
+    if (!token) {
+      window.dispatchEvent(new CustomEvent('openLogin'));
+      return;
+    }
+    setMessagingId(targetUsername);
+    try {
+      const res = await fetch(`${MESSAGES_API}/dm/${encodeURIComponent(targetUsername)}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        navigate(`/messenger?chat=${data.conversationId}`);
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        showToast(errorData.message || t('userProfile.menu.openChatFailed'), 'error');
+      }
+    } catch (e) {
+      console.error(e);
+      showToast(t('userProfile.menu.openChatFailed'), 'error');
+    } finally {
+      setMessagingId(null);
+    }
+  };
 
   // Проверка владельца поста
   const isPostOwner = (post: Post) => {
@@ -658,11 +685,12 @@ const UserProfileComponent: React.FC = () => {
       ? t('userProfile.noFollowersYet')
       : t('userProfile.notFollowingAnyone');
 
+  // Рендер пользователя в списке подписчиков/подписок с кнопкой сообщения
   const renderConnectionUser = (person: FollowerUser) => (
     <Link
       key={person._id || person.username}
       to={`/@${person.username}`}
-      className="group flex items-center gap-3 rounded-xl p-3 transition-colors hover:bg-neutral-50"
+      className="group flex items-center gap-2 rounded-xl py-2 px-3 transition-colors hover:bg-neutral-50"
     >
       <img
         src={
@@ -670,7 +698,7 @@ const UserProfileComponent: React.FC = () => {
           `https://ui-avatars.com/api/?name=${encodeURIComponent(person.fullName || person.username)}&background=000&color=fff&size=40&bold=true`
         }
         alt={person.fullName || person.username}
-        className="h-10 w-10 shrink-0 rounded-full"
+        className="h-8 w-8 shrink-0 rounded-full"
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-semibold group-hover:underline">
@@ -678,6 +706,16 @@ const UserProfileComponent: React.FC = () => {
         </p>
         <p className="truncate text-sm text-neutral-500">@{person.username}</p>
       </div>
+      {user && person.username !== user?.username && (
+        <button
+          type="button"
+          disabled={messagingId === person.username}
+          onClick={() => void startMessage(person.username)}
+          className="inline-flex items-center rounded-full p-2 text-neutral-500 transition-colors hover:text-black"
+        >
+          <MessageCircle className="h-4 w-4" />
+        </button>
+      )}
     </Link>
   );
 
@@ -1031,24 +1069,6 @@ const UserProfileComponent: React.FC = () => {
               >
                 @{displayName}
               </span>
-              {/* {statusIconUrl ? (
-                <img
-                  src={statusIconUrl}
-                  alt=""
-                  className="h-8 w-8 shrink-0 object-contain"
-                  draggable={false}
-                />
-              ) : null} */}
-              {/* {isOwnProfile ? (
-                <button
-                  type="button"
-                  onClick={() => setPremiumModalOpen(true)}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-2.5 py-0.5 text-[11px] font-semibold text-violet-800"
-                >
-                  <Sparkles className="h-3 w-3 shrink-0 text-violet-600" aria-hidden />
-                  {t('userProfile.premiumStatus')}
-                </button>
-              ) : null} */}
             </div>
             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
               {isOwnProfile ? (
@@ -1084,12 +1104,12 @@ const UserProfileComponent: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void openMessengerWithUser(profile.username)}
-                    disabled={messagingLoading}
-                    className="rounded-full border border-neutral-300 p-1.5 transition-colors hover:bg-neutral-100 disabled:opacity-50"
-                    aria-label={t('userProfile.menu.sendMessage')}
+                    onClick={() => void startMessage(profile.username)}
+                    disabled={messagingId === profile.username}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#315efb] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#2547c4] disabled:opacity-60"
                   >
-                    <MessageCircle size={16} />
+                    <MessageCircle className="h-4 w-4" />
+                    {messagingId === profile.username ? t('users.opening') : t('users.message')}
                   </button>
                   <button
                     type="button"
@@ -1138,16 +1158,6 @@ const UserProfileComponent: React.FC = () => {
                 draggable={false}
               />
             ) : null}
-            {isOwnProfile ? (
-              <button
-                type="button"
-                onClick={() => setPremiumModalOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-gradient-to-r from-violet-50 to-fuchsia-50 px-3 py-1 text-xs font-semibold text-violet-800 shadow-sm transition-colors hover:from-violet-100 hover:to-fuchsia-100"
-              >
-                <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-600" aria-hidden />
-                {t('userProfile.premiumStatus')}
-              </button>
-            ) : null}
           </div>
           <p className="text-neutral-500">@{profile.username}</p>
           <div className="mt-2 flex flex-wrap gap-2">
@@ -1177,12 +1187,12 @@ const UserProfileComponent: React.FC = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void openMessengerWithUser(profile.username)}
-                  disabled={messagingLoading}
-                  className="rounded-full border border-neutral-300 p-2 transition-colors hover:bg-neutral-100 disabled:opacity-50"
-                  aria-label={t('userProfile.menu.sendMessage')}
+                  onClick={() => void startMessage(profile.username)}
+                  disabled={messagingId === profile.username}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#315efb] px-5 py-2 text-sm font-medium text-white hover:bg-[#2547c4] disabled:opacity-60"
                 >
-                  <MessageCircle size={18} />
+                  <MessageCircle className="h-4 w-4" />
+                  {messagingId === profile.username ? t('users.opening') : t('users.message')}
                 </button>
                 <button
                   type="button"
@@ -1263,7 +1273,7 @@ const UserProfileComponent: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate('/settings?section=connected')}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white px-3 py-2.5 text-sm font-medium text-blue-600 transition-colors hover:border-blue-300 hover:bg-blue-50/50 active:scale-[0.99] sm:w-auto sm:justify-start"
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:border-blue-300 hover:bg-blue-50/50 active:scale-[0.99] sm:w-auto sm:justify-start"
                 >
                   <LinkIcon size={16} className="shrink-0" aria-hidden />
                   {t('userProfile.addSocialLinks')}

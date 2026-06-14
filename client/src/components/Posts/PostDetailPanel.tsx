@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Unlink2 } from 'lucide-react';
+import { ArrowLeft, Unlink2, X } from 'lucide-react';
 import PostMediaGallery from './PostMediaGallery';
 import PostContentBody from './PostContentBody';
 import { buildPostLightboxMeta } from '../../utils/buildPostLightboxMeta';
@@ -54,31 +54,39 @@ const PostDetailPanel: React.FC<PostDetailPanelProps> = ({
     : `/@${post.author.username}`;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white lg:rounded-2xl lg:border lg:border-neutral-200 lg:shadow-sm">
-      <div className="hidden lg:flex shrink-0 items-center justify-between gap-3 border-b border-neutral-200 bg-white/80 p-4 backdrop-blur-md">
-        <button
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white lg:shadow-sm">
+      <div className="hidden lg:flex shrink-0 items-center justify-between gap-3 border-b border-neutral-200 bg-white/80 px-4 py-2 backdrop-blur-md">
+        {/* <button
           type="button"
           onClick={onClose}
           className="group flex items-center gap-1 font-medium text-neutral-500 transition-colors hover:text-black"
         >
           <ArrowLeft size={18} className="transition-transform group-hover:-translate-x-0.5" />
           <span>Back</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => onCopyLink(String(post._id))}
-          className="rounded-full p-2 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black"
-          aria-label="Copy post link"
-          title="Copy link"
-        >
-          <Unlink2 size={18} />
-        </button>
+        </button> */}
+        <div></div>
+        <div>
+          <button
+            type="button"
+            onClick={() => onCopyLink(String(post._id))}
+            className="rounded-full p-2 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black"
+          >
+            <Unlink2 size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-2 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black"
+          >
+            <X size={18} />
+          </button>
+        </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-2">
-          <div className="mb-4 flex items-center gap-3">
+          <div className="mb-4 flex items-center gap-2">
             <Link to={profileLink} onClick={onClose}>
-              <img src={displayAvatar} alt={displayName} className="h-12 w-12 rounded-full object-cover" />
+              <img src={displayAvatar} alt={displayName} className="h-8 w-8 rounded-full object-cover" />
             </Link>
             <div>
               <Link to={profileLink} onClick={onClose} className="font-bold hover:underline">
