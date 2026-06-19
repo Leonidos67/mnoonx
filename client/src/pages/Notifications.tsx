@@ -134,10 +134,10 @@ const Notifications: React.FC = () => {
   }
 
   return (
-    <div className="mx-auto max-w-full p-4">
-      <h1 className="text-xl font-semibold text-neutral-800">{t('notifications.title')}</h1>
+    <div className="mx-auto max-w-full">
+      <h1 className="text-xl pt-4 px-4 font-semibold text-neutral-800">{t('notifications.title')}</h1>
 
-      <div className="mt-6 flex gap-8 border-b border-neutral-200">
+      <div className="mt-6 px-4 flex gap-8 border-b border-neutral-200">
         <button
           type="button"
           onClick={() => setTab('mentions')}
@@ -207,7 +207,7 @@ const Notifications: React.FC = () => {
                           ) : null}
                         </p>
                       </div>
-                      <span className="shrink-0 text-xs text-neutral-400">
+                      <span className="shrink-0 text-xs text-neutral-400 mr-4">
                         {formatTimestamp(n.createdAt)}
                       </span>
                     </div>

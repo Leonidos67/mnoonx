@@ -37,8 +37,7 @@ import {
   X,
   Pen,
   Trash,
-  Users, 
-  AlertCircle, 
+  Users,
   Loader2 
 } from 'lucide-react';
 import PostComposer from '../components/Posts/PostComposer';

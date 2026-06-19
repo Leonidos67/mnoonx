@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Settings,
-  CreditCard,
   HeartHandshake,
   Languages,
   BookMarked,
@@ -27,7 +26,7 @@ const MobileUserMenu: React.FC = () => {
     { to: '/notifications', icon: Bell, label: t('nav.notifications') },
     { to: '/portfolio-tracker', icon: BriefcaseBusiness, label: t('nav.portfolioTracker') },
     { to: '/settings', icon: Settings, label: t('nav.settings') },
-    { to: '/plan', icon: CreditCard, label: t('nav.plan') },
+    // { to: '/plan', icon: CreditCard, label: t('nav.plan') },
     { to: '/docs/support', icon: HeartHandshake, label: t('nav.support') },
     { to: '/docs', icon: BookMarked, label: t('nav.docs') },
   ] as const;

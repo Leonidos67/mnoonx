@@ -7,7 +7,6 @@ import {
   Search,
   BriefcaseBusiness,
   Settings,
-  CreditCard,
   HeartHandshake,
   Languages,
   BookMarked,
@@ -52,7 +51,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
     { to: '/notifications', icon: Bell, label: t('nav.notifications') },
     { to: '/portfolio-tracker', icon: BriefcaseBusiness, label: t('nav.portfolioTracker') },
     { to: '/settings', icon: Settings, label: t('nav.settings') },
-    { to: '/plan', icon: CreditCard, label: t('nav.plan') },
+    // { to: '/plan', icon: CreditCard, label: t('nav.plan') },
     { to: '/docs/support', icon: HeartHandshake, label: t('nav.support') },
     { to: '/docs', icon: BookMarked, label: t('nav.docs') },
   ] as const;
