@@ -18,6 +18,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useTranslation } from '../../i18n/useTranslation';
 
 import { COMMUNITIES_API as API } from '../../config/api';
 
@@ -72,6 +73,7 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
   onBackToCommunity,
 }) => {
   const { token } = useAuth();
+  const { t } = useTranslation();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const [files, setFiles] = useState<CommunityFileRow[]>([]);
@@ -335,15 +337,15 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
               type="button"
               aria-label="File actions"
               onClick={() => setMenuOpenId((v) => (v === f._id ? null : f._id))}
-              className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
+              className="rounded-full p-2 hover:bg-neutral-100"
             >
-              <MoreVertical className="h-5 w-5" />
+              <MoreVertical className="h-4 w-4" />
             </button>
             {menuOpenId === f._id && (
-              <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
+              <div className="absolute right-0 top-full z-20 mt-1 w-40 rounded-lg border border-neutral-200 bg-white p-1 shadow-md">
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
                   onClick={() => void deleteFile(f._id)}
                 >
                   <Trash2 className="h-4 w-4 shrink-0" />
@@ -357,9 +359,9 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
             type="button"
             title="Download"
             onClick={() => void downloadFile(f)}
-            className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
+            className="rounded-full p-2 hover:bg-neutral-100"
           >
-            <Download className="h-5 w-5" />
+            <Download className="h-4 w-4" />
           </button>
         )}
       </div>
@@ -431,7 +433,7 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
                 className="ml-1 flex items-center gap-1.5 rounded-xl bg-[#315efb] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#2547c4]"
               >
                 <Pencil className="h-4 w-4" strokeWidth={2} />
-                Edit12
+                {t('common.edit')}
               </button>
             )}
           </div>

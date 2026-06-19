@@ -82,9 +82,9 @@ const CommunityRightSidebar: React.FC<CommunityRightSidebarProps> = ({
             <h3 className="text-md pl-2 font-semibold">{t('community.peopleHeading')}</h3>
             <span className="text-[#888]">{formatCount(memberCount)}</span>
           </div>
-          <button type="button" className="pr-2 font-medium text-[#315efb]">
+          {/* <button type="button" className="pr-2 font-medium text-[#315efb]">
             {t('community.seeAll')}
-          </button>
+          </button> */}
         </div>
 
         <div className="p-2">

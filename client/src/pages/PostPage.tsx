@@ -157,12 +157,13 @@ const PostPage: React.FC = () => {
       {/* Header с логотипом */}
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-neutral-200">
         <div className="flex items-center justify-between px-4 py-3">
-          <button 
+          {/* <button 
             onClick={() => navigate(-1)} 
             className="p-2 hover:bg-neutral-100 rounded-full transition-colors"
           >
             <ArrowLeft size={20} />
-          </button>
+          </button> */}
+          <div></div>
           
           <Link to="/" className="flex items-center gap-2">
             <img 

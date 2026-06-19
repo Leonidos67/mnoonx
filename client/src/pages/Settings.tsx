@@ -209,7 +209,7 @@ const Settings: React.FC = () => {
                     type="button"
                     onClick={() => void saveProfile({ socialOnly: true })}
                     disabled={saving}
-                    className="w-full rounded-xl bg-black py-3 font-medium text-white transition-colors hover:bg-neutral-800 active:scale-[0.99] disabled:opacity-50"
+                    className="w-full rounded-xl bg-black py-3 font-medium text-white transition-colors hover:bg-black/80 active:scale-[0.99] disabled:opacity-50"
                   >
                     {saving ? t('settings.saving') : t('settings.saveChanges')}
                   </button>
@@ -375,14 +375,14 @@ const Settings: React.FC = () => {
             </div>
 
             <div className="mt-8 border-t border-neutral-200 pt-4">
-              <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="mb-4 flex items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-lg font-semibold">{t('settings.connectedAccounts')}</h3>
-                  <p className="mt-1 text-sm text-neutral-500">{t('settings.connectedShortHint')}</p>
+                  <h3 className="text-lg font-semibold">{t('settings.invites')}</h3>
+                  <p className="mt-0 text-sm text-neutral-500">{t('settings.invitesPeople')}</p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => selectSection('connected')}
+                  onClick={() => selectSection('invites')}
                   className="shrink-0 rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-800 transition-colors hover:bg-neutral-50"
                 >
                   {t('settings.manageLinks')}
@@ -401,7 +401,7 @@ const Settings: React.FC = () => {
                   {t('settings.manageLinks')}
                 </button>
               </div>
-              <div className="py-4 border-t flex items-center justify-between gap-3">
+              {/* <div className="py-4 border-t flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold">{t('settings.connectedAccounts')}</h3>
                   <p className="mt-1 text-sm text-neutral-500">{t('settings.connectedShortHint')}</p>
@@ -413,7 +413,7 @@ const Settings: React.FC = () => {
                 >
                   {t('settings.manageLinks')}
                 </button>
-              </div>
+              </div> */}
               {/* <SocialLinksEditor value={socialLinks} onChange={handleSocialChange} /> */}
             </div>
 
@@ -422,7 +422,7 @@ const Settings: React.FC = () => {
                 type="button"
                 onClick={() => void saveProfile()}
                 disabled={saving}
-                className="w-full rounded-xl bg-black py-3 font-medium text-white transition-colors hover:bg-neutral-800 active:scale-[0.99] disabled:opacity-50"
+                className="w-full rounded-xl bg-black py-3 font-medium text-white transition-colors hover:bg-black/80 active:scale-[0.99] disabled:opacity-50"
               >
                 {saving ? t('settings.saving') : t('settings.saveChanges')}
               </button>

@@ -2,9 +2,7 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  communityDashboardPath,
   communityPath,
-  communitySettingsPath,
   communityStorePath,
 } from '../constants/communityRoutes';
 import CommunityLeftSidebar, { type CommunityLeftNav } from '../components/Community/CommunityLeftSidebar';
@@ -20,37 +18,28 @@ import CommunityEventsPanel from '../components/Community/CommunityEventsPanel';
 import {
   Plus,
   UserPlus,
-  Copy,
-  HouseHeart,
   Globe,
   Lock,
-  Bolt,
   GraduationCap,
-  MoreVertical,
-  Pencil,
   ChevronRight,
-  Check,
   Trash2,
-  ArrowLeft,
   MessagesSquare,
   Quote,
   CloudDownload,
   Megaphone,
   Star,
-  LayoutList,
-  LayoutGrid,
   ChevronUp,
   ChevronDown,
   MoreHorizontal,
   Package,
   Camera,
   Calendar,
-  EyeOff,
   X,
-  LayoutDashboard,
   Pen,
   Trash,
-  Unlink2,
+  Users, 
+  AlertCircle, 
+  Loader2 
 } from 'lucide-react';
 import PostComposer from '../components/Posts/PostComposer';
 import PostFeedCard from '../components/Posts/PostFeedCard';
@@ -71,7 +60,7 @@ import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { useTranslation } from '../i18n/useTranslation';
 
-import { API_ORIGIN, COMMUNITIES_API as API_URL, POSTS_API as POSTS_API_URL } from '../config/api';
+import { COMMUNITIES_API as API_URL, POSTS_API as POSTS_API_URL } from '../config/api';
 const OWNER_ONLY_POST_NOTICE_KEY = 'communityOwnerOnlyPostNoticeDismissed';
 
 interface InstalledAppInstance {
@@ -163,7 +152,6 @@ const CommunityPage: React.FC = () => {
   const [activeAnnouncementsInstanceId, setActiveAnnouncementsInstanceId] = useState<string | null>(null);
   const [activeEventsInstanceId, setActiveEventsInstanceId] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<'home' | 'apps' | 'products' | 'about'>('home');
-  const [productsView, setProductsView] = useState<'list' | 'grid'>('list');
   const [productsBundleOpen, setProductsBundleOpen] = useState(true);
   const avatarFileRef = useRef<HTMLInputElement | null>(null);
   const [brandingFieldBusy, setBrandingFieldBusy] = useState<'banner' | 'avatar' | null>(null);
@@ -176,7 +164,7 @@ const CommunityPage: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const isLgUp = useMediaQuery('(min-width: 1024px)');
-  const [postVisibility, setPostVisibility] = useState<'public' | 'private'>('public');
+  const [postVisibility] = useState<'public' | 'private'>('public');
   const [ownerOnlyPostNoticeDismissed, setOwnerOnlyPostNoticeDismissed] = useState(false);
   const [addAdminModalOpen, setAddAdminModalOpen] = useState(false);
   const [adminActionBusy, setAdminActionBusy] = useState<string | null>(null);
@@ -1146,73 +1134,83 @@ const CommunityPage: React.FC = () => {
   if (privateGatePreview && !community) {
     const preview = privateGatePreview;
     return (
-      <div className="flex h-full min-h-0 flex-1 flex-col">
+      <div className="flex h-full min-h-0 flex-1 flex-col bg-white">
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <div className="mx-auto w-full max-w-[720px] px-4 py-6 pb-10 sm:px-6">
-            <article className="flex min-h-[calc(100dvh-var(--app-header-height)-var(--app-mobile-nav-height)-3rem)] flex-col overflow-hidden rounded-2xl border border-[#e7e7e7] bg-white shadow-sm lg:min-h-[calc(100dvh-var(--app-header-height)-4rem)]">
-              <div className="relative h-40 shrink-0 overflow-hidden rounded-t-2xl bg-gradient-to-br from-neutral-800 via-neutral-900 to-neutral-950 sm:h-[200px]">
-                {preview.banner ? (
-                  <img src={preview.banner} alt="" className="h-full w-full object-cover" />
-                ) : null}
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
-              </div>
-
-              <div className="relative px-4 pb-8 pt-0 sm:px-8 sm:pb-10">
-                <div className="-mt-12 flex justify-center sm:-mt-14">
+          <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
+            
+            {/* Карточка как в соцсетях */}
+            <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+              {/* Шапка с аватаркой */}
+              <div className="px-6 pt-6 sm:px-8 sm:pt-8">
+                <div className="flex items-start gap-4">
                   <img
                     src={
                       preview.avatar ||
-                      `https://ui-avatars.com/api/?name=${encodeURIComponent(preview.name)}&background=111827&color=fff&size=120&bold=true`
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(preview.name)}&background=000&color=fff&size=80&bold=true`
                     }
-                    alt=""
-                    className="h-24 w-24 rounded-2xl border-4 border-white object-cover shadow-md sm:h-[120px] sm:w-[120px]"
+                    alt={preview.name}
+                    className="h-16 w-16 rounded-full object-cover sm:h-20 sm:w-20"
                   />
-                </div>
-
-                <header className="mt-4 text-center">
-                  <h1 className="text-xl font-semibold tracking-tight text-neutral-900 sm:text-2xl">
-                    {preview.name}
-                  </h1>
-                  <p className="mt-1 font-mono text-sm text-neutral-500">@{preview.handle}</p>
-                  <span className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs font-medium text-neutral-700">
-                    <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    {t('community.privateCommunityBadge')}
-                  </span>
-                </header>
-
-                <p className="mx-auto mt-4 max-w-lg text-center text-[15px] leading-relaxed text-neutral-600 sm:text-base">
-                  {preview.description || t('community.noDescriptionYet')}
-                </p>
-                <p className="mt-2 text-center text-sm text-neutral-500">
-                  {t(
-                    preview.memberCount === 1
-                      ? 'community.memberCountLineOne'
-                      : 'community.memberCountLineMany',
-                    { count: formatCount(preview.memberCount) }
-                  )}
-                </p>
-
-                <section className="mx-auto mt-8 w-full max-w-md rounded-2xl border border-[#e8ecf4] bg-gradient-to-b from-[#f8faff] to-white p-6 shadow-sm sm:p-8">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#315efb]">
-                    <Lock className="h-6 w-6" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h2 className="text-lg font-semibold text-neutral-900 sm:text-xl">
+                          {preview.name}
+                        </h2>
+                        <p className="text-sm text-neutral-500">@{preview.handle}</p>
+                      </div>
+                      <span className="shrink-0 rounded-full border border-neutral-200 px-3 py-1 text-xs font-medium text-neutral-600">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Lock className="h-3 w-3" />
+                          Приватное
+                        </span>
+                      </span>
+                    </div>
+                    
+                    {/* Описание */}
+                    {preview.description && (
+                      <p className="mt-2 text-sm leading-relaxed text-neutral-600 sm:text-base">
+                        {preview.description}
+                      </p>
+                    )}
+                    
+                    {/* Статистика */}
+                    <div className="mt-2 flex items-center gap-4 text-sm text-neutral-500">
+                      <span className="inline-flex items-center gap-1">
+                        <Users className="h-4 w-4" />
+                        {t(
+                          preview.memberCount === 1
+                            ? 'community.memberCountLineOne'
+                            : 'community.memberCountLineMany',
+                          { count: formatCount(preview.memberCount) }
+                        )}
+                      </span>
+                    </div>
                   </div>
-                  <h2 className="mt-5 text-center text-lg font-semibold text-neutral-900">
+                </div>
+              </div>
+  
+              {/* Контент с приглашением */}
+              <div className="mt-4 border-t border-neutral-100 px-6 py-6 sm:px-8 sm:py-8">
+                {/* Заголовок приглашения */}
+                <div className="text-center">
+                  <h3 className="text-base font-semibold text-neutral-900">
                     {t('community.membersOnlyTitle')}
-                  </h2>
-                  <p className="mt-2 text-center text-sm leading-relaxed text-neutral-600">
+                  </h3>
+                  <p className="mt-1 text-sm text-neutral-500">
                     {t('community.membersOnlySubtitle')}
                   </p>
-
-                  {preview.requiresJoinCode ? (
-                    <div className="mt-6">
-                      <label
-                        htmlFor="community-join-code"
-                        className="mb-2 block text-sm font-medium text-neutral-800"
-                      >
+                </div>
+  
+                {/* Форма вступления */}
+                <div className="mt-6 space-y-4">
+                  {preview.requiresJoinCode && (
+                    <div>
+                      <label htmlFor="code" className="sr-only">
                         {t('community.joinPassphraseLabel')}
                       </label>
                       <input
-                        id="community-join-code"
+                        id="code"
                         type="password"
                         autoComplete="off"
                         value={joinCodeInput}
@@ -1221,35 +1219,51 @@ const CommunityPage: React.FC = () => {
                           setJoinError(null);
                         }}
                         placeholder={t('community.joinPassphrasePlaceholder')}
-                        className="w-full rounded-xl border border-[#e0e4ec] bg-white px-4 py-3 text-[15px] outline-none transition-shadow focus:border-[#315efb]/40 focus:ring-2 focus:ring-[#315efb]/20"
+                        className="w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-center text-sm outline-none transition-colors placeholder:text-neutral-400 focus:border-neutral-300 focus:bg-white focus:ring-0"
                       />
                     </div>
-                  ) : null}
-
-                  {joinError ? (
-                    <p className="mt-3 text-sm text-red-600" role="alert">
+                  )}
+  
+                  {joinError && (
+                    <p className="text-center text-sm text-red-600" role="alert">
                       {joinError}
                     </p>
-                  ) : null}
-
+                  )}
+  
                   <button
                     type="button"
                     onClick={handleJoin}
                     disabled={joinLoading}
-                    className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#315efb] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#2547c4] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-black px-6 py-3 text-sm font-medium text-white transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <Plus className="h-[18px] w-[18px]" aria-hidden />
-                    {joinLoading ? t('community.joining') : t('community.joinCommunity')}
+                    {joinLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {t('community.joining')}
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-4 w-4" />
+                        {t('community.joinCommunity')}
+                      </>
+                    )}
                   </button>
-
-                  {!token ? (
-                    <p className="mt-4 text-center text-xs text-neutral-500">
+  
+                  {!token && (
+                    <p className="text-center text-xs text-neutral-400">
                       {t('community.signInToJoin')}
                     </p>
-                  ) : null}
-                </section>
+                  )}
+                </div>
               </div>
-            </article>
+            </div>
+  
+            {/* Дополнительная информация */}
+            <div className="mt-8 text-center">
+              <p className="text-xs text-neutral-400">
+                {t('community.invitationFooter') || 'Приватное сообщество'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -1526,8 +1540,8 @@ const CommunityPage: React.FC = () => {
                 <div
                   className={
                     mobileComposerFull
-                      ? 'mx-auto mt-4 flex min-h-0 w-full max-w-2xl flex-1 flex-col'
-                      : 'mx-auto flex w-full max-w-2xl flex-col pt-2'
+                      ? 'mx-auto mt-4 flex min-h-0 w-full flex-1 flex-col'
+                      : 'mx-auto flex w-full flex-col pt-2'
                   }
                 >
                   {canPost && (

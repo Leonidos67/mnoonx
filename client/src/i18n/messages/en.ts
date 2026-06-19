@@ -179,7 +179,7 @@ export const en = {
   discover: {
     title: 'Discover',
     market: 'Market',
-    marketNew: 'NEW',
+    marketNew: 'BETA',
     tabTagline: 'Find communities and creators worth following',
     searchWidePlaceholder: 'Search communities, traders, or keywords...',
     communities: 'Communities',
@@ -616,6 +616,7 @@ export const en = {
     accountSettings: 'Account settings',
     editProfile: 'Edit profile',
     invites: 'Invites',
+    invitesPeople: 'Invite people to join using your link',
     connectedAccounts: 'Connected accounts',
     accountSecurity: 'Account security',
     orders: 'Orders',

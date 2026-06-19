@@ -74,7 +74,7 @@ async function main() {
     const payload = {
       name: spec.name,
       handle,
-      description: `${spec.topic}. Private community — join with passphrase.`,
+      description: `${spec.topic}.`,
       avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(spec.name)}&background=111827&color=fff&size=128&bold=true`,
       banner: '',
       owner: owner._id,

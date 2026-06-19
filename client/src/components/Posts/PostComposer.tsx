@@ -83,9 +83,9 @@ const PostComposer: React.FC<PostComposerProps> = ({
   const canSubmit =
     Boolean(content.trim()) || media.length > 0 || hasLink || hasCoin;
 
-  const avatarSrc =
-    userAvatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(userFullName || 'User')}&background=000&color=fff&size=40&bold=true`;
+  // const avatarSrc =
+  //   userAvatar ||
+  //   `https://ui-avatars.com/api/?name=${encodeURIComponent(userFullName || 'User')}&background=000&color=fff&size=40&bold=true`;
 
   useEffect(() => {
     if (mobileFull || !textareaRef.current) return;
@@ -212,7 +212,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
   const attachUiActive = isLgUp ? attachMenuOpen : mobileAttach.open;
 
   const attachMenuItemClass =
-    'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-neutral-900 transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50';
+    'flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-black transition-colors hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50';
 
   const attachMenuSheetItemClass =
     'flex w-full items-center gap-3 rounded-xl px-4 py-3.5 text-left text-sm font-medium text-neutral-900 transition-colors hover:bg-neutral-50 active:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-50';
@@ -229,9 +229,9 @@ const PostComposer: React.FC<PostComposerProps> = ({
             className={itemClass}
           >
             {mediaUploading ? (
-              <Loader2 size={20} className="animate-spin text-neutral-500" aria-hidden />
+              <Loader2 size={14} className="animate-spin text-black" aria-hidden />
             ) : (
-              <Image size={20} className="text-neutral-500" aria-hidden />
+              <Image size={16} className="text-black" aria-hidden />
             )}
             {mediaUploading ? t('postComposer.uploading') : t('postComposer.addPhotos')}
           </button>
@@ -242,20 +242,20 @@ const PostComposer: React.FC<PostComposerProps> = ({
             disabled={mediaUploading}
             className={itemClass}
           >
-            <Link2 size={20} className="text-neutral-500" aria-hidden />
+            <Link2 size={16} className="text-black" aria-hidden />
             {t('postComposer.addImageUrl')}
           </button>
         </>
       ) : null}
       {onLinkAttachmentChange ? (
         <button type="button" role="menuitem" onClick={handleAddLink} className={itemClass}>
-          <SquareArrowOutUpRight size={20} className="text-neutral-500" aria-hidden />
+          <SquareArrowOutUpRight size={16} className="text-black" aria-hidden />
           {hasLink ? t('postComposer.editLink') : t('postComposer.addLink')}
         </button>
       ) : null}
       {onCoinAttachmentChange ? (
         <button type="button" role="menuitem" onClick={handleAddCoin} className={itemClass}>
-          <CandlestickChart size={20} className="text-neutral-500" aria-hidden />
+          <CandlestickChart size={16} className="text-black" aria-hidden />
           {hasCoin ? t('postComposer.editCoin') : t('postComposer.addCoin')}
         </button>
       ) : null}

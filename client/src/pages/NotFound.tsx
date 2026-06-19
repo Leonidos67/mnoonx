@@ -1,7 +1,6 @@
 // pages/NotFound.tsx
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Home } from 'lucide-react';
 import { useTranslation } from '../i18n/useTranslation';
 
 const NotFound: React.FC = () => {
