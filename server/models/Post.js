@@ -41,6 +41,11 @@ const postSchema = new mongoose.Schema({
       required: true,
       maxlength: 500
     },
+    /** Null = top-level comment; otherwise _id of parent comment */
+    parentId: {
+      type: String,
+      default: null,
+    },
     likes: [{
       type: String
     }],

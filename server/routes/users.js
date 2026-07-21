@@ -239,6 +239,36 @@ router.patch('/me/profile', auth, async (req, res) => {
   }
 });
 
+// PATCH /api/users/me/password — change password
+router.patch('/me/password', auth, async (req, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current and new password are required' });
+    }
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters' });
+    }
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    const ok = await user.comparePassword(String(currentPassword));
+    if (!ok) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+    user.password = String(newPassword);
+    await user.save();
+    res.json({ message: 'Password updated' });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // PATCH /api/users/me/profile-customization
 router.patch('/me/profile-customization', auth, async (req, res) => {
   try {
@@ -389,6 +419,104 @@ router.get('/:username/reposts', auth, async (req, res) => {
     res.json({ posts: postsWithAuthor, total: postsWithAuthor.length });
   } catch (error) {
     console.error('Get reposts error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+function profileIdVariants(profileUserId) {
+  const idVariants = [String(profileUserId)];
+  if (mongoose.Types.ObjectId.isValid(profileUserId)) {
+    idVariants.push(new mongoose.Types.ObjectId(profileUserId));
+  }
+  return idVariants;
+}
+
+function commentUserMatches(commentUser, idVariants) {
+  const uid = String(commentUser);
+  return idVariants.some((v) => String(v) === uid);
+}
+
+// GET /api/users/:username/replies — comments this user left on posts
+router.get('/:username/replies', auth, async (req, res) => {
+  try {
+    const { username } = req.params;
+    const user = await User.findOne({ username }).select('_id username fullName avatar');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const profileUserId = user._id.toString();
+    const idVariants = profileIdVariants(profileUserId);
+    const viewerId = req.userId ? String(req.userId) : null;
+
+    const posts = await Post.find({
+      'comments.user': profileUserId,
+    })
+      .sort({ updatedAt: -1 })
+      .limit(120);
+
+    const replyAuthor = {
+      _id: profileUserId,
+      username: user.username,
+      fullName: user.fullName || user.username,
+      avatar: user.avatar || '',
+    };
+
+    const replies = [];
+    for (const post of posts) {
+      if (post.isPrivate) {
+        const authorId = String(post.author);
+        if (viewerId !== authorId && viewerId !== profileUserId) continue;
+      }
+      const serializedPost = await serializePostWithAuthor(post, req.userId);
+      for (const c of post.comments || []) {
+        if (!commentUserMatches(c.user, idVariants)) continue;
+        replies.push({
+          _id: String(c._id),
+          content: c.content,
+          createdAt: c.createdAt,
+          parentId: c.parentId ? String(c.parentId) : null,
+          user: replyAuthor,
+          post: serializedPost,
+        });
+      }
+    }
+
+    replies.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json({ replies: replies.slice(0, 50), total: Math.min(replies.length, 50) });
+  } catch (error) {
+    console.error('Get replies error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// GET /api/users/:username/media — posts by this user that include media
+router.get('/:username/media', auth, async (req, res) => {
+  try {
+    const { username } = req.params;
+    const user = await User.findOne({ username }).select('_id');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const profileUserId = user._id.toString();
+    const viewerId = req.userId ? String(req.userId) : null;
+    const filter = {
+      author: profileUserId,
+      'media.0': { $exists: true },
+    };
+    if (viewerId !== profileUserId) {
+      filter.isPrivate = { $ne: true };
+    }
+
+    const posts = await Post.find(filter).sort({ createdAt: -1 }).limit(60);
+    const postsWithAuthor = await Promise.all(
+      posts.map((post) => serializePostWithAuthor(post, req.userId))
+    );
+
+    res.json({ posts: postsWithAuthor, total: postsWithAuthor.length });
+  } catch (error) {
+    console.error('Get media error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });

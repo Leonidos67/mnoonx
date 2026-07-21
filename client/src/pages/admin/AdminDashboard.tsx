@@ -185,7 +185,7 @@ const AdminDashboard: React.FC = () => {
   const mongoOk = stats.server.mongo.code === 'online';
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto">
       <h1 className="text-2xl font-bold text-white">Обзор системы</h1>
       <p className="mt-1 text-sm text-neutral-500">
         Метрики платформы, графики за 30 дней и последние события в базе

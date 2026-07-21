@@ -15,6 +15,9 @@ import CommunityContentPanel from '../components/Community/CommunityContentPanel
 import CommunityFilesPanel from '../components/Community/CommunityFilesPanel';
 import CommunityAnnouncementsPanel from '../components/Community/CommunityAnnouncementsPanel';
 import CommunityEventsPanel from '../components/Community/CommunityEventsPanel';
+import CommunityAiPanel from '../components/Community/CommunityAiPanel';
+import CommunityKanbanPanel from '../components/Community/CommunityKanbanPanel';
+import CommunityFormsPanel from '../components/Community/CommunityFormsPanel';
 import {
   Plus,
   UserPlus,
@@ -30,18 +33,19 @@ import {
   Star,
   ChevronUp,
   ChevronDown,
-  MoreHorizontal,
   Package,
   Camera,
   Calendar,
   X,
-  Pen,
-  Trash,
   Users,
-  Loader2 
+  Loader2,
+  Bot,
+  Columns3,
+  ClipboardList,
 } from 'lucide-react';
 import PostComposer from '../components/Posts/PostComposer';
 import PostFeedCard from '../components/Posts/PostFeedCard';
+import { AnimatedPostMenuIcon } from '../components/Posts/PostMenuAnimatedIcons';
 import PostDetailPanel from '../components/Posts/PostDetailPanel';
 import type { PostCoinAttachment } from '../types/postCoin';
 import type { PostLinkAttachment } from '../types/postLink';
@@ -143,13 +147,16 @@ const CommunityPage: React.FC = () => {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [repostedPosts, setRepostedPosts] = useState<Set<string>>(new Set());
-  const [leftNav, setLeftNav] = useState<'home' | 'chat' | 'courses' | 'content' | 'files' | 'announcements' | 'events'>('home');
+  const [leftNav, setLeftNav] = useState<CommunityLeftNav>('home');
   const [activeChatInstanceId, setActiveChatInstanceId] = useState<string | null>(null);
   const [activeCoursesInstanceId, setActiveCoursesInstanceId] = useState<string | null>(null);
   const [activeContentInstanceId, setActiveContentInstanceId] = useState<string | null>(null);
   const [activeFilesInstanceId, setActiveFilesInstanceId] = useState<string | null>(null);
   const [activeAnnouncementsInstanceId, setActiveAnnouncementsInstanceId] = useState<string | null>(null);
   const [activeEventsInstanceId, setActiveEventsInstanceId] = useState<string | null>(null);
+  const [activeAiInstanceId, setActiveAiInstanceId] = useState<string | null>(null);
+  const [activeKanbanInstanceId, setActiveKanbanInstanceId] = useState<string | null>(null);
+  const [activeFormsInstanceId, setActiveFormsInstanceId] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<'home' | 'apps' | 'products' | 'about'>('home');
   const [productsBundleOpen, setProductsBundleOpen] = useState(true);
   const avatarFileRef = useRef<HTMLInputElement | null>(null);
@@ -387,6 +394,12 @@ const CommunityPage: React.FC = () => {
       announcementsInstanceId?: string;
       focusEvents?: boolean;
       eventsInstanceId?: string;
+      focusAi?: boolean;
+      aiInstanceId?: string;
+      focusKanban?: boolean;
+      kanbanInstanceId?: string;
+      focusForms?: boolean;
+      formsInstanceId?: string;
     } | undefined;
     const chats =
       community?.installedAppInstances?.filter((i) => i.appId === COMMUNITY_APP_IDS.CHAT) ?? [];
@@ -460,6 +473,42 @@ const CommunityPage: React.FC = () => {
       navigate(location.pathname, { replace: true, state: {} });
       return;
     }
+    const aiInst =
+      community?.installedAppInstances?.filter((i) => i.appId === COMMUNITY_APP_IDS.AI) ?? [];
+    if (st?.focusAi && aiInst.length > 0) {
+      setLeftNav('ai');
+      const pick =
+        st.aiInstanceId && aiInst.some((c) => c.id === st.aiInstanceId)
+          ? st.aiInstanceId
+          : aiInst[0].id;
+      setActiveAiInstanceId(pick);
+      navigate(location.pathname, { replace: true, state: {} });
+      return;
+    }
+    const kanbanInst =
+      community?.installedAppInstances?.filter((i) => i.appId === COMMUNITY_APP_IDS.KANBAN) ?? [];
+    if (st?.focusKanban && kanbanInst.length > 0) {
+      setLeftNav('kanban');
+      const pick =
+        st.kanbanInstanceId && kanbanInst.some((c) => c.id === st.kanbanInstanceId)
+          ? st.kanbanInstanceId
+          : kanbanInst[0].id;
+      setActiveKanbanInstanceId(pick);
+      navigate(location.pathname, { replace: true, state: {} });
+      return;
+    }
+    const formsInst =
+      community?.installedAppInstances?.filter((i) => i.appId === COMMUNITY_APP_IDS.FORMS) ?? [];
+    if (st?.focusForms && formsInst.length > 0) {
+      setLeftNav('forms');
+      const pick =
+        st.formsInstanceId && formsInst.some((c) => c.id === st.formsInstanceId)
+          ? st.formsInstanceId
+          : formsInst[0].id;
+      setActiveFormsInstanceId(pick);
+      navigate(location.pathname, { replace: true, state: {} });
+      return;
+    }
   }, [location.state, location.pathname, community, navigate]);
 
   useEffect(() => {
@@ -523,6 +572,39 @@ const CommunityPage: React.FC = () => {
     setActiveEventsInstanceId((prev) => {
       if (prev && eventsInst.some((c) => c.id === prev)) return prev;
       return eventsInst[0]?.id ?? null;
+    });
+  }, [community]);
+
+  useEffect(() => {
+    if (!community) return;
+    const aiInst = (community.installedAppInstances || []).filter(
+      (i) => i.appId === COMMUNITY_APP_IDS.AI
+    );
+    setActiveAiInstanceId((prev) => {
+      if (prev && aiInst.some((c) => c.id === prev)) return prev;
+      return aiInst[0]?.id ?? null;
+    });
+  }, [community]);
+
+  useEffect(() => {
+    if (!community) return;
+    const kanbanInst = (community.installedAppInstances || []).filter(
+      (i) => i.appId === COMMUNITY_APP_IDS.KANBAN
+    );
+    setActiveKanbanInstanceId((prev) => {
+      if (prev && kanbanInst.some((c) => c.id === prev)) return prev;
+      return kanbanInst[0]?.id ?? null;
+    });
+  }, [community]);
+
+  useEffect(() => {
+    if (!community) return;
+    const formsInst = (community.installedAppInstances || []).filter(
+      (i) => i.appId === COMMUNITY_APP_IDS.FORMS
+    );
+    setActiveFormsInstanceId((prev) => {
+      if (prev && formsInst.some((c) => c.id === prev)) return prev;
+      return formsInst[0]?.id ?? null;
     });
   }, [community]);
 
@@ -719,13 +801,17 @@ const CommunityPage: React.FC = () => {
       .catch(() => showToast(t('common.copyLinkFailed'), 'error'));
   };
 
-  const copyCommunityLink = useCallback(() => {
-    if (!community?.handle) return;
+  const copyCommunityLink = useCallback(async (): Promise<boolean> => {
+    if (!community?.handle) return false;
     const link = `${window.location.origin}${communityPath(community.handle)}`;
-    navigator.clipboard
-      .writeText(link)
-      .then(() => showToast(t('common.linkCopied')))
-      .catch(() => showToast(t('common.copyLinkFailed'), 'error'));
+    try {
+      await navigator.clipboard.writeText(link);
+      showToast(t('common.linkCopied'));
+      return true;
+    } catch {
+      showToast(t('common.copyLinkFailed'), 'error');
+      return false;
+    }
   }, [community?.handle, showToast, t]);
 
   const isPostOwner = (post: Post) => {
@@ -886,12 +972,21 @@ const CommunityPage: React.FC = () => {
     community?.installedAppInstances?.filter((i) => i.appId === COMMUNITY_APP_IDS.ANNOUNCEMENTS) ?? [];
   const eventInstances =
     community?.installedAppInstances?.filter((i) => i.appId === COMMUNITY_APP_IDS.EVENTS) ?? [];
+  const aiInstances =
+    community?.installedAppInstances?.filter((i) => i.appId === COMMUNITY_APP_IDS.AI) ?? [];
+  const kanbanInstances =
+    community?.installedAppInstances?.filter((i) => i.appId === COMMUNITY_APP_IDS.KANBAN) ?? [];
+  const formInstances =
+    community?.installedAppInstances?.filter((i) => i.appId === COMMUNITY_APP_IDS.FORMS) ?? [];
   const hasChatApp = chatInstances.length > 0;
   const hasCoursesApp = courseInstances.length > 0;
   const hasContentApp = contentInstances.length > 0;
   const hasFilesApp = fileInstances.length > 0;
   const hasAnnouncementsApp = announcementInstances.length > 0;
   const hasEventsApp = eventInstances.length > 0;
+  const hasAiApp = aiInstances.length > 0;
+  const hasKanbanApp = kanbanInstances.length > 0;
+  const hasFormsApp = formInstances.length > 0;
   const sidebarAppInstances = (community?.installedAppInstances ?? []).filter(
     (i) =>
       i.appId === COMMUNITY_APP_IDS.CHAT ||
@@ -899,7 +994,10 @@ const CommunityPage: React.FC = () => {
       i.appId === COMMUNITY_APP_IDS.CONTENT ||
       i.appId === COMMUNITY_APP_IDS.FILES ||
       i.appId === COMMUNITY_APP_IDS.ANNOUNCEMENTS ||
-      i.appId === COMMUNITY_APP_IDS.EVENTS
+      i.appId === COMMUNITY_APP_IDS.EVENTS ||
+      i.appId === COMMUNITY_APP_IDS.AI ||
+      i.appId === COMMUNITY_APP_IDS.KANBAN ||
+      i.appId === COMMUNITY_APP_IDS.FORMS
   );
 
   const activateAppInstance = useCallback((inst: InstalledAppInstance) => {
@@ -921,6 +1019,15 @@ const CommunityPage: React.FC = () => {
     } else if (inst.appId === COMMUNITY_APP_IDS.EVENTS) {
       setActiveEventsInstanceId(inst.id);
       setLeftNav('events');
+    } else if (inst.appId === COMMUNITY_APP_IDS.AI) {
+      setActiveAiInstanceId(inst.id);
+      setLeftNav('ai');
+    } else if (inst.appId === COMMUNITY_APP_IDS.KANBAN) {
+      setActiveKanbanInstanceId(inst.id);
+      setLeftNav('kanban');
+    } else if (inst.appId === COMMUNITY_APP_IDS.FORMS) {
+      setActiveFormsInstanceId(inst.id);
+      setLeftNav('forms');
     }
   }, []);
 
@@ -969,7 +1076,13 @@ const CommunityPage: React.FC = () => {
                   ? t('community.removeAppAnnouncementsBody')
                   : removed?.appId === COMMUNITY_APP_IDS.EVENTS
                     ? t('community.removeAppEventsBody')
-                    : t('community.removeAppGenericBody');
+                    : removed?.appId === COMMUNITY_APP_IDS.AI
+                      ? t('community.removeAppAiBody')
+                      : removed?.appId === COMMUNITY_APP_IDS.KANBAN
+                        ? t('community.removeAppKanbanBody')
+                        : removed?.appId === COMMUNITY_APP_IDS.FORMS
+                          ? t('community.removeAppFormsBody')
+                          : t('community.removeAppGenericBody');
       const confirmed = await confirm({
         title: t('community.removeAppConfirmTitle'),
         message: msg,
@@ -1058,12 +1171,96 @@ const CommunityPage: React.FC = () => {
           });
           if (nextEv.length === 0 && leftNav === 'events') setLeftNav('home');
         }
+        if (removed?.appId === COMMUNITY_APP_IDS.AI) {
+          const nextAi =
+            data.installedAppInstances?.filter(
+              (i: InstalledAppInstance) => i.appId === COMMUNITY_APP_IDS.AI
+            ) ?? [];
+          setActiveAiInstanceId((prev) => {
+            if (instanceId === prev) return nextAi[0]?.id ?? null;
+            if (prev && nextAi.some((c: InstalledAppInstance) => c.id === prev)) return prev;
+            return nextAi[0]?.id ?? null;
+          });
+          if (nextAi.length === 0 && leftNav === 'ai') setLeftNav('home');
+        }
+        if (removed?.appId === COMMUNITY_APP_IDS.KANBAN) {
+          const nextKb =
+            data.installedAppInstances?.filter(
+              (i: InstalledAppInstance) => i.appId === COMMUNITY_APP_IDS.KANBAN
+            ) ?? [];
+          setActiveKanbanInstanceId((prev) => {
+            if (instanceId === prev) return nextKb[0]?.id ?? null;
+            if (prev && nextKb.some((c: InstalledAppInstance) => c.id === prev)) return prev;
+            return nextKb[0]?.id ?? null;
+          });
+          if (nextKb.length === 0 && leftNav === 'kanban') setLeftNav('home');
+        }
+        if (removed?.appId === COMMUNITY_APP_IDS.FORMS) {
+          const nextFm =
+            data.installedAppInstances?.filter(
+              (i: InstalledAppInstance) => i.appId === COMMUNITY_APP_IDS.FORMS
+            ) ?? [];
+          setActiveFormsInstanceId((prev) => {
+            if (instanceId === prev) return nextFm[0]?.id ?? null;
+            if (prev && nextFm.some((c: InstalledAppInstance) => c.id === prev)) return prev;
+            return nextFm[0]?.id ?? null;
+          });
+          if (nextFm.length === 0 && leftNav === 'forms') setLeftNav('home');
+        }
       } catch (e) {
         console.error(e);
         showToast(t('community.failedRemoveApp'), 'error');
       }
     },
     [token, handle, community, leftNav, confirm, showToast, t]
+  );
+
+  const duplicateAppInstance = useCallback(
+    async (instanceId: string): Promise<boolean> => {
+      if (!token || !handle || !community) return false;
+      const source = community.installedAppInstances?.find((i) => i.id === instanceId);
+      if (!source) return false;
+      const copySuffix = t('community.duplicateAppCopySuffix');
+      const baseTitle = String(source.title || '').trim() || source.appId;
+      const title = `${baseTitle} (${copySuffix})`.slice(0, 120);
+      try {
+        const res = await fetch(`${API_URL}/${handle}/apps`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            appId: source.appId,
+            title,
+            visibleToMembers: source.visibleToMembers !== false,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          showToast(
+            typeof data?.message === 'string' ? data.message : t('community.failedDuplicateApp'),
+            'error',
+          );
+          return false;
+        }
+        const data = await res.json();
+        setCommunity(data);
+        showToast(t('community.appDuplicatedToast'));
+        if (data.newInstanceId) {
+          const created = data.installedAppInstances?.find(
+            (i: InstalledAppInstance) => i.id === data.newInstanceId,
+          );
+          if (created) activateAppInstance(created);
+        }
+        return true;
+      } catch (e) {
+        console.error(e);
+        showToast(t('community.failedDuplicateApp'), 'error');
+        return false;
+      }
+    },
+    [token, handle, community, showToast, t, activateAppInstance],
   );
 
   const leftSidebarProps = useMemo(() => {
@@ -1086,11 +1283,15 @@ const CommunityPage: React.FC = () => {
       activeFilesInstanceId,
       activeAnnouncementsInstanceId,
       activeEventsInstanceId,
+      activeAiInstanceId,
+      activeKanbanInstanceId,
+      activeFormsInstanceId,
       unreadByInstance,
       isOwner,
       formatCount,
       onPatchVisibility: patchInstanceVisibility,
       onDeleteApp: deleteAppInstance,
+      onDuplicateApp: duplicateAppInstance,
     };
   }, [
     community,
@@ -1103,10 +1304,14 @@ const CommunityPage: React.FC = () => {
     activeFilesInstanceId,
     activeAnnouncementsInstanceId,
     activeEventsInstanceId,
+    activeAiInstanceId,
+    activeKanbanInstanceId,
+    activeFormsInstanceId,
     unreadByInstance,
     isOwner,
     patchInstanceVisibility,
     deleteAppInstance,
+    duplicateAppInstance,
   ]);
 
   const rightSidebarProps = useMemo(() => {
@@ -1256,13 +1461,6 @@ const CommunityPage: React.FC = () => {
                 </div>
               </div>
             </div>
-  
-            {/* Дополнительная информация */}
-            <div className="mt-8 text-center">
-              <p className="text-xs text-neutral-400">
-                {t('community.invitationFooter') || 'Приватное сообщество'}
-              </p>
-            </div>
           </div>
         </div>
       </div>
@@ -1277,7 +1475,10 @@ const CommunityPage: React.FC = () => {
     leftNav === 'content' ||
     leftNav === 'files' ||
     leftNav === 'announcements' ||
-    leftNav === 'events';
+    leftNav === 'events' ||
+    leftNav === 'ai' ||
+    leftNav === 'kanban' ||
+    leftNav === 'forms';
 
   return (
     <div className="flex h-full min-h-[calc(100dvh-var(--app-header-height)-var(--app-mobile-nav-height))] flex-col overflow-hidden lg:min-h-[calc(100dvh-var(--app-header-height))]">
@@ -1357,6 +1558,39 @@ const CommunityPage: React.FC = () => {
               isOwner={isOwner}
               isMember={isMember}
               ownerUsername={community.owner?.username || ''}
+              onBackToCommunity={() => {
+                setLeftNav('home');
+                setMainTab('home');
+              }}
+            />
+          ) : leftNav === 'ai' && hasAiApp && handle && activeAiInstanceId ? (
+            <CommunityAiPanel
+              handle={handle}
+              instanceId={activeAiInstanceId}
+              instanceTitle={aiInstances.find((c) => c.id === activeAiInstanceId)?.title}
+              isOwner={isOwner}
+              onBackToCommunity={() => {
+                setLeftNav('home');
+                setMainTab('home');
+              }}
+            />
+          ) : leftNav === 'kanban' && hasKanbanApp && handle && activeKanbanInstanceId ? (
+            <CommunityKanbanPanel
+              handle={handle}
+              instanceId={activeKanbanInstanceId}
+              instanceTitle={kanbanInstances.find((c) => c.id === activeKanbanInstanceId)?.title}
+              isOwner={isOwner}
+              onBackToCommunity={() => {
+                setLeftNav('home');
+                setMainTab('home');
+              }}
+            />
+          ) : leftNav === 'forms' && hasFormsApp && handle && activeFormsInstanceId ? (
+            <CommunityFormsPanel
+              handle={handle}
+              instanceId={activeFormsInstanceId}
+              instanceTitle={formInstances.find((c) => c.id === activeFormsInstanceId)?.title}
+              isOwner={isOwner}
               onBackToCommunity={() => {
                 setLeftNav('home');
                 setMainTab('home');
@@ -1628,6 +1862,12 @@ const CommunityPage: React.FC = () => {
                         onSubmitInlineComment={() =>
                           void handleSubmitComment(String(post._id), 'inline')
                         }
+                        onSubmitInlineReply={(parentId, content) =>
+                          void handleSubmitComment(String(post._id), 'inline', {
+                            parentId,
+                            content,
+                          })
+                        }
                         token={token}
                         commentSubmitting={commentSubmitting}
                         commentsLoading={commentsLoadingPostId === String(post._id)}
@@ -1681,6 +1921,12 @@ const CommunityPage: React.FC = () => {
                           <CloudDownload size={26} />
                         ) : inst.appId === COMMUNITY_APP_IDS.EVENTS ? (
                           <Calendar size={26} />
+                        ) : inst.appId === COMMUNITY_APP_IDS.AI ? (
+                          <Bot size={26} />
+                        ) : inst.appId === COMMUNITY_APP_IDS.KANBAN ? (
+                          <Columns3 size={26} />
+                        ) : inst.appId === COMMUNITY_APP_IDS.FORMS ? (
+                          <ClipboardList size={26} />
                         ) : (
                           <Megaphone size={26} />
                         );
@@ -1695,7 +1941,13 @@ const CommunityPage: React.FC = () => {
                                 ? t('community.appKindFiles')
                                 : inst.appId === COMMUNITY_APP_IDS.EVENTS
                                   ? t('community.appKindEvents')
-                                  : t('community.appKindAnnouncements');
+                                  : inst.appId === COMMUNITY_APP_IDS.AI
+                                    ? t('community.appKindAi')
+                                    : inst.appId === COMMUNITY_APP_IDS.KANBAN
+                                      ? t('community.appKindKanban')
+                                      : inst.appId === COMMUNITY_APP_IDS.FORMS
+                                        ? t('community.appKindForms')
+                                        : t('community.appKindAnnouncements');
                       return (
                         <button
                           key={inst.id}
@@ -1762,7 +2014,7 @@ const CommunityPage: React.FC = () => {
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1 text-neutral-400">
-                          <MoreHorizontal className="h-5 w-5" />
+                          <AnimatedPostMenuIcon kind="ellipsis" size={20} color="#a3a3a3" />
                           {productsBundleOpen ? (
                             <ChevronUp className="h-5 w-5 text-neutral-600" />
                           ) : (
@@ -1790,7 +2042,13 @@ const CommunityPage: React.FC = () => {
                                         ? CloudDownload
                                         : inst.appId === COMMUNITY_APP_IDS.EVENTS
                                           ? Calendar
-                                          : Megaphone;
+                                          : inst.appId === COMMUNITY_APP_IDS.AI
+                                            ? Bot
+                                            : inst.appId === COMMUNITY_APP_IDS.KANBAN
+                                              ? Columns3
+                                              : inst.appId === COMMUNITY_APP_IDS.FORMS
+                                                ? ClipboardList
+                                                : Megaphone;
                               let primary = inst.title;
                               let secondary = inst.title;
                               if (inst.appId === COMMUNITY_APP_IDS.CHAT) {
@@ -1811,6 +2069,15 @@ const CommunityPage: React.FC = () => {
                               } else if (inst.appId === COMMUNITY_APP_IDS.EVENTS) {
                                 primary = inst.title || t('community.defaultEventsTitle');
                                 secondary = t('community.defaultEventsTitle');
+                              } else if (inst.appId === COMMUNITY_APP_IDS.AI) {
+                                primary = inst.title || t('community.defaultAiTitle');
+                                secondary = t('community.defaultAiTitle');
+                              } else if (inst.appId === COMMUNITY_APP_IDS.KANBAN) {
+                                primary = inst.title || t('community.defaultKanbanTitle');
+                                secondary = t('community.defaultKanbanTitle');
+                              } else if (inst.appId === COMMUNITY_APP_IDS.FORMS) {
+                                primary = inst.title || t('community.defaultFormsTitle');
+                                secondary = t('community.defaultFormsTitle');
                               }
                               const I = IconComp;
                               return (
@@ -2007,6 +2274,12 @@ const CommunityPage: React.FC = () => {
             commentText={commentText}
             onCommentTextChange={setCommentText}
             onSubmitComment={() => void handleSubmitComment(String(selectedPost._id), 'sidebar')}
+            onSubmitReply={(parentId, content) =>
+              void handleSubmitComment(String(selectedPost._id), 'sidebar', {
+                parentId,
+                content,
+              })
+            }
             token={token}
             commentSubmitting={commentSubmitting}
             commentsLoading={commentsLoadingPostId === String(selectedPost._id)}
@@ -2040,7 +2313,7 @@ const CommunityPage: React.FC = () => {
           }}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
         >
-          <Pen size={14} />
+          <AnimatedPostMenuIcon kind="edit" size={14} />
           {t('common.edit')}
         </button>
         <div className="my-1 h-px bg-neutral-100" />
@@ -2053,7 +2326,7 @@ const CommunityPage: React.FC = () => {
           }}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
         >
-          <Trash size={14} />
+          <AnimatedPostMenuIcon kind="trash" size={14} color="#dc2626" />
           {t('common.delete')}
         </button>
       </FloatingMenu>

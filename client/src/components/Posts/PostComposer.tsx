@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { CandlestickChart, Image, Link2, Loader2, Plus, PlusCircle, SquareArrowOutUpRight, X } from 'lucide-react';
+import { CandlestickChart, Image, Link2, Loader2, SquareArrowOutUpRight, X } from 'lucide-react';
 import FloatingMenu, { type FloatingMenuAnchor } from '../Common/FloatingMenu';
 import MobileBottomSheet from '../Common/MobileBottomSheet';
+import AnimatedPlusIcon from '../Common/AnimatedPlusIcon';
 import PostMediaUpload, { PostMediaUploadHandle } from './PostMediaUpload';
 import PostCoinAttachmentModal, { PostCoinAttachmentForm } from './PostCoinAttachmentModal';
 import PostLinkAttachmentModal, { PostLinkAttachmentForm } from './PostLinkAttachmentModal';
@@ -309,7 +310,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
         }}
       >
         <div className={closedInnerClass}>
-          <PlusCircle size={28} className="text-neutral-500" aria-hidden />
+          <AnimatedPlusIcon variant="circle" size={28} color="currentColor" className="text-neutral-500" />
           <div className="flex-1">
             <p className="text-base text-neutral-500">{t('postComposer.whatsOnMind')}</p>
           </div>
@@ -400,14 +401,14 @@ const PostComposer: React.FC<PostComposerProps> = ({
             aria-expanded={attachUiActive}
             aria-haspopup="menu"
             aria-label={t('postComposer.attachMenuLabel')}
-            className={`inline-flex items-center justify-center rounded-full p-2 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 ${
+            className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 ${
               attachUiActive ? 'bg-neutral-100 text-neutral-900' : ''
             }`}
           >
             {mediaUploading ? (
               <Loader2 size={20} className="animate-spin" aria-hidden />
             ) : (
-              <Plus size={20} aria-hidden />
+              <AnimatedPlusIcon variant="plus" size={20} color="currentColor" />
             )}
           </button>
           {isLgUp ? (

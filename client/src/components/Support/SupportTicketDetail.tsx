@@ -8,11 +8,11 @@ import {
   CheckCircle2,
   ExternalLink,
   Plus,
-  Send,
   Tag,
   User,
   X,
 } from 'lucide-react';
+import AnimatedSendIcon, { type AnimatedSendIconHandle } from '../Common/AnimatedSendIcon';
 import { SUPPORT_API } from '../../config/api';
 import { DOCS_SUPPORT_PATH } from '../../docs/docsNav';
 import type { SupportTicket, SupportTicketMessage } from '../../types/support';
@@ -48,6 +48,7 @@ const SupportTicketDetail: React.FC<SupportTicketDetailProps> = ({
   const [sending, setSending] = useState(false);
   const [closing, setClosing] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const sendIconRef = useRef<AnimatedSendIconHandle>(null);
   const fetchedIdRef = useRef<string | null>(seedTicket ? ticketId : null);
 
   const load = useCallback(
@@ -95,6 +96,7 @@ const SupportTicketDetail: React.FC<SupportTicketDetailProps> = ({
   const sendReply = async () => {
     const text = reply.trim();
     if (!text || !ticket || ticket.status === 'closed' || sending) return;
+    sendIconRef.current?.startAnimation();
     setSending(true);
     try {
       const res = await fetch(`${SUPPORT_API}/tickets/${ticketId}/messages`, {
@@ -312,7 +314,7 @@ const SupportTicketDetail: React.FC<SupportTicketDetailProps> = ({
               className="mb-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white transition-colors hover:bg-neutral-800 disabled:bg-stone-200 disabled:text-stone-400"
               aria-label="Send"
             >
-              <Send className="h-4 w-4" />
+              <AnimatedSendIcon ref={sendIconRef} size={16} color="currentColor" />
             </button>
           </div>
         ) : (

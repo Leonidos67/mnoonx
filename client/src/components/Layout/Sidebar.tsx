@@ -1,21 +1,16 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  House,
-  Compass,
   Plus,
   LogIn,
   User,
   ChevronDown,
   Settings,
-  CreditCard,
   LogOut,
-  Menu,
   Languages,
   ChevronRight,
   HeartHandshake,
   BookMarked,
-  BriefcaseBusiness,
   Wallet,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -23,6 +18,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useTranslation } from '../../i18n/useTranslation';
 import { communityPath, communitySettingsPath } from '../../constants/communityRoutes';
 import { profilePath } from '../../constants/paths';
+import { AnimatedNavIcon } from './AnimatedNavIcon';
+import AnimatedMenuIcon from '../Common/AnimatedMenuIcon';
 
 import { COMMUNITIES_API as API_COMMUNITIES } from '../../config/api';
 import MnoonxLogo from './MnoonxLogo';
@@ -88,18 +85,19 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
   }, []);
 
   const navItems = useMemo(
-    () => [
-      { nameKey: 'nav.home' as const, icon: House, path: '/', end: true },
-      { nameKey: 'nav.discover' as const, icon: Compass, path: '/discover', end: false },
-      {
-        nameKey: 'nav.profile' as const,
-        icon: User,
-        path: profileHref,
-        isActive: isProfileActive,
-        skipPathMatch: true,
-      },
-    ],
-    [profileHref, isProfileActive, t]
+    () =>
+      [
+        { nameKey: 'nav.home' as const, icon: 'home' as const, path: '/', end: true },
+        { nameKey: 'nav.discover' as const, icon: 'discover' as const, path: '/discover', end: false },
+        {
+          nameKey: 'nav.profile' as const,
+          icon: 'profile' as const,
+          path: profileHref,
+          isActive: isProfileActive,
+          skipPathMatch: true as const,
+        },
+      ] as const,
+    [profileHref, isProfileActive]
   );
 
   const isCommunityRouteActive = (handle: string) => {
@@ -114,8 +112,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
     navigate('/');
   };
 
-  const userMenuPanelClass =
-    'absolute bottom-full left-0 right-0 p-1 z-50';
+  const userMenuPanelClass = 'absolute bottom-full left-0 right-0 p-1 z-50';
   const userMenuItemClass =
     'w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-50 transition-colors flex items-center gap-2 text-neutral-800';
   const langSubmenuClass =
@@ -130,28 +127,29 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-neutral-700 transition-colors hover:bg-black/5 active:scale-95"
           aria-label={t('nav.hideSidebar')}
         >
-          <Menu className="h-5 w-5" strokeWidth={2} aria-hidden />
+          <AnimatedMenuIcon size={20} />
         </button>
         <MnoonxLogo className="min-w-0 flex-1" size="md" />
       </div>
 
-      <nav className="flex-1 p-2 overflow-y-auto">
+      <nav className="flex-1 overflow-y-auto p-2">
         <ul className="space-y-1">
           {navItems.map((item) => {
-            const active = item.skipPathMatch
-              ? !!item.isActive
-              : item.end
-                ? location.pathname === item.path
-                : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
+            const active =
+              'skipPathMatch' in item && item.skipPathMatch
+                ? !!item.isActive
+                : 'end' in item && item.end
+                  ? location.pathname === item.path
+                  : location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
             return (
               <li key={item.nameKey}>
                 <Link
                   to={item.path}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all active:scale-[0.95] ${
+                  className={`flex items-center gap-3 rounded-xl px-4 py-3 transition-all active:scale-[0.95] ${
                     active ? 'bg-black/10' : 'hover:bg-black/5'
                   }`}
                 >
-                  <item.icon className="h-5 w-5 shrink-0" />
+                  <AnimatedNavIcon kind={item.icon} size={20} />
                   <span className="font-medium">{t(item.nameKey)}</span>
                 </Link>
               </li>
@@ -160,8 +158,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
         </ul>
 
         <div className="mt-4">
-          <div className="flex items-center justify-between mb-2 px-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">{t('nav.myCommunities')}</h2>
+          <div className="mb-2 flex items-center justify-between px-2">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+              {t('nav.myCommunities')}
+            </h2>
           </div>
 
           <div className="space-y-1">
@@ -183,7 +183,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                 >
                   <span
                     aria-hidden
-                    className={`flex-shrink-0 w-2 -ml-5 rounded-full transition-all duration-200 ease-out ${
+                    className={`-ml-5 w-2 flex-shrink-0 rounded-full transition-all duration-200 ease-out ${
                       active
                         ? 'h-8 bg-black'
                         : 'h-1.5 bg-black/20 group-hover:h-4 group-hover:bg-black/20'
@@ -195,7 +195,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                       `https://ui-avatars.com/api/?name=${encodeURIComponent(c.name)}&size=64&bold=true`
                     }
                     alt=""
-                    className="h-8 w-8 ml-1 flex-shrink-0 rounded-lg object-cover"
+                    className="ml-1 h-8 w-8 flex-shrink-0 rounded-lg object-cover"
                   />
                   <span className="truncate text-sm font-medium">{c.name}</span>
                 </Link>
@@ -206,35 +206,37 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
           <button
             type="button"
             onClick={() => navigate('/new')}
-            className="mt-2 w-full flex items-center justify-center gap-2 bg-black text-white py-3 rounded-xl hover:rounded-2xl transition-colors"
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-black py-3 text-white transition-colors hover:rounded-2xl"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="h-5 w-5" />
             {t('nav.startCommunity')}
           </button>
         </div>
       </nav>
 
-      <div className="p-2 border-t border-neutral-200 relative" ref={userMenuRef}>
+      <div className="relative border-t border-neutral-200 p-2" ref={userMenuRef}>
         {user ? (
           <>
             <button
               type="button"
               onClick={() => setUserMenuOpen((o) => !o)}
-              className={`w-full flex items-center gap-2 px-2 py-2 border rounded-xl cursor-pointer transition-all text-left ${
+              className={`flex w-full cursor-pointer items-center gap-2 rounded-xl border px-2 py-2 text-left transition-all ${
                 userMenuOpen ? 'bg-neutral-100 ring-1 ring-neutral-300' : 'hover:bg-neutral-100'
               }`}
               aria-expanded={userMenuOpen}
               aria-haspopup="menu"
             >
-              <div className="w-8 h-8 bg-gradient-to-r from-[#fef08a] via-[#84cc16] to-[#16a34a] rounded-full flex items-center justify-center text-white font-bold shrink-0">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#fef08a] via-[#84cc16] to-[#16a34a] font-bold text-white">
                 {user.fullName?.charAt(0) || user.username?.charAt(0) || 'U'}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{user.username || 'User'}</p>
-                <p className="text-xs text-neutral-500 truncate">@{user.username}</p>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{user.username || 'User'}</p>
+                <p className="truncate text-xs text-neutral-500">@{user.username}</p>
               </div>
               <ChevronDown
-                className={`w-4 h-4 text-neutral-500 shrink-0 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`}
+                className={`h-4 w-4 shrink-0 text-neutral-500 transition-transform ${
+                  userMenuOpen ? 'rotate-180' : ''
+                }`}
               />
             </button>
 
@@ -267,15 +269,6 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                   <Settings size={14} className="shrink-0 text-neutral-500" />
                   {t('nav.settings')}
                 </Link>
-                {/* <Link
-                  to="/plan"
-                  role="menuitem"
-                  onClick={() => setUserMenuOpen(false)}
-                  className={userMenuItemClass}
-                >
-                  <CreditCard size={14} className="shrink-0 text-neutral-500" />
-                  {t('nav.plan')}
-                </Link> */}
                 <Link
                   to="/docs/support"
                   role="menuitem"
@@ -346,7 +339,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                   <BookMarked size={14} className="shrink-0 text-neutral-500" />
                   {t('nav.docs')}
                 </Link>
-                <div className="h-px bg-neutral-100 my-1" />
+                <div className="my-1 h-px bg-neutral-100" />
                 <button
                   type="button"
                   role="menuitem"
@@ -363,9 +356,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
           <button
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent('openLogin'))}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-neutral-300 rounded-xl hover:bg-neutral-100 transition-colors"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-300 px-4 py-3 transition-colors hover:bg-neutral-100"
           >
-            <LogIn className="w-5 h-5" />
+            <LogIn className="h-5 w-5" />
             <span className="font-medium">{t('common.signIn')}</span>
           </button>
         )}

@@ -10,17 +10,14 @@ import {
   MapPin,
   Link as LinkIcon,
   MessageCircle,
-  Repeat2,
-  Heart,
-  MoreHorizontal,
   Search,
-  Pen,
-  Trash,
-  Unlink2,
   Zap,
   Globe,
   Lock,
+  Repeat2,
 } from 'lucide-react';
+import { AnimatedPostMenuIcon } from '../components/Posts/PostMenuAnimatedIcons';
+import PostFeedActionButtons from '../components/Posts/PostFeedActionButtons';
 import ProfileBgEmojiDecor from '../components/Profile/ProfileBgEmojiDecor';
 import {
   PROFILE_HEADER_BG_DISABLED,
@@ -51,6 +48,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 import { getPostDisplayMeta } from '../utils/postDisplay';
 import { tryAwardActivity } from '../utils/awardActivity';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 import { USERS_API as API_URL, POSTS_API as POSTS_API_URL, MESSAGES_API } from '../config/api';
 import { useTranslation } from '../i18n/useTranslation';
@@ -59,6 +57,20 @@ import type { SocialLinks } from '../types/socialLinks';
 import { hasAnySocialLink } from '../utils/socialLinks';
 
 type Post = FeedPost;
+
+type ProfileReply = {
+  _id: string;
+  content: string;
+  createdAt: string;
+  parentId?: string | null;
+  user: {
+    _id: string;
+    username: string;
+    fullName: string;
+    avatar: string;
+  };
+  post: FeedPost;
+};
 
 interface UserProfile {
   _id: string;
@@ -113,6 +125,10 @@ const UserProfileComponent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'posts' | 'reposts' | 'replies' | 'media'>('posts');
   const [reposts, setReposts] = useState<FeedPost[]>([]);
   const [repostsLoading, setRepostsLoading] = useState(false);
+  const [replies, setReplies] = useState<ProfileReply[]>([]);
+  const [repliesLoading, setRepliesLoading] = useState(false);
+  const [mediaPosts, setMediaPosts] = useState<FeedPost[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
   const [searchFollower, setSearchFollower] = useState('');
   const [connectionsTab, setConnectionsTab] = useState<'followers' | 'following'>('followers');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -139,7 +155,7 @@ const UserProfileComponent: React.FC = () => {
   const [editPostTarget, setEditPostTarget] = useState<{ postId: string; content: string } | null>(null);
   const [editPostSaving, setEditPostSaving] = useState(false);
 
-  const postDetail = usePostDetail(posts, reposts, setPosts, setReposts);
+  const postDetail = usePostDetail(posts, reposts, setPosts, setReposts, mediaPosts, setMediaPosts);
   const {
     selectedPost,
     setSelectedPost,
@@ -331,6 +347,7 @@ const UserProfileComponent: React.FC = () => {
 
       setPosts((prev) => prev.filter((p) => String(p._id) !== postId));
       setReposts((prev) => prev.filter((p) => String(p._id) !== postId));
+      setMediaPosts((prev) => prev.filter((p) => String(p._id) !== postId));
       onPostDeleted(postId);
       
       // Обновляем счетчик
@@ -495,6 +512,50 @@ const UserProfileComponent: React.FC = () => {
     }
   }, [token, syncLikeRepostSets]);
 
+  const fetchReplies = useCallback(async (cleanUsername: string) => {
+    if (!cleanUsername || cleanUsername === 'undefined') return;
+    try {
+      setRepliesLoading(true);
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_URL}/${cleanUsername}/replies`, { headers });
+      if (!res.ok) {
+        setReplies([]);
+        return;
+      }
+      const data = await res.json();
+      setReplies((data.replies || []) as ProfileReply[]);
+    } catch (err) {
+      console.error('Fetch replies error:', err);
+      setReplies([]);
+    } finally {
+      setRepliesLoading(false);
+    }
+  }, [token]);
+
+  const fetchMedia = useCallback(async (cleanUsername: string) => {
+    if (!cleanUsername || cleanUsername === 'undefined') return;
+    try {
+      setMediaLoading(true);
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${API_URL}/${cleanUsername}/media`, { headers });
+      if (!res.ok) {
+        setMediaPosts([]);
+        return;
+      }
+      const data = await res.json();
+      const list: Post[] = data.posts || [];
+      setMediaPosts(list);
+      syncLikeRepostSets(list);
+    } catch (err) {
+      console.error('Fetch media error:', err);
+      setMediaPosts([]);
+    } finally {
+      setMediaLoading(false);
+    }
+  }, [token, syncLikeRepostSets]);
+
   const profileSlug = useMemo(() => {
     if (!username) return '';
     try {
@@ -525,7 +586,13 @@ const UserProfileComponent: React.FC = () => {
     if (activeTab === 'reposts' && profileSlug) {
       fetchReposts(profileSlug);
     }
-  }, [activeTab, profileSlug, fetchReposts]);
+    if (activeTab === 'replies' && profileSlug) {
+      fetchReplies(profileSlug);
+    }
+    if (activeTab === 'media' && profileSlug) {
+      fetchMedia(profileSlug);
+    }
+  }, [activeTab, profileSlug, fetchReposts, fetchReplies, fetchMedia]);
 
   const closeComposer = useCallback(() => {
     setShowPostCreator(false);
@@ -565,6 +632,9 @@ const UserProfileComponent: React.FC = () => {
       console.log('New post created:', newPost); // Проверь что author заполнен
       
       setPosts(prev => [newPost, ...prev]);
+      if (Array.isArray(newPost.media) && newPost.media.length > 0) {
+        setMediaPosts((prev) => [newPost, ...prev]);
+      }
       setProfile(prev => prev ? { ...prev, postsCount: (prev.postsCount || 0) + 1 } : null);
       setNewPostContent('');
       setNewPostMedia([]);
@@ -848,9 +918,9 @@ const UserProfileComponent: React.FC = () => {
               <div className="ml-auto relative" ref={menuOpenPostId === postId ? menuRef : null}>
                 <button
                   onClick={(e) => { e.stopPropagation(); setMenuOpenPostId(menuOpenPostId === postId ? null : postId); }}
-                  className={`post-feed-card-menu p-1 rounded-full transition-all ${menuOpenPostId === postId ? 'bg-black/10 text-black opacity-100' : 'text-neutral-500 opacity-60 hover:bg-black/5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/article:opacity-100'}`}
+                  className={`post-feed-card-menu flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${menuOpenPostId === postId ? 'bg-black/10 text-black opacity-100' : 'text-neutral-500 opacity-60 hover:bg-black/5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/article:opacity-100'}`}
                 >
-                  <MoreHorizontal size={16} />
+                  <AnimatedPostMenuIcon kind="ellipsis" size={16} />
                 </button>
                 {menuOpenPostId === postId && (
                   <div
@@ -864,7 +934,7 @@ const UserProfileComponent: React.FC = () => {
                       }}
                       className="w-full text-left py-1 px-3 text-[14px] rounded hover:bg-black/5 transition-colors flex items-center gap-2"
                     >
-                      <Unlink2 className="h-3 w-3" />
+                      <AnimatedPostMenuIcon kind="link" size={12} />
                       {t('home.copyLink')}
                     </button>
                     {isPostOwner(post) && (
@@ -873,7 +943,7 @@ const UserProfileComponent: React.FC = () => {
                           onClick={() => openEditPost(postId, post.content)}
                           className="w-full text-left py-1 px-3 text-[14px] rounded hover:bg-black/5 transition-colors flex items-center gap-2"
                         >
-                          <Pen className="h-3 w-3" />
+                          <AnimatedPostMenuIcon kind="edit" size={12} />
                           {t('common.edit')}
                         </button>
                         <div className="h-px bg-neutral-100 my-1" />
@@ -881,7 +951,7 @@ const UserProfileComponent: React.FC = () => {
                           onClick={() => handleDeletePost(postId)}
                           className="w-full text-left px-3 py-1 text-[14px] rounded hover:bg-red-50 transition-colors flex items-center gap-2 text-red-600"
                         >
-                          <Trash className="h-3 w-3" />
+                          <AnimatedPostMenuIcon kind="trash" size={12} color="#dc2626" />
                           {t('common.delete')}
                         </button>
                       </>
@@ -901,39 +971,19 @@ const UserProfileComponent: React.FC = () => {
             {post.media && post.media.length > 0 && (
               <PostMediaGallery media={post.media} meta={buildPostLightboxMeta(post)} />
             )}
-            <div className="flex items-center gap-1 mt-1 max-w-md">
-              <button
-                onClick={(e) => { e.stopPropagation(); handleLike(postId); }}
-                className={`flex items-center transition-colors group ${likedPosts.has(postId) ? 'text-red-500' : 'text-neutral-500 hover:text-red-500'}`}
-              >
-                <div className="p-2 rounded-full group-hover:bg-red-50 transition-colors">
-                  <Heart size={16} fill={likedPosts.has(postId) ? 'currentColor' : 'none'} />
-                </div>
-                <span className="text-xs">{formatCount(post.likesCount || 0)}</span>
-              </button>
-              <button
-                onClick={(e) => toggleFeedComments(postId, e)}
-                className={`flex items-center transition-colors group ${
-                  expandedCommentsPostId === postId ? 'text-black' : 'text-neutral-500 hover:text-black'
-                }`}
-              >
-                <div className="p-2 rounded-full group-hover:bg-black/5 transition-colors">
-                  <MessageCircle size={16} />
-                </div>
-                <span className="text-xs">{formatCount(post.commentsCount || 0)}</span>
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); handleRepost(postId); }}
-                className={`flex items-center transition-colors group ${
-                  repostedPosts.has(postId) ? 'text-black' : 'text-neutral-500 hover:text-black'
-                }`}
-              >
-                <div className="p-2 rounded-full group-hover:bg-black/5 transition-colors">
-                  <Repeat2 size={16} fill={repostedPosts.has(postId) ? 'currentColor' : 'none'} />
-                </div>
-                <span className="text-xs">{formatCount(post.repostsCount || 0)}</span>
-              </button>
-            </div>
+            <PostFeedActionButtons
+              postId={postId}
+              likesCount={post.likesCount || 0}
+              commentsCount={post.commentsCount || 0}
+              repostsCount={post.repostsCount || 0}
+              liked={likedPosts.has(postId)}
+              reposted={repostedPosts.has(postId)}
+              commentsExpanded={expandedCommentsPostId === postId}
+              formatCount={formatCount}
+              onLike={handleLike}
+              onToggleComments={toggleFeedComments}
+              onRepost={handleRepost}
+            />
 
             {expandedCommentsPostId === postId && (
               <PostCommentsSection
@@ -942,6 +992,9 @@ const UserProfileComponent: React.FC = () => {
                 text={inlineCommentText}
                 onTextChange={setInlineCommentText}
                 onSubmit={() => void handleSubmitComment(postId, 'inline')}
+                onSubmitReply={(parentId, content) =>
+                  void handleSubmitComment(postId, 'inline', { parentId, content })
+                }
                 token={token}
                 commentSubmitting={commentSubmitting}
                 commentsLoading={commentsLoadingPostId === postId}
@@ -1114,12 +1167,12 @@ const UserProfileComponent: React.FC = () => {
                   <button
                     type="button"
                     onClick={openProfileMenu}
-                    className="rounded-full border border-neutral-300 p-1.5 transition-colors hover:bg-neutral-100"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-neutral-300 transition-colors hover:bg-neutral-100"
                     aria-label={t('userProfile.menu.title')}
                     aria-haspopup="menu"
                     aria-expanded={profileMenuOpen}
                   >
-                    <MoreHorizontal size={16} />
+                    <AnimatedPostMenuIcon kind="ellipsis" size={16} />
                   </button>
                 </>
               )}
@@ -1197,12 +1250,12 @@ const UserProfileComponent: React.FC = () => {
                 <button
                   type="button"
                   onClick={openProfileMenu}
-                  className="rounded-full border border-neutral-300 p-2 transition-colors hover:bg-neutral-100"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-300 transition-colors hover:bg-neutral-100"
                   aria-label={t('userProfile.menu.title')}
                   aria-haspopup="menu"
                   aria-expanded={profileMenuOpen}
                 >
-                  <MoreHorizontal size={18} />
+                  <AnimatedPostMenuIcon kind="ellipsis" size={18} />
                 </button>
               </>
             )}
@@ -1365,10 +1418,120 @@ const UserProfileComponent: React.FC = () => {
           </div>
         )}
 
-        {(activeTab === 'replies' || activeTab === 'media') && (
-          <div className="text-center py-20 px-4">
-            <h2 className="text-2xl font-bold text-neutral-900 mb-2">{t('userProfile.noTabYet', { tab: activeTabTitle })}</h2>
-            <p className="text-neutral-500">{t('userProfile.noTabHint', { name: profile.username, tab: activeTabTitle })}</p>
+        {activeTab === 'replies' && (
+          <div>
+            {repliesLoading ? (
+              <div className="flex justify-center py-16">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-neutral-300 border-t-black" />
+              </div>
+            ) : replies.length > 0 ? (
+              replies.map((reply) => {
+                const parent = reply.post;
+                const parentAuthor = parent.author?.username || 'unknown';
+                const snippet = (parent.content || '').trim().slice(0, 140);
+                return (
+                  <article
+                    key={`${reply.post._id}-${reply._id}`}
+                    onClick={() => setSelectedPost(reply.post)}
+                    className="cursor-pointer border-b border-neutral-200 p-4 transition-colors hover:bg-neutral-50/80"
+                  >
+                    <p className="mb-2 text-xs text-neutral-500">
+                      {t('userProfile.replyingTo', { name: parentAuthor })}
+                    </p>
+                    <div className="flex gap-3">
+                      <img
+                        src={
+                          reply.user.avatar ||
+                          `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.user.fullName || reply.user.username)}&background=000&color=fff&size=40&bold=true`
+                        }
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded-full object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1 text-sm">
+                          <span className="font-bold text-neutral-900">{reply.user.fullName}</span>
+                          <span className="text-neutral-500">@{reply.user.username}</span>
+                          <span className="text-neutral-400">·</span>
+                          <span className="text-neutral-500">{formatPostDate(reply.createdAt)}</span>
+                        </div>
+                        <p className="mt-1 whitespace-pre-wrap break-words text-[15px] text-neutral-900">
+                          {reply.content}
+                        </p>
+                        {snippet ? (
+                          <div className="mt-3 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-600">
+                            <p className="line-clamp-2">
+                              <span className="font-medium text-neutral-800">@{parentAuthor}</span>
+                              {': '}
+                              {snippet}
+                              {(parent.content || '').length > 140 ? '…' : ''}
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })
+            ) : (
+              <div className="px-4 py-20 text-center">
+                <h2 className="mb-2 text-2xl font-bold text-neutral-900">{t('userProfile.noReplies')}</h2>
+                <p className="text-neutral-500">
+                  {t('userProfile.noRepliesHint', { name: profile.username })}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'media' && (
+          <div>
+            {mediaLoading ? (
+              <div className="flex justify-center py-16">
+                <div className="animate-spin rounded-full h-8 w-8 border-2 border-neutral-300 border-t-black" />
+              </div>
+            ) : mediaPosts.length > 0 ? (
+              <div className="grid grid-cols-3 gap-0.5 p-0.5 sm:gap-1 sm:p-1">
+                {mediaPosts.map((post) => {
+                  const urls = (post.media || []).map((u) => resolveMediaUrl(u)).filter(Boolean);
+                  const cover = urls[0];
+                  if (!cover) return null;
+                  const extra = urls.length - 1;
+                  const isVideo = /\.(mp4|webm|mov)(\?|$)/i.test(cover);
+                  return (
+                    <button
+                      key={post._id}
+                      type="button"
+                      onClick={() => setSelectedPost(post)}
+                      className="relative aspect-square overflow-hidden bg-neutral-100 transition-opacity hover:opacity-90"
+                    >
+                      {isVideo ? (
+                        <video
+                          src={cover}
+                          className="h-full w-full object-cover"
+                          muted
+                          playsInline
+                          preload="metadata"
+                        />
+                      ) : (
+                        <img src={cover} alt="" className="h-full w-full object-cover" />
+                      )}
+                      {extra > 0 ? (
+                        <span className="absolute right-1.5 top-1.5 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                          +{extra}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="px-4 py-20 text-center">
+                <h2 className="mb-2 text-2xl font-bold text-neutral-900">{t('userProfile.noMedia')}</h2>
+                <p className="text-neutral-500">
+                  {t('userProfile.noMediaHint', { name: profile.username })}
+                </p>
+              </div>
+            )}
           </div>
         )}
         </div>
@@ -1386,6 +1549,12 @@ const UserProfileComponent: React.FC = () => {
               commentText={commentText}
               onCommentTextChange={setCommentText}
               onSubmitComment={() => void handleSubmitComment(String(selectedPost._id), 'sidebar')}
+              onSubmitReply={(parentId, content) =>
+                void handleSubmitComment(String(selectedPost._id), 'sidebar', {
+                  parentId,
+                  content,
+                })
+              }
               token={token}
               commentSubmitting={commentSubmitting}
               commentsLoading={commentsLoadingPostId === String(selectedPost._id)}
@@ -1472,6 +1641,12 @@ const UserProfileComponent: React.FC = () => {
             commentText={commentText}
             onCommentTextChange={setCommentText}
             onSubmitComment={() => void handleSubmitComment(String(selectedPost._id), 'sidebar')}
+            onSubmitReply={(parentId, content) =>
+              void handleSubmitComment(String(selectedPost._id), 'sidebar', {
+                parentId,
+                content,
+              })
+            }
             token={token}
             commentSubmitting={commentSubmitting}
             commentsLoading={commentsLoadingPostId === String(selectedPost._id)}
@@ -1505,7 +1680,7 @@ const UserProfileComponent: React.FC = () => {
           }}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
         >
-          <Pen size={14} />
+          <AnimatedPostMenuIcon kind="edit" size={14} />
           {t('common.edit')}
         </button>
         <div className="my-1 h-px bg-neutral-100" />
@@ -1518,7 +1693,7 @@ const UserProfileComponent: React.FC = () => {
           }}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
         >
-          <Trash size={14} />
+          <AnimatedPostMenuIcon kind="trash" size={14} color="#dc2626" />
           {t('common.delete')}
         </button>
       </FloatingMenu>

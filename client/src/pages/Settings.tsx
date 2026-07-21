@@ -11,26 +11,27 @@ import type { SocialLinks, SocialPlatform } from '../types/socialLinks';
 import { EMPTY_SOCIAL_LINKS } from '../types/socialLinks';
 import { normalizeSocialLinksInput } from '../utils/socialLinks';
 import {
-  User,
-  Edit,
-  Users,
-  Link as LinkIcon,
-  Shield,
-  ShoppingBag,
-  Bell,
-  CreditCard,
-  AlertCircle,
   Camera,
   MapPin,
   ArrowLeft,
   ChevronRight,
   LogOut,
+  Link as LinkIcon,
 } from 'lucide-react';
+import {
+  AnimatedSettingsNavIcon,
+  type SettingsNavIconKind,
+} from '../components/Settings/AnimatedSettingsNavIcon';
+import SettingsAccountPanel from '../components/Settings/SettingsAccountPanel';
+import SettingsNotificationsPanel from '../components/Settings/SettingsNotificationsPanel';
+import SettingsSecurityPanel from '../components/Settings/SettingsSecurityPanel';
+import SettingsOrdersPanel from '../components/Settings/SettingsOrdersPanel';
+import SettingsPaymentsPanel from '../components/Settings/SettingsPaymentsPanel';
+import SettingsResolutionPanel from '../components/Settings/SettingsResolutionPanel';
 
 type SettingsSectionId =
   | 'account'
   | 'edit-profile'
-  | 'invites'
   | 'connected'
   | 'security'
   | 'orders'
@@ -41,7 +42,7 @@ type SettingsSectionId =
 type MenuItem = {
   id: SettingsSectionId;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: SettingsNavIconKind;
 };
 
 const Settings: React.FC = () => {
@@ -69,15 +70,14 @@ const Settings: React.FC = () => {
 
   const menuItems: MenuItem[] = useMemo(
     () => [
-      { id: 'account', label: t('settings.accountSettings'), icon: User },
-      { id: 'edit-profile', label: t('settings.editProfile'), icon: Edit },
-      { id: 'invites', label: t('settings.invites'), icon: Users },
-      { id: 'connected', label: t('settings.connectedAccounts'), icon: LinkIcon },
-      { id: 'security', label: t('settings.accountSecurity'), icon: Shield },
-      { id: 'orders', label: t('settings.orders'), icon: ShoppingBag },
-      { id: 'notifications', label: t('settings.notifications'), icon: Bell },
-      { id: 'payments', label: t('settings.paymentMethods'), icon: CreditCard },
-      { id: 'resolution', label: t('settings.resolutionCenter'), icon: AlertCircle },
+      { id: 'account', label: t('settings.accountSettings'), icon: 'account' },
+      { id: 'edit-profile', label: t('settings.editProfile'), icon: 'editProfile' },
+      { id: 'connected', label: t('settings.connectedAccounts'), icon: 'connected' },
+      { id: 'security', label: t('settings.accountSecurity'), icon: 'security' },
+      { id: 'orders', label: t('settings.orders'), icon: 'orders' },
+      { id: 'notifications', label: t('settings.notifications'), icon: 'notifications' },
+      { id: 'payments', label: t('settings.paymentMethods'), icon: 'payments' },
+      { id: 'resolution', label: t('settings.resolutionCenter'), icon: 'resolution' },
     ],
     [t]
   );
@@ -375,20 +375,7 @@ const Settings: React.FC = () => {
             </div>
 
             <div className="mt-8 border-t border-neutral-200 pt-4">
-              <div className="mb-4 flex items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-lg font-semibold">{t('settings.invites')}</h3>
-                  <p className="mt-0 text-sm text-neutral-500">{t('settings.invitesPeople')}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => selectSection('invites')}
-                  className="shrink-0 rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-800 transition-colors hover:bg-neutral-50"
-                >
-                  {t('settings.manageLinks')}
-                </button>
-              </div>
-              <div className="py-4 border-t flex items-center justify-between gap-3">
+              <div className="flex items-center justify-between gap-3 py-4">
                 <div>
                   <h3 className="text-lg font-semibold">{t('settings.connectedAccounts')}</h3>
                   <p className="mt-1 text-sm text-neutral-500">{t('settings.connectedShortHint')}</p>
@@ -401,20 +388,6 @@ const Settings: React.FC = () => {
                   {t('settings.manageLinks')}
                 </button>
               </div>
-              {/* <div className="py-4 border-t flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold">{t('settings.connectedAccounts')}</h3>
-                  <p className="mt-1 text-sm text-neutral-500">{t('settings.connectedShortHint')}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => selectSection('connected')}
-                  className="shrink-0 rounded-full border border-neutral-200 px-4 py-2 text-sm font-semibold text-neutral-800 transition-colors hover:bg-neutral-50"
-                >
-                  {t('settings.manageLinks')}
-                </button>
-              </div> */}
-              {/* <SocialLinksEditor value={socialLinks} onChange={handleSocialChange} /> */}
             </div>
 
             <div className="mt-8 pb-4">
@@ -433,46 +406,22 @@ const Settings: React.FC = () => {
         );
 
       case 'account':
-        return (
-          <div className="mx-auto w-full max-w-2xl">
-            <h2 className="mb-6 hidden text-2xl font-bold lg:block">{t('settings.accountHeading')}</h2>
-            <div className="space-y-4">
-              <div className="rounded-xl bg-neutral-50 p-4">
-                <p className="font-medium">{t('settings.email')}</p>
-                <p className="text-neutral-500">{user?.email || t('settings.notSet')}</p>
-              </div>
-              <div className="rounded-xl bg-neutral-50 p-4">
-                <p className="font-medium">{t('settings.memberSince')}</p>
-                <p className="text-neutral-500">
-                  {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
-                </p>
-              </div>
-            </div>
-          </div>
-        );
+        return <SettingsAccountPanel />;
 
       case 'notifications':
-        return (
-          <div className="mx-auto w-full max-w-2xl">
-            <h2 className="mb-6 hidden text-2xl font-bold lg:block">{t('settings.notificationsHeading')}</h2>
-            <div className="space-y-4">
-              {[t('settings.pushNotifications'), t('settings.emailNotifications'), t('settings.smsNotifications')].map(
-                (item) => (
-                  <div
-                    key={item}
-                    className="flex items-center justify-between rounded-xl bg-neutral-50 p-4"
-                  >
-                    <span className="font-medium">{item}</span>
-                    <label className="relative inline-flex cursor-pointer items-center">
-                      <input type="checkbox" className="peer sr-only" />
-                      <div className="peer h-6 w-11 rounded-full bg-neutral-200 after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-neutral-300 after:bg-white after:transition-all peer-checked:bg-black peer-checked:after:translate-x-full peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-black/10" />
-                    </label>
-                  </div>
-                )
-              )}
-            </div>
-          </div>
-        );
+        return <SettingsNotificationsPanel userId={user?.id} />;
+
+      case 'security':
+        return <SettingsSecurityPanel />;
+
+      case 'orders':
+        return <SettingsOrdersPanel />;
+
+      case 'payments':
+        return <SettingsPaymentsPanel />;
+
+      case 'resolution':
+        return <SettingsResolutionPanel />;
 
       default:
         return (
@@ -500,7 +449,6 @@ const Settings: React.FC = () => {
 
           <div className="mt-3 min-h-0 flex-1 space-y-1 overflow-y-auto">
             {menuItems.map((item) => {
-              const Icon = item.icon;
               const isActive = activeSection === item.id;
               return (
                 <button
@@ -513,7 +461,12 @@ const Settings: React.FC = () => {
                       : 'hover:bg-black/5 max-lg:active:bg-black/5'
                   }`}
                 >
-                  <Icon className="h-5 w-5 shrink-0 text-neutral-700" />
+                  <AnimatedSettingsNavIcon
+                    kind={item.icon}
+                    size={20}
+                    className="text-neutral-700"
+                    color="currentColor"
+                  />
                   <span className="min-w-0 flex-1 font-medium text-neutral-900">{item.label}</span>
                   <ChevronRight className="h-5 w-5 shrink-0 text-neutral-400 lg:hidden" aria-hidden />
                 </button>

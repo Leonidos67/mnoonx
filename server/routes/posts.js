@@ -182,6 +182,7 @@ async function serializePostComments(comments) {
         content: c.content,
         createdAt: c.createdAt,
         likesCount: c.likesCount || 0,
+        parentId: c.parentId ? String(c.parentId) : null,
         user: author
           ? {
               _id: author._id.toString(),
@@ -505,14 +506,14 @@ function findPostComment(post, commentId) {
   return post.comments.find((c) => String(c._id) === String(commentId)) || null;
 }
 
-// POST /api/posts/:id/comments - Добавить комментарий
+// POST /api/posts/:id/comments - Добавить комментарий (optional parentId for reply)
 router.post('/:id/comments', auth, async (req, res) => {
   try {
     if (!req.userId) {
       return res.status(401).json({ message: 'Authentication required' });
     }
 
-    const { content } = req.body;
+    const { content, parentId: rawParentId } = req.body;
     if (!content || !String(content).trim()) {
       return res.status(400).json({ message: 'Comment is required' });
     }
@@ -522,9 +523,22 @@ router.post('/:id/comments', auth, async (req, res) => {
       return res.status(404).json({ message: 'Post not found' });
     }
 
+    let parentId = rawParentId ? String(rawParentId).trim() : null;
+    if (parentId) {
+      const parent = findPostComment(post, parentId);
+      if (!parent) {
+        return res.status(404).json({ message: 'Parent comment not found' });
+      }
+      // One-level threads: replies always hang under the root comment
+      if (parent.parentId) {
+        parentId = String(parent.parentId);
+      }
+    }
+
     post.comments.push({
       user: req.userId.toString(),
       content: String(content).trim().slice(0, 500),
+      parentId: parentId || null,
     });
     post.commentsCount = post.comments.length;
     await post.save();
@@ -603,9 +617,13 @@ router.delete('/:id/comments/:commentId', auth, async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to delete this comment' });
     }
 
-    post.comments = post.comments.filter(
-      (c) => String(c._id) !== String(req.params.commentId)
-    );
+    post.comments = post.comments.filter((c) => {
+      const id = String(c._id);
+      if (id === String(req.params.commentId)) return false;
+      // Drop nested replies when deleting the root
+      if (c.parentId && String(c.parentId) === String(req.params.commentId)) return false;
+      return true;
+    });
     post.commentsCount = post.comments.length;
     await post.save();
 

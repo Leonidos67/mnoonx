@@ -3,25 +3,23 @@ import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus,
   HouseHeart,
-  Globe,
-  Lock,
   GraduationCap,
-  MoreVertical,
-  Pencil,
   ChevronRight,
   Check,
-  Trash2,
   ArrowLeft,
   MessagesSquare,
   Quote,
   CloudDownload,
   Megaphone,
   Calendar,
-  EyeOff,
+  Bot,
+  Columns3,
+  ClipboardList,
 } from 'lucide-react';
 import { COMMUNITY_APP_IDS } from '../../constants/communityApps';
-import { communitySettingsPath, communityStorePath } from '../../constants/communityRoutes';
+import { communitySettingsPath, communityStorePath, communityDashboardInvitesPath } from '../../constants/communityRoutes';
 import { useTranslation } from '../../i18n/useTranslation';
+import { AnimatedCommunitySidebarIcon } from './CommunitySidebarAnimatedIcons';
 
 export interface CommunitySidebarAppInstance {
   id: string;
@@ -37,7 +35,10 @@ export type CommunityLeftNav =
   | 'content'
   | 'files'
   | 'announcements'
-  | 'events';
+  | 'events'
+  | 'ai'
+  | 'kanban'
+  | 'forms';
 
 export interface CommunityLeftSidebarProps {
   communityName: string;
@@ -54,11 +55,15 @@ export interface CommunityLeftSidebarProps {
   activeFilesInstanceId: string | null;
   activeAnnouncementsInstanceId: string | null;
   activeEventsInstanceId: string | null;
+  activeAiInstanceId: string | null;
+  activeKanbanInstanceId: string | null;
+  activeFormsInstanceId: string | null;
   unreadByInstance: Record<string, number>;
   isOwner: boolean;
   formatCount: (n: number) => string;
   onPatchVisibility: (instanceId: string, visible: boolean) => void | Promise<void>;
   onDeleteApp: (instanceId: string) => void | Promise<void>;
+  onDuplicateApp: (instanceId: string) => boolean | void | Promise<boolean | void>;
   /** Close mobile drawer after navigation */
   onNavigate?: () => void;
   className?: string;
@@ -79,11 +84,15 @@ const CommunityLeftSidebar: React.FC<CommunityLeftSidebarProps> = ({
   activeFilesInstanceId,
   activeAnnouncementsInstanceId,
   activeEventsInstanceId,
+  activeAiInstanceId,
+  activeKanbanInstanceId,
+  activeFormsInstanceId,
   unreadByInstance,
   isOwner,
   formatCount,
   onPatchVisibility,
   onDeleteApp,
+  onDuplicateApp,
   onNavigate,
   className = '',
 }) => {
@@ -91,13 +100,22 @@ const CommunityLeftSidebar: React.FC<CommunityLeftSidebarProps> = ({
   const { t } = useTranslation();
   const [appInstanceMenuId, setAppInstanceMenuId] = useState<string | null>(null);
   const [appInstanceMenuPanel, setAppInstanceMenuPanel] = useState<'main' | 'visibility'>('main');
+  const [duplicateSuccessId, setDuplicateSuccessId] = useState<string | null>(null);
   const appInstanceMenuRef = useRef<HTMLDivElement | null>(null);
+  const duplicateTimerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (duplicateTimerRef.current != null) window.clearTimeout(duplicateTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!appInstanceMenuId) return;
     const onDown = (e: MouseEvent) => {
       if (appInstanceMenuRef.current && !appInstanceMenuRef.current.contains(e.target as Node)) {
         setAppInstanceMenuId(null);
+        setDuplicateSuccessId(null);
       }
     };
     document.addEventListener('mousedown', onDown);
@@ -167,7 +185,13 @@ const CommunityLeftSidebar: React.FC<CommunityLeftSidebarProps> = ({
                       ? 'announcements'
                       : inst.appId === COMMUNITY_APP_IDS.EVENTS
                         ? 'events'
-                        : 'other';
+                        : inst.appId === COMMUNITY_APP_IDS.AI
+                          ? 'ai'
+                          : inst.appId === COMMUNITY_APP_IDS.KANBAN
+                            ? 'kanban'
+                            : inst.appId === COMMUNITY_APP_IDS.FORMS
+                              ? 'forms'
+                              : 'other';
           const rowActive =
             (appKind === 'chat' && leftNav === 'chat' && activeChatInstanceId === inst.id) ||
             (appKind === 'courses' && leftNav === 'courses' && activeCoursesInstanceId === inst.id) ||
@@ -176,7 +200,10 @@ const CommunityLeftSidebar: React.FC<CommunityLeftSidebarProps> = ({
             (appKind === 'announcements' &&
               leftNav === 'announcements' &&
               activeAnnouncementsInstanceId === inst.id) ||
-            (appKind === 'events' && leftNav === 'events' && activeEventsInstanceId === inst.id);
+            (appKind === 'events' && leftNav === 'events' && activeEventsInstanceId === inst.id) ||
+            (appKind === 'ai' && leftNav === 'ai' && activeAiInstanceId === inst.id) ||
+            (appKind === 'kanban' && leftNav === 'kanban' && activeKanbanInstanceId === inst.id) ||
+            (appKind === 'forms' && leftNav === 'forms' && activeFormsInstanceId === inst.id);
           const menuOpen = appInstanceMenuId === inst.id;
           const instVisible = inst.visibleToMembers;
 
@@ -202,6 +229,12 @@ const CommunityLeftSidebar: React.FC<CommunityLeftSidebarProps> = ({
                   <CloudDownload size={18} />
                 ) : appKind === 'events' ? (
                   <Calendar size={18} />
+                ) : appKind === 'ai' ? (
+                  <Bot size={18} />
+                ) : appKind === 'kanban' ? (
+                  <Columns3 size={18} />
+                ) : appKind === 'forms' ? (
+                  <ClipboardList size={18} />
                 ) : (
                   <Megaphone size={18} />
                 )}
@@ -224,7 +257,7 @@ const CommunityLeftSidebar: React.FC<CommunityLeftSidebarProps> = ({
                       }`}
                       title={t('community.hiddenFromMembersTitle')}
                     >
-                      <EyeOff size={14} aria-hidden />
+                      <AnimatedCommunitySidebarIcon kind="eyeOff" size={14} />
                     </span>
                   )}
                   <button
@@ -245,7 +278,7 @@ const CommunityLeftSidebar: React.FC<CommunityLeftSidebarProps> = ({
                         : 'pointer-events-none opacity-0 group-hover/row:pointer-events-auto group-hover/row:opacity-100'
                     }`}
                   >
-                    <MoreVertical size={14} />
+                    <AnimatedCommunitySidebarIcon kind="ellipsisVertical" size={14} />
                   </button>
                   {menuOpen && (
                     <div
@@ -264,7 +297,7 @@ const CommunityLeftSidebar: React.FC<CommunityLeftSidebarProps> = ({
                             className="flex w-full items-center gap-2 rounded px-3 py-1 text-left text-[14px] text-neutral-900 transition-colors hover:bg-black/5"
                             role="menuitem"
                           >
-                            <Pencil className="h-3 w-3 shrink-0" />
+                            <AnimatedCommunitySidebarIcon kind="settings" size={12} />
                             {t('community.nestedMenuAdminSettings')}
                           </Link>
                           <button
@@ -273,10 +306,49 @@ const CommunityLeftSidebar: React.FC<CommunityLeftSidebarProps> = ({
                             className="flex w-full items-center gap-2 rounded px-3 py-1 text-left text-[14px] text-neutral-900 transition-colors hover:bg-black/5"
                             role="menuitem"
                           >
-                            <Globe className="h-3 w-3 shrink-0" />
+                            <AnimatedCommunitySidebarIcon kind="visibility" size={12} />
                             <span className="min-w-0 flex-1 truncate text-[14px]">{t('community.changeVisibility')}</span>
                             <ChevronRight className="h-3 w-3 shrink-0 text-neutral-400" />
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void (async () => {
+                                const result = await onDuplicateApp(inst.id);
+                                if (result === false) return;
+                                setDuplicateSuccessId(inst.id);
+                                if (duplicateTimerRef.current != null) {
+                                  window.clearTimeout(duplicateTimerRef.current);
+                                }
+                                duplicateTimerRef.current = window.setTimeout(() => {
+                                  setDuplicateSuccessId(null);
+                                  setAppInstanceMenuId(null);
+                                  duplicateTimerRef.current = null;
+                                }, 3000);
+                              })();
+                            }}
+                            className="flex w-full items-center gap-2 rounded px-3 py-1 text-left text-[14px] text-neutral-900 transition-colors hover:bg-black/5"
+                            role="menuitem"
+                          >
+                            <AnimatedCommunitySidebarIcon
+                              kind={duplicateSuccessId === inst.id ? 'check' : 'copy'}
+                              size={12}
+                              autoPlay={duplicateSuccessId === inst.id}
+                            />
+                            {t('community.duplicateApp')}
+                          </button>
+                          <Link
+                            to={communityDashboardInvitesPath(handle)}
+                            onClick={() => {
+                              setAppInstanceMenuId(null);
+                              onNavigate?.();
+                            }}
+                            className="flex w-full items-center gap-2 rounded px-3 py-1 text-left text-[14px] text-neutral-900 transition-colors hover:bg-black/5"
+                            role="menuitem"
+                          >
+                            <AnimatedCommunitySidebarIcon kind="userPlus" size={12} />
+                            {t('community.invitePeople')}
+                          </Link>
                           <div className="my-1 h-px bg-neutral-100" />
                           <button
                             type="button"
@@ -284,7 +356,7 @@ const CommunityLeftSidebar: React.FC<CommunityLeftSidebarProps> = ({
                             className="flex w-full items-center gap-2 rounded px-3 py-1 text-left text-[14px] text-red-600 transition-colors hover:bg-red-50"
                             role="menuitem"
                           >
-                            <Trash2 className="h-3 w-3 shrink-0" />
+                            <AnimatedCommunitySidebarIcon kind="trash" size={12} color="#dc2626" />
                             {t('community.deleteApp')}
                           </button>
                         </>
@@ -304,7 +376,7 @@ const CommunityLeftSidebar: React.FC<CommunityLeftSidebarProps> = ({
                             onClick={() => void onPatchVisibility(inst.id, true)}
                           >
                             <span className="flex items-center gap-2">
-                              <Globe className="h-3 w-3 shrink-0" aria-hidden />
+                              <AnimatedCommunitySidebarIcon kind="eye" size={12} />
                               {t('community.showToMembers')}
                             </span>
                             {instVisible && <Check className="h-3 w-3 shrink-0" aria-hidden />}
@@ -315,7 +387,7 @@ const CommunityLeftSidebar: React.FC<CommunityLeftSidebarProps> = ({
                             onClick={() => void onPatchVisibility(inst.id, false)}
                           >
                             <span className="flex items-center gap-2">
-                              <Lock className="h-3 w-3 shrink-0" aria-hidden />
+                              <AnimatedCommunitySidebarIcon kind="eyeOff" size={12} />
                               {t('community.hideFromMembers')}
                             </span>
                             {!instVisible && <Check className="h-3 w-3 shrink-0" aria-hidden />}

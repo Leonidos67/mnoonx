@@ -14,6 +14,20 @@ export function formatPlatformVersionLabel(version: string): string {
 
 export const PLATFORM_RELEASES: PlatformRelease[] = [
   {
+    version: '1.3.1',
+    date: '2026-07-21',
+    titleKey: 'platformUpdates.releases.v18.title',
+    itemKeys: [
+      'platformUpdates.releases.v18.items.comments',
+      'platformUpdates.releases.v18.items.profile',
+      'platformUpdates.releases.v18.items.settings',
+      'platformUpdates.releases.v18.items.icons',
+      'platformUpdates.releases.v18.items.aiApp',
+      'platformUpdates.releases.v18.items.kanbanApp',
+      'platformUpdates.releases.v18.items.formsApp',
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-06-11',
     titleKey: 'platformUpdates.releases.v17.title',

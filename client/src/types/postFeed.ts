@@ -3,6 +3,8 @@ export interface PostComment {
   content: string;
   createdAt: string;
   likesCount?: number;
+  /** Null/undefined = top-level; otherwise parent comment _id */
+  parentId?: string | null;
   user: {
     _id: string;
     username: string;

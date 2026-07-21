@@ -1,6 +1,8 @@
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-function getApiKey() {
+function getApiKey(override) {
+  const fromOverride = String(override || '').trim().replace(/^['"]|['"]$/g, '');
+  if (fromOverride) return fromOverride;
   const key = (process.env.GEMINI_API_KEY || process.env.GOOGLE_GEMINI_API_KEY || '').trim();
   if (!key) {
     const err = new Error('GEMINI_API_KEY is not set in server/.env');
@@ -29,7 +31,7 @@ function friendlyError(status, rawMessage) {
 }
 
 /**
- * @param {{ system?: string, user: string, maxTokens?: number, temperature?: number, model?: string }} opts
+ * @param {{ system?: string, user: string, maxTokens?: number, temperature?: number, model?: string, apiKey?: string }} opts
  */
 async function generateText({
   system,
@@ -38,6 +40,7 @@ async function generateText({
   temperature = 0.7,
   model,
   useGoogleSearch = false,
+  apiKey,
 }) {
   const modelId = model || getModel();
   const url = `${GEMINI_BASE}/models/${encodeURIComponent(modelId)}:generateContent`;
@@ -62,7 +65,7 @@ async function generateText({
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-goog-api-key': getApiKey(),
+      'x-goog-api-key': getApiKey(apiKey),
     },
     body: JSON.stringify(body),
   });

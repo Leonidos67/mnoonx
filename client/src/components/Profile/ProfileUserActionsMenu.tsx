@@ -1,8 +1,9 @@
 import React from 'react';
-import { Ban, Flag, MessageCircle, Unlink2 } from 'lucide-react';
+import { Ban, Flag, MessageCircle } from 'lucide-react';
 import FloatingMenu, { type FloatingMenuAnchor } from '../Common/FloatingMenu';
 import ResponsiveDialogShell from '../Common/ResponsiveDialogShell';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { AnimatedPostMenuIcon } from '../Posts/PostMenuAnimatedIcons';
 
 export type ProfileUserActionId = 'message' | 'copyLink' | 'report' | 'block';
 
@@ -22,7 +23,7 @@ interface ProfileUserActionsMenuProps {
 }
 
 const menuBtnClass =
-  'flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm text-neutral-900 transition-colors hover:bg-neutral-50';
+  'flex w-full items-center gap-2 rounded-md p-2 text-left text-sm text-black transition-colors hover:bg-neutral-50';
 
 const ProfileUserActionsMenu: React.FC<ProfileUserActionsMenuProps> = ({
   open,
@@ -39,22 +40,22 @@ const ProfileUserActionsMenu: React.FC<ProfileUserActionsMenuProps> = ({
     {
       id: 'message',
       label: labels.sendMessage,
-      icon: <MessageCircle className="h-5 w-5 shrink-0 text-neutral-700" aria-hidden />,
+      icon: <MessageCircle className="h-4 w-4 shrink-0 text-black" aria-hidden />,
     },
     {
       id: 'copyLink',
       label: labels.copyLink,
-      icon: <Unlink2 className="h-5 w-5 shrink-0 text-neutral-700" aria-hidden />,
+      icon: <AnimatedPostMenuIcon kind="link" size={16} color="#000000" />,
     },
     {
       id: 'report',
       label: labels.report,
-      icon: <Flag className="h-5 w-5 shrink-0 text-neutral-700" aria-hidden />,
+      icon: <Flag className="h-4 w-4 shrink-0 text-black" aria-hidden />,
     },
     {
       id: 'block',
       label: labels.block,
-      icon: <Ban className="h-5 w-5 shrink-0 text-neutral-700" aria-hidden />,
+      icon: <Ban className="h-4 w-4 shrink-0 text-black" aria-hidden />,
     },
   ];
 

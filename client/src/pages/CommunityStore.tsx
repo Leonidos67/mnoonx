@@ -12,6 +12,9 @@ import {
   FolderOpen,
   Megaphone,
   Calendar,
+  Bot,
+  Columns3,
+  ClipboardList,
 } from 'lucide-react';
 import { communityPath } from '../constants/communityRoutes';
 import { isCommunityOwner } from '../utils/communityOwner';
@@ -123,6 +126,30 @@ const APP_DEFS = [
     Icon: Calendar,
     iconBg: 'bg-amber-100',
     iconColor: 'text-amber-600',
+  },
+  {
+    id: COMMUNITY_APP_IDS.AI,
+    i18nKey: 'ai',
+    category: 'AI' as AppCategory,
+    Icon: Bot,
+    iconBg: 'bg-emerald-100',
+    iconColor: 'text-emerald-700',
+  },
+  {
+    id: COMMUNITY_APP_IDS.KANBAN,
+    i18nKey: 'kanban',
+    category: 'Business & productivity' as AppCategory,
+    Icon: Columns3,
+    iconBg: 'bg-sky-100',
+    iconColor: 'text-sky-700',
+  },
+  {
+    id: COMMUNITY_APP_IDS.FORMS,
+    i18nKey: 'forms',
+    category: 'Business & productivity' as AppCategory,
+    Icon: ClipboardList,
+    iconBg: 'bg-violet-100',
+    iconColor: 'text-violet-700',
   },
 ] as const;
 
@@ -279,6 +306,21 @@ const CommunityStore: React.FC = () => {
           replace: false,
           state: { focusEvents: true, eventsInstanceId: newId },
         });
+      } else if (app.id === COMMUNITY_APP_IDS.AI) {
+        navigate(communityPath(handle), {
+          replace: false,
+          state: { focusAi: true, aiInstanceId: newId },
+        });
+      } else if (app.id === COMMUNITY_APP_IDS.KANBAN) {
+        navigate(communityPath(handle), {
+          replace: false,
+          state: { focusKanban: true, kanbanInstanceId: newId },
+        });
+      } else if (app.id === COMMUNITY_APP_IDS.FORMS) {
+        navigate(communityPath(handle), {
+          replace: false,
+          state: { focusForms: true, formsInstanceId: newId },
+        });
       }
     } catch {
       showToast(t('community.networkError'), 'error');
@@ -371,7 +413,10 @@ const CommunityStore: React.FC = () => {
               app.id === COMMUNITY_APP_IDS.CONTENT ||
               app.id === COMMUNITY_APP_IDS.FILES ||
               app.id === COMMUNITY_APP_IDS.ANNOUNCEMENTS ||
-              app.id === COMMUNITY_APP_IDS.EVENTS;
+              app.id === COMMUNITY_APP_IDS.EVENTS ||
+              app.id === COMMUNITY_APP_IDS.AI ||
+              app.id === COMMUNITY_APP_IDS.KANBAN ||
+              app.id === COMMUNITY_APP_IDS.FORMS;
             const busy = installingId === app.id;
 
             return (

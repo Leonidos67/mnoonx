@@ -1,9 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
-  Bell,
-  MessageCircle,
   LogIn,
-  Menu,
   Search,
   BriefcaseBusiness,
   Settings,
@@ -11,9 +8,15 @@ import {
   Languages,
   BookMarked,
 } from 'lucide-react';
+import {
+  BellIcon,
+  MessageCircleIcon,
+  type IconHandle,
+} from '@animateicons/react/lucide';
 import SearchBar from '../Common/SearchBar';
 import SearchModal from '../Common/SearchModal';
 import HeaderIconBadge from '../Common/HeaderIconBadge';
+import AnimatedMenuIcon from '../Common/AnimatedMenuIcon';
 import MnoonxLogo from './MnoonxLogo';
 import GoToDashboardMenu from './GoToDashboardMenu';
 import AuthModalShell from '../Auth/AuthModalShell';
@@ -44,14 +47,15 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
   const { user } = useAuth();
   const { messageUnread, notificationUnread } = useUnreads();
   const [searchOpen, setSearchOpen] = useState(false);
+  const bellRef = useRef<IconHandle>(null);
+  const messageRef = useRef<IconHandle>(null);
+  const menuBellRef = useRef<IconHandle>(null);
 
   const close = () => setOpen(false);
 
   const items = [
-    { to: '/notifications', icon: Bell, label: t('nav.notifications') },
     { to: '/portfolio-tracker', icon: BriefcaseBusiness, label: t('nav.portfolioTracker') },
     { to: '/settings', icon: Settings, label: t('nav.settings') },
-    // { to: '/plan', icon: CreditCard, label: t('nav.plan') },
     { to: '/docs/support', icon: HeartHandshake, label: t('nav.support') },
     { to: '/docs', icon: BookMarked, label: t('nav.docs') },
   ] as const;
@@ -68,7 +72,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
               className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl text-neutral-700 transition-colors hover:bg-black/5 active:scale-95 lg:flex"
               aria-label={t('nav.showSidebar')}
             >
-              <Menu className="h-5 w-5" strokeWidth={2} aria-hidden />
+              <AnimatedMenuIcon size={20} />
             </button>
           )}
           {sidebarCollapsed && <MnoonxLogo className="hidden shrink-0 lg:flex" size="sm" />}
@@ -99,8 +103,17 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
                   label={t('header.notifications')}
                   count={notificationUnread}
                   ariaLabelWhenUnread={t('header.notificationsUnread', { count: notificationUnread })}
+                  onMouseEnter={() => bellRef.current?.startAnimation()}
+                  onMouseLeave={() => bellRef.current?.stopAnimation()}
                 >
-                  <Bell className="h-5 w-5" />
+                  <BellIcon
+                    ref={bellRef}
+                    size={20}
+                    duration={1}
+                    color="currentColor"
+                    isAnimated={false}
+                    className="!h-5 !w-5 !min-h-0 !min-w-0"
+                  />
                 </HeaderIconBadge>
               </span>
               <span className="hidden lg:contents">
@@ -109,8 +122,17 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
                   label={t('header.messages')}
                   count={messageUnread}
                   ariaLabelWhenUnread={t('header.messagesUnread', { count: messageUnread })}
+                  onMouseEnter={() => messageRef.current?.startAnimation()}
+                  onMouseLeave={() => messageRef.current?.stopAnimation()}
                 >
-                  <MessageCircle className="h-5 w-5" />
+                  <MessageCircleIcon
+                    ref={messageRef}
+                    size={20}
+                    duration={1}
+                    color="currentColor"
+                    isAnimated={false}
+                    className="!h-5 !w-5 !min-h-0 !min-w-0"
+                  />
                 </HeaderIconBadge>
               </span>
               <GoToDashboardMenu />
@@ -119,6 +141,24 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
                   <HomeSidebarPromoCarousel />
                 </div>
                 <nav className="flex flex-col gap-0.5" role="menu">
+                  <Link
+                    to="/notifications"
+                    role="menuitem"
+                    onClick={close}
+                    className={menuItemClass}
+                    onMouseEnter={() => menuBellRef.current?.startAnimation()}
+                    onMouseLeave={() => menuBellRef.current?.stopAnimation()}
+                  >
+                    <BellIcon
+                      ref={menuBellRef}
+                      size={20}
+                      duration={1}
+                      color="#000000"
+                      isAnimated={false}
+                      className="!h-5 !w-5 !min-h-0 !min-w-0"
+                    />
+                    {t('nav.notifications')}
+                  </Link>
                   {items.map(({ to, icon: Icon, label }) => (
                     <Link
                       key={to}
@@ -167,7 +207,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
               <span className="font-medium">{t('common.signIn')}</span>
             </button>
           )}
-          
+
           <button
             type="button"
             onClick={() => setOpen(true)}
@@ -176,7 +216,7 @@ const Header: React.FC<HeaderProps> = ({ onSearch, sidebarCollapsed, onSidebarOp
             aria-expanded={open}
             aria-haspopup="menu"
           >
-            <span className='px-1'>Menu</span>
+            <AnimatedMenuIcon size={20} />
           </button>
         </div>
       </header>

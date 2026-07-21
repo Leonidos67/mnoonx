@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Globe, Heart, Lock, MessageCircle, MoreHorizontal, Pen, Repeat2, Trash, Unlink2 } from 'lucide-react';
+import { Globe, Lock } from 'lucide-react';
 import PostContentBody from './PostContentBody';
 import PostMediaGallery from './PostMediaGallery';
 import { PostCommentsSection } from './PostCommentsSection';
+import { AnimatedPostMenuIcon } from './PostMenuAnimatedIcons';
+import PostFeedActionButtons from './PostFeedActionButtons';
 import { buildPostLightboxMeta } from '../../utils/buildPostLightboxMeta';
 import type { FeedPost } from '../../types/postFeed';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -34,6 +36,7 @@ export interface PostFeedCardProps {
   inlineCommentText: string;
   onInlineCommentTextChange: (value: string) => void;
   onSubmitInlineComment: () => void;
+  onSubmitInlineReply?: (parentId: string, content: string) => void;
   token: string | null;
   commentSubmitting: boolean;
   commentsLoading: boolean;
@@ -70,6 +73,7 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
   inlineCommentText,
   onInlineCommentTextChange,
   onSubmitInlineComment,
+  onSubmitInlineReply,
   token,
   commentSubmitting,
   commentsLoading,
@@ -143,7 +147,7 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
                   e.stopPropagation();
                   onMenuToggle(postId, e);
                 }}
-                className={`post-feed-card-menu rounded-full p-1 transition-all ${
+                className={`post-feed-card-menu flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${
                   menuOpenPostId === postId
                     ? 'bg-black/10 text-black opacity-100'
                     : 'text-neutral-500 opacity-60 hover:bg-black/5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/article:opacity-100'
@@ -151,7 +155,7 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
                 aria-expanded={menuOpenPostId === postId}
                 aria-haspopup="menu"
               >
-                <MoreHorizontal size={16} />
+                <AnimatedPostMenuIcon kind="ellipsis" size={16} />
               </button>
 
               {menuOpenPostId === postId && (
@@ -166,7 +170,7 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
                     role="menuitem"
                   >
-                    <Unlink2 size={14} />
+                    <AnimatedPostMenuIcon kind="link" size={14} />
                     {t('home.copyLink')}
                   </button>
                   {canManagePost && onEdit && onDelete && (
@@ -177,7 +181,7 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
                         role="menuitem"
                       >
-                        <Pen size={14} />
+                        <AnimatedPostMenuIcon kind="edit" size={14} />
                         {t('common.edit')}
                       </button>
                       <div className="my-1 h-px bg-neutral-100" />
@@ -187,7 +191,7 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
                         role="menuitem"
                       >
-                        <Trash size={14} />
+                        <AnimatedPostMenuIcon kind="trash" size={14} color="#dc2626" />
                         {t('common.delete')}
                       </button>
                     </>
@@ -210,52 +214,19 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
             <PostMediaGallery media={post.media} meta={lightboxMeta} />
           )}
 
-          <div className="mt-1 flex max-w-md items-center gap-1">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onLike(postId);
-              }}
-              className={`group flex items-center transition-colors ${
-                likedPosts.has(postId) ? 'text-red-500' : 'text-neutral-500 hover:text-red-500'
-              }`}
-            >
-              <div className="rounded-full p-2 transition-colors group-hover:bg-red-50">
-                <Heart size={16} fill={likedPosts.has(postId) ? 'currentColor' : 'none'} />
-              </div>
-              <span className="text-xs">{formatCount(post.likesCount || 0)}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={(e) => onToggleComments(postId, e)}
-              className={`group flex items-center transition-colors ${
-                expandedCommentsPostId === postId ? 'text-black' : 'text-neutral-500 hover:text-black'
-              }`}
-            >
-              <div className="rounded-full p-2 transition-colors group-hover:bg-black/5">
-                <MessageCircle size={16} />
-              </div>
-              <span className="text-xs">{formatCount(post.commentsCount || 0)}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRepost(postId);
-              }}
-              className={`group flex items-center transition-colors ${
-                repostedPosts.has(postId) ? 'text-black' : 'text-neutral-500 hover:text-black'
-              }`}
-            >
-              <div className="rounded-full p-2 transition-colors group-hover:bg-black/5">
-                <Repeat2 size={16} fill={repostedPosts.has(postId) ? 'currentColor' : 'none'} />
-              </div>
-              <span className="text-xs">{formatCount(post.repostsCount || 0)}</span>
-            </button>
-          </div>
+          <PostFeedActionButtons
+            postId={postId}
+            likesCount={post.likesCount || 0}
+            commentsCount={post.commentsCount || 0}
+            repostsCount={post.repostsCount || 0}
+            liked={likedPosts.has(postId)}
+            reposted={repostedPosts.has(postId)}
+            commentsExpanded={expandedCommentsPostId === postId}
+            formatCount={formatCount}
+            onLike={onLike}
+            onToggleComments={onToggleComments}
+            onRepost={onRepost}
+          />
 
           {expandedCommentsPostId === postId && (
             <PostCommentsSection
@@ -264,6 +235,7 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
               text={inlineCommentText}
               onTextChange={onInlineCommentTextChange}
               onSubmit={onSubmitInlineComment}
+              onSubmitReply={onSubmitInlineReply}
               token={token}
               commentSubmitting={commentSubmitting}
               commentsLoading={commentsLoading}

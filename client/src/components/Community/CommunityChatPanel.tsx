@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, MessageCircle, Lock, Check, CheckCheck, SendHorizonal } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Lock, Check, CheckCheck } from 'lucide-react';
+import AnimatedSendIcon, { type AnimatedSendIconHandle } from '../Common/AnimatedSendIcon';
 import { useAuth } from '../../context/AuthContext';
 
 import { COMMUNITIES_API as API } from '../../config/api';
@@ -18,6 +19,8 @@ interface ChatMessage {
   author: ChatAuthor;
   readByOthers?: number;
   otherMembersCount?: number;
+  isAiBot?: boolean;
+  aiBotName?: string;
 }
 
 interface CommunityChatPanelProps {
@@ -40,6 +43,7 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
+  const sendIconRef = useRef<AnimatedSendIconHandle>(null);
   const lastReadPostedRef = useRef<string | null>(null);
 
   const tryMarkRead = useCallback(
@@ -145,6 +149,7 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
   const send = async () => {
     const text = input.trim();
     if (!text || !token || sending || !instanceId) return;
+    sendIconRef.current?.startAnimation();
     setSending(true);
     setError(null);
     try {
@@ -251,21 +256,37 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
           <p className="py-8 text-center text-sm text-[#999]">No messages yet. Say hello!</p>
         )}
         {messages.map((m) => {
-          const mine = user?.id === m.author?._id;
+          const isBot = Boolean(m.isAiBot);
+          const mine = !isBot && user?.id === m.author?._id;
+          const displayName = isBot
+            ? m.aiBotName || 'Community AI'
+            : m.author?.fullName || m.author?.username;
           return (
             <div key={m._id} className={`flex gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
               <img
-                src={m.author?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(m.author?.fullName || m.author?.username || '?')}&background=315efb&color=fff&size=40&bold=true`}
+                src={
+                  isBot
+                    ? `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName || 'AI')}&background=059669&color=fff&size=40&bold=true`
+                    : m.author?.avatar ||
+                      `https://ui-avatars.com/api/?name=${encodeURIComponent(m.author?.fullName || m.author?.username || '?')}&background=315efb&color=fff&size=40&bold=true`
+                }
                 alt=""
                 className="h-9 w-9 shrink-0 rounded-full object-cover"
               />
               <div
                 className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-[15px] leading-relaxed ${
-                  mine ? 'bg-[#315efb] text-white' : 'border border-[#ececec] bg-white text-neutral-900 shadow-sm'
+                  mine
+                    ? 'bg-[#315efb] text-white'
+                    : isBot
+                      ? 'border border-emerald-200 bg-emerald-50 text-neutral-900 shadow-sm'
+                      : 'border border-[#ececec] bg-white text-neutral-900 shadow-sm'
                 }`}
               >
                 {!mine && (
-                  <p className="mb-1 text-xs font-semibold text-[#315efb]">{m.author?.fullName || m.author?.username}</p>
+                  <p className={`mb-1 text-xs font-semibold ${isBot ? 'text-emerald-700' : 'text-[#315efb]'}`}>
+                    {displayName}
+                    {isBot ? ' · AI' : ''}
+                  </p>
                 )}
                 <p className="whitespace-pre-wrap break-words">{m.content}</p>
                 <div
@@ -306,7 +327,7 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl mr-2 bg-[#315efb] text-white transition-colors hover:bg-[#2547c4] disabled:cursor-not-allowed disabled:opacity-40"
             aria-label="Send"
           >
-            {sending ? <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <SendHorizonal className='-rotate-90' size={20} />}
+            <AnimatedSendIcon ref={sendIconRef} size={18} color="#ffffff" />
           </button>
         </div>
       </div>

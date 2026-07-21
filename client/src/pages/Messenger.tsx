@@ -3,7 +3,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
-  Send,
   ArrowLeft,
   X,
   Smile,
@@ -15,6 +14,7 @@ import {
   ChevronRight,
   CirclePlus,
 } from 'lucide-react';
+import AnimatedSendIcon, { type AnimatedSendIconHandle } from '../components/Common/AnimatedSendIcon';
 import { useAuth } from '../context/AuthContext';
 import { useUnreads } from '../context/UnreadsContext';
 import MessengerAttachmentMenu, {
@@ -75,7 +75,7 @@ import { MESSAGES_API as MSG_API, USERS_API as USERS_API } from '../config/api';
 const SCROLL_NEAR_BOTTOM_PX = 72;
 
 const composerIconBtnClass =
-  'rounded-full p-1 transition-colors hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40';
+  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40';
 
 interface ApiMessage {
   id: string;
@@ -162,6 +162,7 @@ const Messenger: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
+  const sendIconRef = useRef<AnimatedSendIconHandle>(null);
   const attachMenuRef = useRef<HTMLDivElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const chatPanelRef = useRef<HTMLDivElement>(null);
@@ -739,6 +740,7 @@ const Messenger: React.FC = () => {
 
   const sendMessage = async () => {
     if (!newMessage.trim() || sending) return;
+    sendIconRef.current?.startAnimation();
     let text = newMessage.trim();
 
     if (editingMessage) {
@@ -1322,10 +1324,10 @@ const Messenger: React.FC = () => {
                   aria-label="Send message"
                   className={`absolute right-2 top-1/2 z-[1] -translate-y-1/2 ${composerIconBtnClass}`}
                 >
-                  <Send
-                    className={`h-5 w-5 ${
-                      newMessage.trim() && !sending ? 'text-neutral-800' : 'text-neutral-400'
-                    }`}
+                  <AnimatedSendIcon
+                    ref={sendIconRef}
+                    size={20}
+                    color={newMessage.trim() && !sending ? '#262626' : '#a3a3a3'}
                   />
                 </button>
 

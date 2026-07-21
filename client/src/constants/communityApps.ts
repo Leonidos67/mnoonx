@@ -6,6 +6,9 @@ export const COMMUNITY_APP_IDS = {
   FILES: 'files',
   ANNOUNCEMENTS: 'announcements',
   EVENTS: 'events',
+  AI: 'ai',
+  KANBAN: 'kanban',
+  FORMS: 'forms',
 } as const;
 
 export type CommunityAppId = (typeof COMMUNITY_APP_IDS)[keyof typeof COMMUNITY_APP_IDS];

@@ -24,6 +24,17 @@ const CommunityChatMessageSchema = new mongoose.Schema({
     trim: true,
     maxlength: 4000,
   },
+  /** Сообщение от Community AI (author = owner, отображается botName) */
+  isAiBot: {
+    type: Boolean,
+    default: false,
+  },
+  aiBotName: {
+    type: String,
+    trim: true,
+    maxlength: 80,
+    default: '',
+  },
   createdAt: {
     type: Date,
     default: Date.now,

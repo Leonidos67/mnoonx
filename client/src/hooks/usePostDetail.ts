@@ -11,6 +11,8 @@ export function usePostDetail(
   reposts: FeedPost[],
   setPosts: React.Dispatch<React.SetStateAction<FeedPost[]>>,
   setReposts?: React.Dispatch<React.SetStateAction<FeedPost[]>>,
+  mediaPosts?: FeedPost[],
+  setMediaPosts?: React.Dispatch<React.SetStateAction<FeedPost[]>>,
 ) {
   const { token, user } = useAuth();
   const { showToast } = useToast();
@@ -42,9 +44,10 @@ export function usePostDetail(
       const apply = (p: FeedPost) => (String(p._id) === id ? { ...p, ...patch } : p);
       setPosts((prev) => prev.map(apply));
       setReposts?.((prev) => prev.map(apply));
+      setMediaPosts?.((prev) => prev.map(apply));
       setSelectedPost((prev) => (prev && String(prev._id) === id ? { ...prev, ...patch } : prev));
     },
-    [setPosts, setReposts],
+    [setPosts, setReposts, setMediaPosts],
   );
 
   const getPostFromState = useCallback(
@@ -53,10 +56,11 @@ export function usePostDetail(
       return (
         posts.find((p) => String(p._id) === id) ||
         reposts.find((p) => String(p._id) === id) ||
+        mediaPosts?.find((p) => String(p._id) === id) ||
         (selectedPost && String(selectedPost._id) === id ? selectedPost : undefined)
       );
     },
-    [posts, reposts, selectedPost],
+    [posts, reposts, mediaPosts, selectedPost],
   );
 
   const updateCommentsOnPost = useCallback(
@@ -98,16 +102,22 @@ export function usePostDetail(
     void loadCommentsForPost(String(postId));
   }, [selectedPost?._id, loadCommentsForPost]);
 
-  const handleSubmitComment = async (postId: string, source: 'inline' | 'sidebar') => {
+  const handleSubmitComment = async (
+    postId: string,
+    source: 'inline' | 'sidebar',
+    options?: { parentId?: string | null; content?: string },
+  ) => {
     if (!token) {
       window.dispatchEvent(new CustomEvent('openLogin'));
       return;
     }
-    const text = source === 'inline' ? inlineCommentText : commentText;
+    const text =
+      options?.content ?? (source === 'inline' ? inlineCommentText : commentText);
     if (!text.trim() || commentSubmitting) return;
 
     const id = String(postId);
     const current = getPostFromState(id);
+    const parentId = options?.parentId ? String(options.parentId) : undefined;
     try {
       setCommentSubmitting(true);
       const res = await fetch(`${POSTS_API}/${id}/comments`, {
@@ -116,13 +126,18 @@ export function usePostDetail(
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ content: text.trim() }),
+        body: JSON.stringify({
+          content: text.trim(),
+          ...(parentId ? { parentId } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || t('common.failedToPostComment'));
 
-      if (source === 'inline') setInlineCommentText('');
-      else setCommentText('');
+      if (!options?.content) {
+        if (source === 'inline') setInlineCommentText('');
+        else setCommentText('');
+      }
 
       const nextComments = [...(current?.comments || []), data.comment];
       updateCommentsOnPost(id, nextComments, data.commentsCount);
@@ -215,7 +230,11 @@ export function usePostDetail(
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || t('common.failedToDeleteComment'));
 
-      const nextComments = (current.comments || []).filter((c) => String(c._id) !== commentId);
+      const nextComments = (current.comments || []).filter(
+        (c) =>
+          String(c._id) !== commentId &&
+          String(c.parentId || '') !== commentId,
+      );
       updateCommentsOnPost(id, nextComments, data.commentsCount);
       showToast(t('common.commentDeleted'));
     } catch (err: unknown) {

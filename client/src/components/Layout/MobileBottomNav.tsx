@@ -1,10 +1,34 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { House, Compass, Plus, MessageCircle, User } from 'lucide-react';
+import { MessageCircleIcon, type IconHandle } from '@animateicons/react/lucide';
 import { useAuth } from '../../context/AuthContext';
 import { useUnreads } from '../../context/UnreadsContext';
 import { useTranslation } from '../../i18n/useTranslation';
 import { profilePath } from '../../constants/paths';
+import { AnimatedNavIcon } from './AnimatedNavIcon';
+import AnimatedPlusIcon from '../Common/AnimatedPlusIcon';
+import { useAnimateOnParentHover } from '../../hooks/useAnimateOnParentHover';
+
+const MobileMessageIcon: React.FC = () => {
+  const iconRef = useRef<IconHandle>(null);
+  const nodeRef = useRef<HTMLSpanElement>(null);
+  useAnimateOnParentHover(iconRef, nodeRef);
+  return (
+    <span
+      ref={nodeRef}
+      className="relative inline-flex h-6 w-6 items-center justify-center overflow-hidden"
+    >
+      <MessageCircleIcon
+        ref={iconRef}
+        size={24}
+        duration={1}
+        color="currentColor"
+        isAnimated={false}
+        className="!h-6 !w-6 !min-h-0 !min-w-0"
+      />
+    </span>
+  );
+};
 
 const MobileBottomNav: React.FC = () => {
   const location = useLocation();
@@ -38,7 +62,7 @@ const MobileBottomNav: React.FC = () => {
     >
       <div className="mx-auto flex h-[60px] max-w-lg items-stretch justify-between px-2">
         <Link to="/" className={iconLinkClass(isHomeActive)} aria-current={isHomeActive ? 'page' : undefined}>
-          <House className={`h-6 w-6 ${isHomeActive ? 'stroke-[2.25]' : 'stroke-[1.75]'}`} aria-hidden />
+          <AnimatedNavIcon kind="home" size={24} />
         </Link>
 
         <Link
@@ -46,7 +70,7 @@ const MobileBottomNav: React.FC = () => {
           className={iconLinkClass(isDiscoverActive)}
           aria-current={isDiscoverActive ? 'page' : undefined}
         >
-          <Compass className={`h-6 w-6 ${isDiscoverActive ? 'stroke-[2.25]' : 'stroke-[1.75]'}`} aria-hidden />
+          <AnimatedNavIcon kind="discover" size={24} />
         </Link>
 
         <Link
@@ -55,12 +79,11 @@ const MobileBottomNav: React.FC = () => {
           aria-current={isStartActive ? 'page' : undefined}
         >
           <span
-            className={`inline-flex items-center gap-1 rounded-full p-2 text-sm font-semibold shadow-sm transition-transform active:scale-95 ${
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold shadow-sm transition-transform active:scale-95 ${
               isStartActive ? 'bg-neutral-800 text-white ring-2 ring-neutral-300' : 'bg-black text-white'
             }`}
           >
-            <Plus className="h-5 w-5 shrink-0" strokeWidth={2.5} aria-hidden />
-            {/* Start */}
+            <AnimatedPlusIcon variant="plus" size={20} color="#ffffff" />
           </span>
         </Link>
 
@@ -75,10 +98,7 @@ const MobileBottomNav: React.FC = () => {
           }
         >
           <span className="relative">
-            <MessageCircle
-              className={`h-6 w-6 ${isMessengerActive ? 'stroke-[2.25]' : 'stroke-[1.75]'}`}
-              aria-hidden
-            />
+            <MobileMessageIcon />
             {unreadLabel && (
               <span className="absolute -right-1.5 -top-1 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-[#e5484d] px-0.5 text-[9px] font-bold leading-none text-white">
                 {unreadLabel}
@@ -92,7 +112,7 @@ const MobileBottomNav: React.FC = () => {
           className={iconLinkClass(isProfileActive)}
           aria-current={isProfileActive ? 'page' : undefined}
         >
-          <User className={`h-6 w-6 ${isProfileActive ? 'stroke-[2.25]' : 'stroke-[1.75]'}`} aria-hidden />
+          <AnimatedNavIcon kind="profile" size={24} />
         </Link>
       </div>
     </nav>

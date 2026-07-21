@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Unlink2, X } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 import PostMediaGallery from './PostMediaGallery';
 import PostContentBody from './PostContentBody';
 import { buildPostLightboxMeta } from '../../utils/buildPostLightboxMeta';
 import { PostCommentsSection } from './PostCommentsSection';
+import { AnimatedPostMenuIcon } from './PostMenuAnimatedIcons';
 import { formatCount } from './postFeedUtils';
 import type { FeedPost, PostComment } from '../../types/postFeed';
 
@@ -15,6 +16,7 @@ interface PostDetailPanelProps {
   commentText: string;
   onCommentTextChange: (value: string) => void;
   onSubmitComment: () => void;
+  onSubmitReply?: (parentId: string, content: string) => void;
   token: string | null;
   commentSubmitting: boolean;
   commentsLoading: boolean;
@@ -35,6 +37,7 @@ const PostDetailPanel: React.FC<PostDetailPanelProps> = ({
   commentText,
   onCommentTextChange,
   onSubmitComment,
+  onSubmitReply,
   token,
   commentSubmitting,
   commentsLoading,
@@ -65,18 +68,18 @@ const PostDetailPanel: React.FC<PostDetailPanelProps> = ({
           <span>Back</span>
         </button> */}
         <div></div>
-        <div>
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => onCopyLink(String(post._id))}
-            className="rounded-full p-2 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black"
           >
-            <Unlink2 size={18} />
+            <AnimatedPostMenuIcon kind="link" size={18} />
           </button>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-2 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black"
           >
             <X size={18} />
           </button>
@@ -135,6 +138,7 @@ const PostDetailPanel: React.FC<PostDetailPanelProps> = ({
               text={commentText}
               onTextChange={onCommentTextChange}
               onSubmit={onSubmitComment}
+              onSubmitReply={onSubmitReply}
               token={token}
               commentSubmitting={commentSubmitting}
               commentsLoading={commentsLoading}

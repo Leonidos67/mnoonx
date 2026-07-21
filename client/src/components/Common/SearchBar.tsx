@@ -13,6 +13,7 @@ import {
 import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { authInputClass } from '../Auth/authFormStyles';
 import { useTranslation } from '../../i18n/useTranslation';
+import AnimatedSearchIcon from './AnimatedSearchIcon';
 
 interface SearchBarProps {
   onSearch?: (query: string, category?: string) => void;
@@ -406,13 +407,15 @@ const SearchBar: React.FC<SearchBarProps> = ({
   );
 
   const inputBlock = (
-    <div className="relative">
-      <Search
-        className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400 ${
+    <div className="relative" data-animate-hover>
+      <span
+        className={`pointer-events-none absolute top-1/2 z-[1] flex -translate-y-1/2 items-center justify-center text-neutral-400 ${
           isModal ? 'left-5' : 'left-3'
         }`}
         aria-hidden
-      />
+      >
+        <AnimatedSearchIcon size={16} />
+      </span>
       <input
         ref={inputRef}
         type="text"

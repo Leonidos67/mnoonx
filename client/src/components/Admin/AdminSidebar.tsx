@@ -30,7 +30,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onCloseMobile }
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-violet-400/90">MNOONX</p>
           <p className="text-lg font-bold text-white">Админ-панель</p>
-          {username ? <p className="mt-1 text-xs text-neutral-500">@{username}</p> : null}
+          {/* {username ? <p className="mt-1 text-xs text-neutral-500">@{username}</p> : null} */}
         </div>
         <button
           type="button"

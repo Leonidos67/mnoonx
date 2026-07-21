@@ -6,9 +6,9 @@ import {
   Clock,
   ExternalLink,
   RotateCcw,
-  Send,
   Ticket,
 } from 'lucide-react';
+import AnimatedSendIcon, { type AnimatedSendIconHandle } from '../../components/Common/AnimatedSendIcon';
 import { ADMIN_API } from '../../config/api';
 import { adminAuthHeaders, useAdminAuth } from '../../context/AdminAuthContext';
 
@@ -58,6 +58,7 @@ const AdminSupportTickets: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [mobileShowThread, setMobileShowThread] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sendIconRef = useRef<AnimatedSendIconHandle>(null);
   const listLoadedOnce = useRef(false);
 
   const loadTickets = useCallback(
@@ -131,6 +132,7 @@ const AdminSupportTickets: React.FC = () => {
 
   const handleSend = async () => {
     if (!token || !selectedId || !replyText.trim() || sending) return;
+    sendIconRef.current?.startAnimation();
     setSending(true);
     try {
       const res = await fetch(`${ADMIN_API}/support-tickets/${selectedId}/reply`, {
@@ -380,7 +382,7 @@ const AdminSupportTickets: React.FC = () => {
                       disabled={sending || !replyText.trim()}
                       className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white disabled:opacity-50"
                     >
-                      <Send size={18} />
+                      <AnimatedSendIcon ref={sendIconRef} size={18} color="#ffffff" />
                     </button>
                   </div>
                 </div>

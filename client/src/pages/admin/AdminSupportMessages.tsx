@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowLeft, MessageCircle, Send } from 'lucide-react';
+import { ArrowLeft, MessageCircle } from 'lucide-react';
+import AnimatedSendIcon, { type AnimatedSendIconHandle } from '../../components/Common/AnimatedSendIcon';
 import { ADMIN_API } from '../../config/api';
 import { adminAuthHeaders, useAdminAuth } from '../../context/AdminAuthContext';
 
@@ -42,6 +43,7 @@ const AdminSupportMessages: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [mobileShowThread, setMobileShowThread] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sendIconRef = useRef<AnimatedSendIconHandle>(null);
   const listLoadedOnce = useRef(false);
 
   const loadTickets = useCallback(
@@ -127,6 +129,7 @@ const AdminSupportMessages: React.FC = () => {
 
   const handleSend = async () => {
     if (!token || !selectedUserId || !replyText.trim() || sending) return;
+    sendIconRef.current?.startAnimation();
     setSending(true);
     try {
       const res = await fetch(`${ADMIN_API}/support/tickets/${selectedUserId}/reply`, {
@@ -313,7 +316,7 @@ const AdminSupportMessages: React.FC = () => {
                     disabled={sending || !replyText.trim()}
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-50"
                   >
-                    <Send size={18} />
+                    <AnimatedSendIcon ref={sendIconRef} size={18} color="#ffffff" />
                   </button>
                 </div>
               </div>

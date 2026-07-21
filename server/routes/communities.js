@@ -17,11 +17,34 @@ const CommunityFile = require('../models/CommunityFile');
 const CommunityAnnouncement = require('../models/CommunityAnnouncement');
 const CommunityAnnouncementMeta = require('../models/CommunityAnnouncementMeta');
 const CommunityEvent = require('../models/CommunityEvent');
+const CommunityAiConfig = require('../models/CommunityAiConfig');
+const CommunityAiMessage = require('../models/CommunityAiMessage');
+const CommunityAiOnboarding = require('../models/CommunityAiOnboarding');
+const CommunityKanbanMeta = require('../models/CommunityKanbanMeta');
+const CommunityKanbanCard = require('../models/CommunityKanbanCard');
+const CommunityForm = require('../models/CommunityForm');
+const CommunityFormSubmission = require('../models/CommunityFormSubmission');
 const Post = require('../models/Post');
 const auth = require('../middleware/auth');
 const communityAdmin = require('../utils/communityAdmin');
+const {
+  generateCommunityAiText,
+  buildSystemPrompt,
+  serializeConfig,
+  normalizeOnboardingSteps,
+} = require('../services/communityAi');
 
-const ALLOWED_COMMUNITY_APPS = ['chat', 'courses', 'content', 'files', 'announcements', 'events'];
+const ALLOWED_COMMUNITY_APPS = [
+  'chat',
+  'courses',
+  'content',
+  'files',
+  'announcements',
+  'events',
+  'ai',
+  'kanban',
+  'forms',
+];
 
 const UPLOADS_ROOT = path.join(__dirname, '../uploads');
 const COMMUNITY_FILES_TMP = path.join(UPLOADS_ROOT, 'community-files', '_tmp');
@@ -86,6 +109,16 @@ async function deleteEventsForInstance(communityOid, appInstanceId) {
   await CommunityEvent.deleteMany({ community: communityOid, appInstanceId });
 }
 
+async function deleteKanbanForInstance(communityOid, appInstanceId) {
+  await CommunityKanbanMeta.deleteMany({ community: communityOid, appInstanceId });
+  await CommunityKanbanCard.deleteMany({ community: communityOid, appInstanceId });
+}
+
+async function deleteFormsForInstance(communityOid, appInstanceId) {
+  await CommunityForm.deleteMany({ community: communityOid, appInstanceId });
+  await CommunityFormSubmission.deleteMany({ community: communityOid, appInstanceId });
+}
+
 /** Полное удаление сообщества и связанных данных (посты, приложения, файлы на диске). */
 async function deleteCommunityCascade(communityDoc) {
   const cid = communityDoc._id;
@@ -99,6 +132,13 @@ async function deleteCommunityCascade(communityDoc) {
   await CommunityAnnouncement.deleteMany({ community: cid });
   await CommunityAnnouncementMeta.deleteMany({ community: cid });
   await CommunityEvent.deleteMany({ community: cid });
+  await CommunityAiConfig.deleteMany({ community: cid });
+  await CommunityAiMessage.deleteMany({ community: cid });
+  await CommunityAiOnboarding.deleteMany({ community: cid });
+  await CommunityKanbanMeta.deleteMany({ community: cid });
+  await CommunityKanbanCard.deleteMany({ community: cid });
+  await CommunityForm.deleteMany({ community: cid });
+  await CommunityFormSubmission.deleteMany({ community: cid });
 
   const fileDocs = await CommunityFile.find({ community: cid }).lean();
   for (const f of fileDocs) {
@@ -423,6 +463,309 @@ function canAccessChatInstance(community, userId, instance) {
   if (!isCommunityMember(community, userId)) return false;
   if (isCommunityOwner(community, userId)) return true;
   return instance.visibleToMembers;
+}
+
+async function getOrCreateAiConfig(communityOid, appInstanceId) {
+  let doc = await CommunityAiConfig.findOne({ community: communityOid, appInstanceId }).select('+apiKey');
+  if (!doc) {
+    doc = await CommunityAiConfig.create({ community: communityOid, appInstanceId });
+    doc = await CommunityAiConfig.findById(doc._id).select('+apiKey');
+  }
+  return doc;
+}
+
+async function buildCommunityAiContext(community, config) {
+  const lines = [];
+  const postLimit = Math.min(80, Math.max(0, Number(config.contextPostLimit) || 0));
+  const chatLimit = Math.min(100, Math.max(0, Number(config.contextChatLimit) || 0));
+
+  if (config.analyzePostsEnabled !== false && postLimit > 0) {
+    const posts = await Post.find({ community: community._id })
+      .sort({ createdAt: -1 })
+      .limit(postLimit)
+      .select('content author createdAt')
+      .lean();
+    const authorIds = [...new Set(posts.map((p) => String(p.author)).filter(Boolean))];
+    const users = authorIds.length
+      ? await User.find({ _id: { $in: authorIds } }).select('username fullName').lean()
+      : [];
+    const byId = Object.fromEntries(users.map((u) => [String(u._id), u]));
+    if (posts.length) {
+      lines.push('### Recent community posts');
+      for (const p of posts.reverse()) {
+        const u = byId[String(p.author)];
+        const who = u?.username ? `@${u.username}` : 'member';
+        const text = String(p.content || '').trim().slice(0, 500);
+        if (text) lines.push(`- ${who}: ${text}`);
+      }
+    }
+  }
+
+  if (config.analyzeChatEnabled !== false && chatLimit > 0) {
+    const chatId = String(config.linkedChatInstanceId || '').trim();
+    const chatFilter = chatId
+      ? { community: community._id, chatInstanceId: chatId }
+      : { community: community._id };
+    const msgs = await CommunityChatMessage.find(chatFilter)
+      .sort({ createdAt: -1 })
+      .limit(chatLimit)
+      .populate('author', 'username fullName')
+      .lean();
+    if (msgs.length) {
+      lines.push('### Recent chat messages');
+      for (const m of msgs.reverse()) {
+        const who = m.isAiBot
+          ? m.aiBotName || 'AI'
+          : m.author?.username
+            ? `@${m.author.username}`
+            : 'member';
+        const text = String(m.content || '').trim().slice(0, 400);
+        if (text) lines.push(`- ${who}: ${text}`);
+      }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+async function maybeAutoReplyAiInChat(community, chatInstanceId, userMessage, authorUserId) {
+  try {
+    if (!userMessage || !chatInstanceId) return;
+    const configs = await CommunityAiConfig.find({
+      community: community._id,
+      autoReplyInChat: true,
+      linkedChatInstanceId: String(chatInstanceId),
+    }).select('+apiKey');
+    if (!configs.length) return;
+
+    const ownerId = ownerIdString(community);
+    if (!ownerId) return;
+
+    for (const config of configs) {
+      if (!config.apiKey) continue;
+      const botName = String(config.botName || 'Community AI').trim() || 'Community AI';
+      if (config.replyOnlyWhenMentioned !== false) {
+        const mention = botName.toLowerCase();
+        const text = String(userMessage).toLowerCase();
+        if (!text.includes(mention) && !text.includes('@ai') && !text.includes('@bot')) {
+          continue;
+        }
+      }
+
+      const context = await buildCommunityAiContext(community, config);
+      const system = buildSystemPrompt(config, community.name);
+      const user = [
+        context ? `Community context:\n${context}` : '',
+        `A member wrote in the community chat:\n"""${userMessage}"""`,
+        'Reply helpfully as the community AI assistant. Keep it short (1-3 sentences) unless they ask for detail.',
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+
+      const reply = await generateCommunityAiText({
+        provider: config.provider,
+        apiKey: config.apiKey,
+        model: config.model,
+        system,
+        user,
+        maxTokens: Math.min(800, config.maxTokens || 1024),
+        temperature: config.temperature,
+      });
+
+      if (!reply) continue;
+      const msg = new CommunityChatMessage({
+        community: community._id,
+        author: ownerId,
+        content: String(reply).slice(0, 4000),
+        chatInstanceId: String(chatInstanceId),
+        isAiBot: true,
+        aiBotName: botName,
+      });
+      await msg.save();
+    }
+  } catch (e) {
+    console.error('Community AI auto-reply failed:', e.message || e);
+  }
+}
+
+function serializeOnboardingProgress(doc, config) {
+  const steps = Array.isArray(config?.onboardingSteps) ? config.onboardingSteps : [];
+  const completed = new Set(doc?.completedStepIds || []);
+  return {
+    status: doc?.status || 'pending',
+    welcomeMessage: doc?.welcomeMessage || '',
+    completedStepIds: [...completed],
+    steps: steps.map((s) => ({
+      id: s.id,
+      title: s.title,
+      description: s.description || '',
+      done: completed.has(s.id),
+    })),
+    startedAt: doc?.startedAt || null,
+    completedAt: doc?.completedAt || null,
+    onboardingEnabled: Boolean(config?.onboardingEnabled),
+    botName: config?.botName || 'Community AI',
+  };
+}
+
+async function generateOnboardingWelcome(community, config, memberUser) {
+  const stepsText = (config.onboardingSteps || [])
+    .map((s, i) => `${i + 1}. ${s.title}${s.description ? ` — ${s.description}` : ''}`)
+    .join('\n');
+  const system = [
+    buildSystemPrompt(config, community.name),
+    'You are the community onboarding guide for a brand-new member.',
+    'Be warm, clear, and concise (max ~180 words).',
+    'End by inviting them to complete the checklist and ask you questions.',
+  ].join('\n');
+  const user = [
+    `New member: @${memberUser?.username || 'member'} (${memberUser?.fullName || 'Member'}).`,
+    config.onboardingRulesText
+      ? `Community rules / intro from owner:\n${config.onboardingRulesText}`
+      : '',
+    config.onboardingWelcomePrompt
+      ? `Owner instructions for welcome:\n${config.onboardingWelcomePrompt}`
+      : '',
+    stepsText ? `Onboarding checklist:\n${stepsText}` : '',
+    'Write the welcome / kickoff message now.',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+  return generateCommunityAiText({
+    provider: config.provider,
+    apiKey: config.apiKey,
+    model: config.model,
+    system,
+    user,
+    maxTokens: Math.min(900, config.maxTokens || 1024),
+    temperature: config.temperature,
+  });
+}
+
+/**
+ * Старт онбординга для нового участника (использует API-ключ владельца).
+ * @returns {{ progress, welcomeMessage } | null}
+ */
+async function ensureAiOnboardingForMember(community, userId, { forceRegenerate = false } = {}) {
+  const instances = (community.installedAppInstances || []).filter((i) => i.appId === 'ai');
+  if (!instances.length) return null;
+
+  const ownerId = ownerIdString(community);
+  const member = await User.findById(userId).select('username fullName avatar');
+
+  for (const inst of instances) {
+    const config = await CommunityAiConfig.findOne({
+      community: community._id,
+      appInstanceId: inst.id,
+    }).select('+apiKey');
+    if (!config || !config.onboardingEnabled || !config.apiKey) continue;
+    if (!canAccessChatInstance(community, userId, inst) && !isCommunityOwner(community, userId)) {
+      // member just joined — instance may be member-visible
+      if (inst.visibleToMembers === false) continue;
+    }
+
+    let progress = await CommunityAiOnboarding.findOne({
+      community: community._id,
+      appInstanceId: inst.id,
+      user: userId,
+    });
+
+    if (
+      progress &&
+      (progress.status === 'completed' || progress.status === 'skipped') &&
+      !forceRegenerate
+    ) {
+      return { instanceId: inst.id, progress, config, welcomeMessage: progress.welcomeMessage };
+    }
+
+    if (!progress) {
+      progress = new CommunityAiOnboarding({
+        community: community._id,
+        appInstanceId: inst.id,
+        user: userId,
+        status: 'pending',
+      });
+    }
+
+    let welcome = progress.welcomeMessage;
+    if (!welcome || forceRegenerate) {
+      welcome = await generateOnboardingWelcome(community, config, member);
+      progress.welcomeMessage = String(welcome).slice(0, 8000);
+    }
+
+    if (progress.status === 'pending') {
+      progress.status = 'in_progress';
+      progress.startedAt = progress.startedAt || new Date();
+    }
+    await progress.save();
+
+    const existingWelcome = await CommunityAiMessage.findOne({
+      community: community._id,
+      appInstanceId: inst.id,
+      kind: 'onboarding',
+      onboardingUser: userId,
+      role: 'assistant',
+    });
+    if (!existingWelcome || forceRegenerate) {
+      if (existingWelcome && forceRegenerate) {
+        await CommunityAiMessage.deleteMany({
+          community: community._id,
+          appInstanceId: inst.id,
+          kind: 'onboarding',
+          onboardingUser: userId,
+        });
+      }
+      await CommunityAiMessage.create({
+        community: community._id,
+        appInstanceId: inst.id,
+        role: 'assistant',
+        content: progress.welcomeMessage,
+        kind: 'onboarding',
+        user: null,
+        onboardingUser: userId,
+      });
+    }
+
+    if (config.onboardingPostToChat !== false && config.linkedChatInstanceId && ownerId) {
+      const chatInst = findChatInstance(community, config.linkedChatInstanceId);
+      if (chatInst) {
+        const alreadyPosted = await CommunityChatMessage.findOne({
+          community: community._id,
+          chatInstanceId: config.linkedChatInstanceId,
+          isAiBot: true,
+          content: { $regex: member?.username ? `@${member.username}` : '^', $options: 'i' },
+        })
+          .sort({ createdAt: -1 })
+          .lean();
+        // Soft dedupe: skip if a very recent AI welcome mentions this user
+        const recentMs = alreadyPosted?.createdAt
+          ? Date.now() - new Date(alreadyPosted.createdAt).getTime()
+          : Infinity;
+        if (recentMs > 60_000) {
+          const mention = member?.username ? `@${member.username}` : 'new member';
+          await CommunityChatMessage.create({
+            community: community._id,
+            author: ownerId,
+            content: String(
+              `${progress.welcomeMessage}\n\n— welcome ${mention}`
+            ).slice(0, 4000),
+            chatInstanceId: config.linkedChatInstanceId,
+            isAiBot: true,
+            aiBotName: config.botName || 'Community AI',
+          });
+        }
+      }
+    }
+
+    return {
+      instanceId: inst.id,
+      progress,
+      config,
+      welcomeMessage: progress.welcomeMessage,
+    };
+  }
+  return null;
 }
 
 function compareObjectIdAsTime(a, b) {
@@ -782,7 +1125,13 @@ router.post('/:handle/apps', auth, async (req, res) => {
                 ? 'Announcements'
                 : appId === 'events'
                   ? 'Events'
-                  : String(appId);
+                  : appId === 'ai'
+                    ? 'Community AI'
+                    : appId === 'kanban'
+                      ? 'Kanban'
+                      : appId === 'forms'
+                        ? 'Forms & Waitlist'
+                        : String(appId);
     const next = [
       ...instances,
       {
@@ -889,6 +1238,17 @@ router.delete('/:handle/apps/instances/:instanceId', auth, async (req, res) => {
     if (removed.appId === 'events') {
       await deleteEventsForInstance(fresh._id, instanceId);
     }
+    if (removed.appId === 'ai') {
+      await CommunityAiConfig.deleteMany({ community: fresh._id, appInstanceId: instanceId });
+      await CommunityAiMessage.deleteMany({ community: fresh._id, appInstanceId: instanceId });
+      await CommunityAiOnboarding.deleteMany({ community: fresh._id, appInstanceId: instanceId });
+    }
+    if (removed.appId === 'kanban') {
+      await deleteKanbanForInstance(fresh._id, instanceId);
+    }
+    if (removed.appId === 'forms') {
+      await deleteFormsForInstance(fresh._id, instanceId);
+    }
 
     const updated = await Community.findById(fresh._id).populate('owner', 'username fullName avatar');
     res.json(serializeCommunityDoc(updated, req.userId));
@@ -962,6 +1322,30 @@ router.delete('/:handle/apps/:appId', auth, async (req, res) => {
     if (appId === 'events' && removedIds.length) {
       for (const iid of removedIds) {
         await deleteEventsForInstance(fresh._id, iid);
+      }
+    }
+    if (appId === 'ai' && removedIds.length) {
+      await CommunityAiConfig.deleteMany({
+        community: fresh._id,
+        appInstanceId: { $in: removedIds },
+      });
+      await CommunityAiMessage.deleteMany({
+        community: fresh._id,
+        appInstanceId: { $in: removedIds },
+      });
+      await CommunityAiOnboarding.deleteMany({
+        community: fresh._id,
+        appInstanceId: { $in: removedIds },
+      });
+    }
+    if (appId === 'kanban' && removedIds.length) {
+      for (const iid of removedIds) {
+        await deleteKanbanForInstance(fresh._id, iid);
+      }
+    }
+    if (appId === 'forms' && removedIds.length) {
+      for (const iid of removedIds) {
+        await deleteFormsForInstance(fresh._id, iid);
       }
     }
 
@@ -1154,6 +1538,9 @@ router.post('/:handle/chat/messages', auth, async (req, res) => {
       .populate('author', 'username fullName avatar');
     const arr = await enrichChatMessagesWithReadReceipts([populated], fresh, instanceId, req.userId);
     res.status(201).json(arr[0]);
+
+    // Fire-and-forget auto-reply from Community AI apps linked to this chat
+    void maybeAutoReplyAiInChat(fresh, instanceId, content, req.userId);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -2293,6 +2680,1443 @@ router.delete('/:handle/events/:eventId', auth, async (req, res) => {
   }
 });
 
+// --- Community AI app ---
+
+// @route   GET /api/communities/:handle/ai/config
+router.get('/:handle/ai/config', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.query.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId query required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'ai');
+    if (!instance) return res.status(404).json({ message: 'AI instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+
+    const config = await getOrCreateAiConfig(fresh._id, instanceId);
+    const serialized = serializeConfig(config);
+    const chatInstances = (fresh.installedAppInstances || [])
+      .filter((i) => i.appId === 'chat')
+      .map((i) => ({ id: i.id, title: i.title }));
+    res.json({
+      ...serialized,
+      isOwner: isCommunityOwner(fresh, req.userId),
+      chatInstances,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   PATCH /api/communities/:handle/ai/config
+router.patch('/:handle/ai/config', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    if (!isCommunityOwner(community, req.userId)) {
+      return res.status(403).json({ message: 'Only the owner can configure AI' });
+    }
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'ai');
+    if (!instance) return res.status(404).json({ message: 'AI instance not found' });
+
+    const config = await getOrCreateAiConfig(fresh._id, instanceId);
+    const b = req.body || {};
+
+    if (b.apiKey !== undefined) {
+      const key = String(b.apiKey).trim();
+      if (key) config.apiKey = key.slice(0, 500);
+      else if (b.clearApiKey === true) config.apiKey = '';
+    }
+    if (b.provider !== undefined) {
+      config.provider = b.provider === 'openai' ? 'openai' : 'gemini';
+    }
+    if (b.model !== undefined) config.model = String(b.model).trim().slice(0, 120) || config.model;
+    if (b.botName !== undefined) {
+      const n = String(b.botName).trim().slice(0, 80);
+      if (n) config.botName = n;
+    }
+    if (b.systemPrompt !== undefined) config.systemPrompt = String(b.systemPrompt).slice(0, 8000);
+    if (b.temperature !== undefined) {
+      const t = Number(b.temperature);
+      if (!Number.isNaN(t)) config.temperature = Math.min(2, Math.max(0, t));
+    }
+    if (b.maxTokens !== undefined) {
+      const m = Number(b.maxTokens);
+      if (!Number.isNaN(m)) config.maxTokens = Math.min(4096, Math.max(64, Math.round(m)));
+    }
+    if (typeof b.chatEnabled === 'boolean') config.chatEnabled = b.chatEnabled;
+    if (typeof b.analyzePostsEnabled === 'boolean') config.analyzePostsEnabled = b.analyzePostsEnabled;
+    if (typeof b.analyzeChatEnabled === 'boolean') config.analyzeChatEnabled = b.analyzeChatEnabled;
+    if (typeof b.autoReplyInChat === 'boolean') config.autoReplyInChat = b.autoReplyInChat;
+    if (b.linkedChatInstanceId !== undefined) {
+      config.linkedChatInstanceId = String(b.linkedChatInstanceId || '').trim().slice(0, 80);
+    }
+    if (typeof b.replyOnlyWhenMentioned === 'boolean') {
+      config.replyOnlyWhenMentioned = b.replyOnlyWhenMentioned;
+    }
+    if (b.contextPostLimit !== undefined) {
+      const n = Number(b.contextPostLimit);
+      if (!Number.isNaN(n)) config.contextPostLimit = Math.min(80, Math.max(0, Math.round(n)));
+    }
+    if (b.contextChatLimit !== undefined) {
+      const n = Number(b.contextChatLimit);
+      if (!Number.isNaN(n)) config.contextChatLimit = Math.min(100, Math.max(0, Math.round(n)));
+    }
+    if (b.responseLanguage !== undefined) {
+      config.responseLanguage = String(b.responseLanguage).trim().slice(0, 40) || 'auto';
+    }
+    if (typeof b.onboardingEnabled === 'boolean') config.onboardingEnabled = b.onboardingEnabled;
+    if (b.onboardingWelcomePrompt !== undefined) {
+      config.onboardingWelcomePrompt = String(b.onboardingWelcomePrompt).slice(0, 4000);
+    }
+    if (b.onboardingRulesText !== undefined) {
+      config.onboardingRulesText = String(b.onboardingRulesText).slice(0, 6000);
+    }
+    if (b.onboardingSteps !== undefined) {
+      const steps = normalizeOnboardingSteps(b.onboardingSteps);
+      if (steps.length) config.onboardingSteps = steps;
+    }
+    if (typeof b.onboardingPostToChat === 'boolean') {
+      config.onboardingPostToChat = b.onboardingPostToChat;
+    }
+
+    await config.save();
+    const chatInstances = (fresh.installedAppInstances || [])
+      .filter((i) => i.appId === 'chat')
+      .map((i) => ({ id: i.id, title: i.title }));
+    res.json({
+      ...serializeConfig(config),
+      isOwner: true,
+      chatInstances,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/communities/:handle/ai/test-key
+router.post('/:handle/ai/test-key', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    if (!isCommunityOwner(community, req.userId)) {
+      return res.status(403).json({ message: 'Only the owner can test the API key' });
+    }
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'ai');
+    if (!instance) return res.status(404).json({ message: 'AI instance not found' });
+
+    const config = await getOrCreateAiConfig(fresh._id, instanceId);
+    const keyFromBody = String(req.body.apiKey || '').trim();
+    const apiKey = keyFromBody || config.apiKey;
+    if (!apiKey) return res.status(400).json({ message: 'API key is required' });
+
+    const provider =
+      req.body.provider === 'openai' || req.body.provider === 'gemini'
+        ? req.body.provider
+        : config.provider;
+    const model = String(req.body.model || config.model || '').trim();
+
+    const text = await generateCommunityAiText({
+      provider,
+      apiKey,
+      model,
+      system: 'You are a connection test.',
+      user: 'Reply with exactly: OK',
+      maxTokens: 16,
+      temperature: 0,
+    });
+    res.json({ ok: true, sample: String(text).slice(0, 80) });
+  } catch (err) {
+    console.error(err);
+    res.status(err.status || 500).json({ message: err.message || 'Key test failed' });
+  }
+});
+
+// @route   GET /api/communities/:handle/ai/messages
+router.get('/:handle/ai/messages', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.query.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId query required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'ai');
+    if (!instance) return res.status(404).json({ message: 'AI instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+
+    const messages = await CommunityAiMessage.find({
+      community: fresh._id,
+      appInstanceId: instanceId,
+    })
+      .sort({ createdAt: 1 })
+      .limit(200)
+      .populate('user', 'username fullName avatar')
+      .lean();
+
+    res.json(
+      messages.map((m) => ({
+        _id: m._id,
+        role: m.role,
+        content: m.content,
+        kind: m.kind,
+        createdAt: m.createdAt,
+        user: m.user
+          ? {
+              _id: m.user._id,
+              username: m.user.username,
+              fullName: m.user.fullName,
+              avatar: m.user.avatar,
+            }
+          : null,
+      }))
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/communities/:handle/ai/messages
+router.post('/:handle/ai/messages', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    const content = String(req.body.content || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+    if (!content) return res.status(400).json({ message: 'Message is required' });
+    if (content.length > 4000) return res.status(400).json({ message: 'Message too long' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'ai');
+    if (!instance) return res.status(404).json({ message: 'AI instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+
+    const config = await getOrCreateAiConfig(fresh._id, instanceId);
+    if (config.chatEnabled === false && !isCommunityOwner(fresh, req.userId)) {
+      return res.status(403).json({ message: 'AI chat is disabled for members' });
+    }
+    if (!config.apiKey) {
+      return res.status(400).json({ message: 'Owner must add an API key in AI settings first' });
+    }
+
+    const userMsg = await CommunityAiMessage.create({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      role: 'user',
+      content,
+      kind: 'chat',
+      user: req.userId,
+    });
+
+    const history = await CommunityAiMessage.find({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      kind: 'chat',
+    })
+      .sort({ createdAt: -1 })
+      .limit(16)
+      .lean();
+    const historyText = history
+      .reverse()
+      .map((m) => `${m.role === 'assistant' ? 'Assistant' : 'User'}: ${m.content}`)
+      .join('\n');
+
+    const context = await buildCommunityAiContext(fresh, config);
+    const system = buildSystemPrompt(config, fresh.name);
+    const userPrompt = [
+      context ? `Community context:\n${context}` : '',
+      historyText ? `Recent conversation:\n${historyText}` : '',
+      `Current member message:\n${content}`,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    let replyText;
+    try {
+      replyText = await generateCommunityAiText({
+        provider: config.provider,
+        apiKey: config.apiKey,
+        model: config.model,
+        system,
+        user: userPrompt,
+        maxTokens: config.maxTokens,
+        temperature: config.temperature,
+      });
+    } catch (aiErr) {
+      await CommunityAiMessage.deleteOne({ _id: userMsg._id });
+      return res.status(aiErr.status || 502).json({ message: aiErr.message || 'AI request failed' });
+    }
+
+    const assistantMsg = await CommunityAiMessage.create({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      role: 'assistant',
+      content: String(replyText).slice(0, 16000),
+      kind: 'chat',
+      user: null,
+    });
+
+    const populatedUser = await User.findById(req.userId).select('username fullName avatar');
+    res.status(201).json({
+      userMessage: {
+        _id: userMsg._id,
+        role: 'user',
+        content: userMsg.content,
+        kind: 'chat',
+        createdAt: userMsg.createdAt,
+        user: populatedUser
+          ? {
+              _id: populatedUser._id,
+              username: populatedUser.username,
+              fullName: populatedUser.fullName,
+              avatar: populatedUser.avatar,
+            }
+          : null,
+      },
+      assistantMessage: {
+        _id: assistantMsg._id,
+        role: 'assistant',
+        content: assistantMsg.content,
+        kind: 'chat',
+        createdAt: assistantMsg.createdAt,
+        user: null,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/communities/:handle/ai/analyze
+router.post('/:handle/ai/analyze', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'ai');
+    if (!instance) return res.status(404).json({ message: 'AI instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+    if (!isCommunityOwner(fresh, req.userId)) {
+      return res.status(403).json({ message: 'Only the owner can run analysis' });
+    }
+
+    const config = await getOrCreateAiConfig(fresh._id, instanceId);
+    if (!config.apiKey) {
+      return res.status(400).json({ message: 'Add an API key in AI settings first' });
+    }
+
+    const focus = String(req.body.focus || '').trim().slice(0, 500);
+    const context = await buildCommunityAiContext(fresh, config);
+    if (!context) {
+      return res.status(400).json({ message: 'No posts or chat messages to analyze yet' });
+    }
+
+    const system = buildSystemPrompt(config, fresh.name);
+    const userPrompt = [
+      'Analyze what community members have been writing recently.',
+      'Return: 1) main themes, 2) sentiment, 3) recurring questions, 4) actionable tips for the community owner.',
+      'Use short bullet points.',
+      focus ? `Extra focus from owner: ${focus}` : '',
+      `Community context:\n${context}`,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    let analysis;
+    try {
+      analysis = await generateCommunityAiText({
+        provider: config.provider,
+        apiKey: config.apiKey,
+        model: config.model,
+        system,
+        user: userPrompt,
+        maxTokens: Math.max(config.maxTokens || 1024, 1200),
+        temperature: Math.min(config.temperature ?? 0.7, 0.8),
+      });
+    } catch (aiErr) {
+      return res.status(aiErr.status || 502).json({ message: aiErr.message || 'AI analysis failed' });
+    }
+
+    const assistantMsg = await CommunityAiMessage.create({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      role: 'assistant',
+      content: String(analysis).slice(0, 16000),
+      kind: 'analysis',
+      user: null,
+    });
+
+    res.json({
+      analysis: assistantMsg.content,
+      message: {
+        _id: assistantMsg._id,
+        role: 'assistant',
+        content: assistantMsg.content,
+        kind: 'analysis',
+        createdAt: assistantMsg.createdAt,
+        user: null,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/communities/:handle/ai/messages
+router.delete('/:handle/ai/messages', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.query.instanceId || req.body?.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    if (!isCommunityOwner(community, req.userId)) {
+      return res.status(403).json({ message: 'Only the owner can clear AI history' });
+    }
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'ai');
+    if (!instance) return res.status(404).json({ message: 'AI instance not found' });
+
+    await CommunityAiMessage.deleteMany({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      kind: { $in: ['chat', 'analysis'] },
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /api/communities/:handle/ai/onboarding
+router.get('/:handle/ai/onboarding', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.query.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId query required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'ai');
+    if (!instance) return res.status(404).json({ message: 'AI instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+
+    const config = await getOrCreateAiConfig(fresh._id, instanceId);
+    let progress = await CommunityAiOnboarding.findOne({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      user: req.userId,
+    });
+
+    const messages = await CommunityAiMessage.find({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      kind: 'onboarding',
+      onboardingUser: req.userId,
+    })
+      .sort({ createdAt: 1 })
+      .limit(100)
+      .lean();
+
+    res.json({
+      ...serializeOnboardingProgress(progress, config),
+      hasApiKey: Boolean(config.apiKey),
+      isOwner: isCommunityOwner(fresh, req.userId),
+      messages: messages.map((m) => ({
+        _id: m._id,
+        role: m.role,
+        content: m.content,
+        kind: m.kind,
+        createdAt: m.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/communities/:handle/ai/onboarding/start
+router.post('/:handle/ai/onboarding/start', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'ai');
+    if (!instance) return res.status(404).json({ message: 'AI instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+    if (!isCommunityMember(fresh, req.userId)) {
+      return res.status(403).json({ message: 'Join the community first' });
+    }
+
+    const config = await getOrCreateAiConfig(fresh._id, instanceId);
+    if (!config.onboardingEnabled) {
+      return res.status(400).json({ message: 'AI Onboarding is disabled' });
+    }
+    if (!config.apiKey) {
+      return res.status(400).json({ message: 'Owner must add an API key in AI settings first' });
+    }
+
+    const forceRegenerate = Boolean(req.body.regenerate) && isCommunityOwner(fresh, req.userId);
+    // Scope to this instance: temporarily filter by ensuring config matches
+    const result = await ensureAiOnboardingForMember(fresh, req.userId, { forceRegenerate });
+    if (!result || result.instanceId !== instanceId) {
+      // Start specifically for this instance
+      const member = await User.findById(req.userId).select('username fullName avatar');
+      let progress = await CommunityAiOnboarding.findOne({
+        community: fresh._id,
+        appInstanceId: instanceId,
+        user: req.userId,
+      });
+      if (!progress) {
+        progress = new CommunityAiOnboarding({
+          community: fresh._id,
+          appInstanceId: instanceId,
+          user: req.userId,
+          status: 'pending',
+        });
+      }
+      if (!progress.welcomeMessage || forceRegenerate) {
+        const welcome = await generateOnboardingWelcome(fresh, config, member);
+        progress.welcomeMessage = String(welcome).slice(0, 8000);
+        if (forceRegenerate) {
+          await CommunityAiMessage.deleteMany({
+            community: fresh._id,
+            appInstanceId: instanceId,
+            kind: 'onboarding',
+            onboardingUser: req.userId,
+          });
+        }
+      }
+      if (progress.status === 'pending' || forceRegenerate) {
+        progress.status = 'in_progress';
+        progress.startedAt = new Date();
+        if (forceRegenerate) {
+          progress.completedStepIds = [];
+          progress.completedAt = null;
+        }
+      }
+      await progress.save();
+
+      const hasWelcomeMsg = await CommunityAiMessage.findOne({
+        community: fresh._id,
+        appInstanceId: instanceId,
+        kind: 'onboarding',
+        onboardingUser: req.userId,
+        role: 'assistant',
+      });
+      if (!hasWelcomeMsg) {
+        await CommunityAiMessage.create({
+          community: fresh._id,
+          appInstanceId: instanceId,
+          role: 'assistant',
+          content: progress.welcomeMessage,
+          kind: 'onboarding',
+          onboardingUser: req.userId,
+        });
+      }
+
+      const messages = await CommunityAiMessage.find({
+        community: fresh._id,
+        appInstanceId: instanceId,
+        kind: 'onboarding',
+        onboardingUser: req.userId,
+      })
+        .sort({ createdAt: 1 })
+        .limit(100)
+        .lean();
+
+      return res.json({
+        ...serializeOnboardingProgress(progress, config),
+        hasApiKey: true,
+        messages: messages.map((m) => ({
+          _id: m._id,
+          role: m.role,
+          content: m.content,
+          kind: m.kind,
+          createdAt: m.createdAt,
+        })),
+      });
+    }
+
+    const messages = await CommunityAiMessage.find({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      kind: 'onboarding',
+      onboardingUser: req.userId,
+    })
+      .sort({ createdAt: 1 })
+      .limit(100)
+      .lean();
+
+    res.json({
+      ...serializeOnboardingProgress(result.progress, config),
+      hasApiKey: true,
+      messages: messages.map((m) => ({
+        _id: m._id,
+        role: m.role,
+        content: m.content,
+        kind: m.kind,
+        createdAt: m.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(err.status || 500).json({ message: err.message || 'Failed to start onboarding' });
+  }
+});
+
+// @route   POST /api/communities/:handle/ai/onboarding/message
+router.post('/:handle/ai/onboarding/message', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    const content = String(req.body.content || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+    if (!content) return res.status(400).json({ message: 'Message is required' });
+    if (content.length > 4000) return res.status(400).json({ message: 'Message too long' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'ai');
+    if (!instance) return res.status(404).json({ message: 'AI instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+
+    const config = await getOrCreateAiConfig(fresh._id, instanceId);
+    if (!config.onboardingEnabled) {
+      return res.status(400).json({ message: 'AI Onboarding is disabled' });
+    }
+    if (!config.apiKey) {
+      return res.status(400).json({ message: 'Owner must add an API key in AI settings first' });
+    }
+
+    let progress = await CommunityAiOnboarding.findOne({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      user: req.userId,
+    });
+    if (!progress || progress.status === 'pending') {
+      await ensureAiOnboardingForMember(fresh, req.userId);
+      progress = await CommunityAiOnboarding.findOne({
+        community: fresh._id,
+        appInstanceId: instanceId,
+        user: req.userId,
+      });
+    }
+    if (!progress) {
+      return res.status(400).json({ message: 'Start onboarding first' });
+    }
+    if (progress.status === 'completed' || progress.status === 'skipped') {
+      return res.status(400).json({ message: 'Onboarding already finished' });
+    }
+
+    const userMsg = await CommunityAiMessage.create({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      role: 'user',
+      content,
+      kind: 'onboarding',
+      user: req.userId,
+      onboardingUser: req.userId,
+    });
+
+    const history = await CommunityAiMessage.find({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      kind: 'onboarding',
+      onboardingUser: req.userId,
+    })
+      .sort({ createdAt: -1 })
+      .limit(16)
+      .lean();
+    const historyText = history
+      .reverse()
+      .map((m) => `${m.role === 'assistant' ? 'Guide' : 'Member'}: ${m.content}`)
+      .join('\n');
+
+    const stepsText = (config.onboardingSteps || [])
+      .map((s) => {
+        const done = (progress.completedStepIds || []).includes(s.id);
+        return `- [${done ? 'x' : ' '}] ${s.title}${s.description ? `: ${s.description}` : ''}`;
+      })
+      .join('\n');
+
+    const system = [
+      buildSystemPrompt(config, fresh.name),
+      'You are guiding a new member through community onboarding.',
+      'Help them understand rules, answer questions, and gently push unfinished checklist steps.',
+      'Keep replies short unless they ask for detail.',
+      config.onboardingRulesText ? `Rules from owner:\n${config.onboardingRulesText}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const userPrompt = [
+      stepsText ? `Checklist progress:\n${stepsText}` : '',
+      historyText ? `Conversation:\n${historyText}` : '',
+      `Current message:\n${content}`,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    let replyText;
+    try {
+      replyText = await generateCommunityAiText({
+        provider: config.provider,
+        apiKey: config.apiKey,
+        model: config.model,
+        system,
+        user: userPrompt,
+        maxTokens: config.maxTokens,
+        temperature: config.temperature,
+      });
+    } catch (aiErr) {
+      await CommunityAiMessage.deleteOne({ _id: userMsg._id });
+      return res.status(aiErr.status || 502).json({ message: aiErr.message || 'AI request failed' });
+    }
+
+    const assistantMsg = await CommunityAiMessage.create({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      role: 'assistant',
+      content: String(replyText).slice(0, 16000),
+      kind: 'onboarding',
+      onboardingUser: req.userId,
+    });
+
+    if (progress.status === 'pending') {
+      progress.status = 'in_progress';
+      progress.startedAt = progress.startedAt || new Date();
+      await progress.save();
+    }
+
+    res.status(201).json({
+      userMessage: {
+        _id: userMsg._id,
+        role: 'user',
+        content: userMsg.content,
+        kind: 'onboarding',
+        createdAt: userMsg.createdAt,
+      },
+      assistantMessage: {
+        _id: assistantMsg._id,
+        role: 'assistant',
+        content: assistantMsg.content,
+        kind: 'onboarding',
+        createdAt: assistantMsg.createdAt,
+      },
+      progress: serializeOnboardingProgress(progress, config),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/communities/:handle/ai/onboarding/step
+router.post('/:handle/ai/onboarding/step', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    const stepId = String(req.body.stepId || '').trim();
+    const done = req.body.done !== false;
+    if (!instanceId || !stepId) {
+      return res.status(400).json({ message: 'instanceId and stepId required' });
+    }
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'ai');
+    if (!instance) return res.status(404).json({ message: 'AI instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+
+    const config = await getOrCreateAiConfig(fresh._id, instanceId);
+    const validIds = new Set((config.onboardingSteps || []).map((s) => s.id));
+    if (!validIds.has(stepId)) return res.status(400).json({ message: 'Unknown step' });
+
+    let progress = await CommunityAiOnboarding.findOne({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      user: req.userId,
+    });
+    if (!progress) {
+      progress = await CommunityAiOnboarding.create({
+        community: fresh._id,
+        appInstanceId: instanceId,
+        user: req.userId,
+        status: 'in_progress',
+        startedAt: new Date(),
+      });
+    }
+
+    const set = new Set(progress.completedStepIds || []);
+    if (done) set.add(stepId);
+    else set.delete(stepId);
+    progress.completedStepIds = [...set];
+    if (progress.status === 'pending') {
+      progress.status = 'in_progress';
+      progress.startedAt = progress.startedAt || new Date();
+    }
+
+    const allDone =
+      (config.onboardingSteps || []).length > 0 &&
+      (config.onboardingSteps || []).every((s) => set.has(s.id));
+    if (allDone) {
+      progress.status = 'completed';
+      progress.completedAt = new Date();
+    } else if (progress.status === 'completed') {
+      progress.status = 'in_progress';
+      progress.completedAt = null;
+    }
+    await progress.save();
+
+    res.json(serializeOnboardingProgress(progress, config));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/communities/:handle/ai/onboarding/finish
+router.post('/:handle/ai/onboarding/finish', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    const action = String(req.body.action || 'complete').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'ai');
+    if (!instance) return res.status(404).json({ message: 'AI instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+
+    const config = await getOrCreateAiConfig(fresh._id, instanceId);
+    let progress = await CommunityAiOnboarding.findOne({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      user: req.userId,
+    });
+    if (!progress) {
+      progress = await CommunityAiOnboarding.create({
+        community: fresh._id,
+        appInstanceId: instanceId,
+        user: req.userId,
+      });
+    }
+
+    if (action === 'skip') {
+      progress.status = 'skipped';
+    } else {
+      progress.status = 'completed';
+      progress.completedStepIds = (config.onboardingSteps || []).map((s) => s.id);
+    }
+    progress.completedAt = new Date();
+    await progress.save();
+
+    res.json(serializeOnboardingProgress(progress, config));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// --- Kanban / Roadmap ---
+
+async function getOrCreateKanbanMeta(communityOid, appInstanceId) {
+  let meta = await CommunityKanbanMeta.findOne({ community: communityOid, appInstanceId });
+  if (!meta) {
+    meta = await CommunityKanbanMeta.create({ community: communityOid, appInstanceId });
+  }
+  return meta;
+}
+
+function serializeKanbanCard(c) {
+  return {
+    _id: c._id,
+    columnId: c.columnId,
+    title: c.title,
+    description: c.description || '',
+    order: c.order ?? 0,
+    createdBy: c.createdBy || null,
+    createdAt: c.createdAt,
+    updatedAt: c.updatedAt,
+  };
+}
+
+// @route   GET /api/communities/:handle/kanban
+router.get('/:handle/kanban', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.query.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId query required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'kanban');
+    if (!instance) return res.status(404).json({ message: 'Kanban instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+
+    const meta = await getOrCreateKanbanMeta(fresh._id, instanceId);
+    const cards = await CommunityKanbanCard.find({
+      community: fresh._id,
+      appInstanceId: instanceId,
+    })
+      .sort({ order: 1, createdAt: 1 })
+      .lean();
+
+    res.json({
+      columns: (meta.columns || []).slice().sort((a, b) => (a.order || 0) - (b.order || 0)),
+      cards: cards.map(serializeKanbanCard),
+      isOwner: isCommunityOwner(fresh, req.userId),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   PATCH /api/communities/:handle/kanban/columns
+router.patch('/:handle/kanban/columns', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    if (!isCommunityOwner(community, req.userId)) {
+      return res.status(403).json({ message: 'Only the owner can edit columns' });
+    }
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'kanban');
+    if (!instance) return res.status(404).json({ message: 'Kanban instance not found' });
+
+    const raw = Array.isArray(req.body.columns) ? req.body.columns : [];
+    const columns = [];
+    for (let i = 0; i < Math.min(12, raw.length); i++) {
+      const c = raw[i];
+      const title = String(c?.title || '').trim().slice(0, 80);
+      if (!title) continue;
+      const id =
+        String(c?.id || '')
+          .trim()
+          .slice(0, 40) || `col_${i + 1}`;
+      columns.push({ id, title, order: i });
+    }
+    if (!columns.length) return res.status(400).json({ message: 'At least one column required' });
+
+    const meta = await getOrCreateKanbanMeta(fresh._id, instanceId);
+    const oldIds = new Set((meta.columns || []).map((c) => c.id));
+    const newIds = new Set(columns.map((c) => c.id));
+    const removed = [...oldIds].filter((id) => !newIds.has(id));
+    if (removed.length) {
+      const fallback = columns[0].id;
+      await CommunityKanbanCard.updateMany(
+        { community: fresh._id, appInstanceId: instanceId, columnId: { $in: removed } },
+        { $set: { columnId: fallback } }
+      );
+    }
+    meta.columns = columns;
+    await meta.save();
+    res.json({ columns: meta.columns });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/communities/:handle/kanban/cards
+router.post('/:handle/kanban/cards', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    const title = String(req.body.title || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+    if (!title) return res.status(400).json({ message: 'Title is required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'kanban');
+    if (!instance) return res.status(404).json({ message: 'Kanban instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+    if (!isCommunityOwner(fresh, req.userId)) {
+      return res.status(403).json({ message: 'Only the owner can edit the roadmap' });
+    }
+
+    const meta = await getOrCreateKanbanMeta(fresh._id, instanceId);
+    const colIds = (meta.columns || []).map((c) => c.id);
+    let columnId = String(req.body.columnId || '').trim();
+    if (!columnId || !colIds.includes(columnId)) columnId = colIds[0] || 'todo';
+
+    const maxOrder = await CommunityKanbanCard.findOne({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      columnId,
+    })
+      .sort({ order: -1 })
+      .select('order')
+      .lean();
+
+    const card = await CommunityKanbanCard.create({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      columnId,
+      title: title.slice(0, 200),
+      description: String(req.body.description || '').slice(0, 4000),
+      order: (maxOrder?.order ?? -1) + 1,
+      createdBy: req.userId,
+    });
+    res.status(201).json(serializeKanbanCard(card));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   PATCH /api/communities/:handle/kanban/cards/:cardId
+router.patch('/:handle/kanban/cards/:cardId', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'kanban');
+    if (!instance) return res.status(404).json({ message: 'Kanban instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+
+    const card = await CommunityKanbanCard.findOne({
+      _id: req.params.cardId,
+      community: fresh._id,
+      appInstanceId: instanceId,
+    });
+    if (!card) return res.status(404).json({ message: 'Card not found' });
+
+    if (!isCommunityOwner(fresh, req.userId)) {
+      return res.status(403).json({ message: 'Only the owner can edit the roadmap' });
+    }
+
+    if (req.body.title !== undefined) {
+      const t = String(req.body.title).trim();
+      if (!t) return res.status(400).json({ message: 'Title cannot be empty' });
+      card.title = t.slice(0, 200);
+    }
+    if (req.body.description !== undefined) {
+      card.description = String(req.body.description).slice(0, 4000);
+    }
+    if (req.body.columnId !== undefined) {
+      const meta = await getOrCreateKanbanMeta(fresh._id, instanceId);
+      const colIds = (meta.columns || []).map((c) => c.id);
+      const next = String(req.body.columnId).trim();
+      if (!colIds.includes(next)) return res.status(400).json({ message: 'Unknown column' });
+      card.columnId = next;
+    }
+    if (req.body.order !== undefined) {
+      const o = Number(req.body.order);
+      if (!Number.isNaN(o)) card.order = o;
+    }
+    await card.save();
+    res.json(serializeKanbanCard(card));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/communities/:handle/kanban/cards/:cardId
+router.delete('/:handle/kanban/cards/:cardId', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.query.instanceId || req.body?.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'kanban');
+    if (!instance) return res.status(404).json({ message: 'Kanban instance not found' });
+
+    const card = await CommunityKanbanCard.findOne({
+      _id: req.params.cardId,
+      community: fresh._id,
+      appInstanceId: instanceId,
+    });
+    if (!card) return res.status(404).json({ message: 'Card not found' });
+
+    if (!isCommunityOwner(fresh, req.userId)) {
+      return res.status(403).json({ message: 'Only the owner can edit the roadmap' });
+    }
+
+    await CommunityKanbanCard.deleteOne({ _id: card._id });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// --- Forms & Waitlist ---
+
+async function getOrCreateForm(communityOid, appInstanceId) {
+  let form = await CommunityForm.findOne({ community: communityOid, appInstanceId });
+  if (!form) {
+    form = await CommunityForm.create({ community: communityOid, appInstanceId });
+  }
+  return form;
+}
+
+function serializeForm(form) {
+  const fields = (form.fields || []).map((f) => ({
+    id: f.id,
+    label: f.label,
+    type: f.type || 'text',
+    required: f.required !== false,
+  }));
+  const title = String(form.title || '').trim();
+  return {
+    title,
+    description: form.description || '',
+    thankYouMessage: form.thankYouMessage || '',
+    isOpen: form.isOpen !== false,
+    fields,
+    configured: Boolean(title && fields.length > 0),
+    updatedAt: form.updatedAt,
+  };
+}
+
+function serializeSubmission(s) {
+  return {
+    _id: s._id,
+    answers: (s.answers || []).map((a) => ({ fieldId: a.fieldId, value: a.value || '' })),
+    submitterUserId: s.submitterUserId || null,
+    status: s.status || 'new',
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+  };
+}
+
+// @route   GET /api/communities/:handle/forms
+router.get('/:handle/forms', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.query.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId query required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'forms');
+    if (!instance) return res.status(404).json({ message: 'Forms instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+
+    const form = await getOrCreateForm(fresh._id, instanceId);
+    const owner = isCommunityOwner(fresh, req.userId);
+    let submissions = [];
+    let count = 0;
+    if (owner) {
+      submissions = await CommunityFormSubmission.find({
+        community: fresh._id,
+        appInstanceId: instanceId,
+      })
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .lean();
+      count = await CommunityFormSubmission.countDocuments({
+        community: fresh._id,
+        appInstanceId: instanceId,
+      });
+    } else {
+      count = await CommunityFormSubmission.countDocuments({
+        community: fresh._id,
+        appInstanceId: instanceId,
+      });
+    }
+
+    res.json({
+      form: serializeForm(form),
+      isOwner: owner,
+      submissionCount: count,
+      submissions: owner ? submissions.map(serializeSubmission) : [],
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   PATCH /api/communities/:handle/forms
+router.patch('/:handle/forms', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    if (!isCommunityOwner(community, req.userId)) {
+      return res.status(403).json({ message: 'Only the owner can edit the form' });
+    }
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'forms');
+    if (!instance) return res.status(404).json({ message: 'Forms instance not found' });
+
+    const form = await getOrCreateForm(fresh._id, instanceId);
+    const b = req.body || {};
+    if (b.title !== undefined) form.title = String(b.title).trim().slice(0, 200);
+    if (b.description !== undefined) form.description = String(b.description).slice(0, 4000);
+    if (b.thankYouMessage !== undefined) {
+      form.thankYouMessage = String(b.thankYouMessage).slice(0, 1000);
+    }
+    if (typeof b.isOpen === 'boolean') form.isOpen = b.isOpen;
+    if (Array.isArray(b.fields)) {
+      const fields = [];
+      for (const f of b.fields.slice(0, 20)) {
+        const label = String(f?.label || '').trim().slice(0, 120);
+        if (!label) continue;
+        const id =
+          String(f?.id || '')
+            .trim()
+            .slice(0, 40) || `field_${fields.length + 1}`;
+        const type = ['text', 'email', 'phone', 'textarea'].includes(f?.type) ? f.type : 'text';
+        fields.push({
+          id,
+          label,
+          type,
+          required: f?.required !== false,
+        });
+      }
+      form.fields = fields;
+    }
+    if (!String(form.title || '').trim() || !(form.fields || []).length) {
+      return res.status(400).json({
+        message: 'Form needs a title and at least one field',
+      });
+    }
+    await form.save();
+    res.json({ form: serializeForm(form), isOwner: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/communities/:handle/forms/submit
+router.post('/:handle/forms/submit', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'forms');
+    if (!instance) return res.status(404).json({ message: 'Forms instance not found' });
+    if (!canAccessChatInstance(fresh, req.userId, instance)) {
+      return res.status(403).json({ message: 'You cannot access this app' });
+    }
+
+    const form = await getOrCreateForm(fresh._id, instanceId);
+    if (!serializeForm(form).configured) {
+      return res.status(400).json({ message: 'Form is not set up yet' });
+    }
+    if (form.isOpen === false) {
+      return res.status(403).json({ message: 'This form is closed' });
+    }
+
+    const rawAnswers = Array.isArray(req.body.answers) ? req.body.answers : [];
+    const byId = Object.fromEntries(
+      rawAnswers.map((a) => [String(a.fieldId), String(a.value || '').trim().slice(0, 4000)])
+    );
+    const answers = [];
+    for (const field of form.fields || []) {
+      const value = byId[field.id] || '';
+      if (field.required !== false && !value) {
+        return res.status(400).json({ message: `Field "${field.label}" is required` });
+      }
+      if (field.type === 'email' && value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+        return res.status(400).json({ message: `Invalid email for "${field.label}"` });
+      }
+      if (field.type === 'phone' && value && value.replace(/[\s\-()]/g, '').length < 7) {
+        return res.status(400).json({ message: `Invalid phone for "${field.label}"` });
+      }
+      answers.push({ fieldId: field.id, value });
+    }
+
+    const sub = await CommunityFormSubmission.create({
+      community: fresh._id,
+      appInstanceId: instanceId,
+      answers,
+      submitterUserId: req.userId,
+      status: 'new',
+    });
+
+    res.status(201).json({
+      ok: true,
+      thankYouMessage: form.thankYouMessage,
+      submission: serializeSubmission(sub),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   PATCH /api/communities/:handle/forms/submissions/:submissionId
+router.patch('/:handle/forms/submissions/:submissionId', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.body.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    if (!isCommunityOwner(community, req.userId)) {
+      return res.status(403).json({ message: 'Only the owner can update submissions' });
+    }
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'forms');
+    if (!instance) return res.status(404).json({ message: 'Forms instance not found' });
+
+    const sub = await CommunityFormSubmission.findOne({
+      _id: req.params.submissionId,
+      community: fresh._id,
+      appInstanceId: instanceId,
+    });
+    if (!sub) return res.status(404).json({ message: 'Submission not found' });
+
+    if (req.body.status !== undefined) {
+      const st = String(req.body.status);
+      if (!['new', 'reviewed', 'archived'].includes(st)) {
+        return res.status(400).json({ message: 'Invalid status' });
+      }
+      sub.status = st;
+    }
+    await sub.save();
+    res.json(serializeSubmission(sub));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/communities/:handle/forms/submissions/:submissionId
+router.delete('/:handle/forms/submissions/:submissionId', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const instanceId = String(req.query.instanceId || '').trim();
+    if (!instanceId) return res.status(400).json({ message: 'instanceId required' });
+
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    if (!isCommunityOwner(community, req.userId)) {
+      return res.status(403).json({ message: 'Only the owner can delete submissions' });
+    }
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instance = findAppInstance(fresh, instanceId, 'forms');
+    if (!instance) return res.status(404).json({ message: 'Forms instance not found' });
+
+    const result = await CommunityFormSubmission.deleteOne({
+      _id: req.params.submissionId,
+      community: fresh._id,
+      appInstanceId: instanceId,
+    });
+    if (!result.deletedCount) return res.status(404).json({ message: 'Submission not found' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // @route   GET /api/communities/:handle/posts
 // @desc    Получить посты сообщества (до GET /:handle — порядок маршрутов)
 // @access  Public
@@ -2705,6 +4529,16 @@ router.post('/:handle/join', auth, async (req, res) => {
     });
 
     res.json({ message: 'Joined successfully', memberCount: community.memberCount });
+
+    // Fire-and-forget: AI onboarding welcome via owner's API key
+    void (async () => {
+      try {
+        const fresh = await communityByHandle(req.params.handle);
+        if (fresh) await ensureAiOnboardingForMember(fresh, req.userId);
+      } catch (e) {
+        console.error('AI onboarding on join failed:', e.message || e);
+      }
+    })();
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

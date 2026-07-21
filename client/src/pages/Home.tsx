@@ -2,18 +2,21 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
-  MessageCircle, Repeat2, Heart, 
-  Send, X,
-  MoreHorizontal, Pen, Trash, Unlink2,
+  X,
   Globe, Lock, Search, Users, Calendar, ArrowLeft
 } from 'lucide-react';
 import PostMediaGallery from '../components/Posts/PostMediaGallery';
 import PostComposer from '../components/Posts/PostComposer';
 import PostContentBody from '../components/Posts/PostContentBody';
+import { AnimatedPostMenuIcon } from '../components/Posts/PostMenuAnimatedIcons';
+import PostFeedActionButtons from '../components/Posts/PostFeedActionButtons';
+import { PostCommentsSection } from '../components/Posts/PostCommentsSection';
 import type { PostCoinAttachment } from '../types/postCoin';
 import type { PostLinkAttachment } from '../types/postLink';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 import HomeSidebarPromoCarousel from '../components/Home/HomeSidebarPromoCarousel';
+import HomeRecommendedCommunities from '../components/Home/HomeRecommendedCommunities';
+import PixelTrail from '../components/Home/PixelTrail';
 import FloatingMenu from '../components/Common/FloatingMenu';
 import EditTextModal from '../components/Common/EditTextModal';
 import { useToast } from '../context/ToastContext';
@@ -24,12 +27,15 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { POSTS_API as API_URL, USERS_API } from '../config/api';
 import { useTranslation } from '../i18n/useTranslation';
 
+/** Temporary: hide home feed while under construction */
+const HOME_FEED_UNDER_MAINTENANCE = true;
 
 interface PostComment {
   _id: string;
   content: string;
   createdAt: string;
   likesCount?: number;
+  parentId?: string | null;
   user: {
     _id: string;
     username: string;
@@ -219,6 +225,10 @@ const Home: React.FC = () => {
   }, [token]);
 
   useEffect(() => {
+    if (HOME_FEED_UNDER_MAINTENANCE) {
+      setLoading(false);
+      return;
+    }
     fetchPosts();
     fetchSuggestedUsers();
   }, [fetchPosts, fetchSuggestedUsers]);
@@ -317,16 +327,22 @@ const Home: React.FC = () => {
     );
   };
 
-  const handleSubmitComment = async (postId: string, source: 'inline' | 'sidebar') => {
+  const handleSubmitComment = async (
+    postId: string,
+    source: 'inline' | 'sidebar',
+    options?: { parentId?: string | null; content?: string },
+  ) => {
     if (!token) {
       window.dispatchEvent(new CustomEvent('openLogin'));
       return;
     }
-    const text = source === 'inline' ? inlineCommentText : commentText;
+    const text =
+      options?.content ?? (source === 'inline' ? inlineCommentText : commentText);
     if (!text.trim() || commentSubmitting) return;
 
     const id = String(postId);
     const current = getPostFromState(id);
+    const parentId = options?.parentId ? String(options.parentId) : undefined;
     try {
       setCommentSubmitting(true);
       const res = await fetch(`${API_URL}/${id}/comments`, {
@@ -335,13 +351,18 @@ const Home: React.FC = () => {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ content: text.trim() }),
+        body: JSON.stringify({
+          content: text.trim(),
+          ...(parentId ? { parentId } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || t('common.failedToPostComment'));
 
-      if (source === 'inline') setInlineCommentText('');
-      else setCommentText('');
+      if (!options?.content) {
+        if (source === 'inline') setInlineCommentText('');
+        else setCommentText('');
+      }
 
       const nextComments = [...(current?.comments || []), data.comment];
       updateCommentsOnPost(id, nextComments, data.commentsCount);
@@ -449,7 +470,9 @@ const Home: React.FC = () => {
       if (!res.ok) throw new Error(data.message || t('common.failedToDeleteComment'));
 
       const nextComments = (current.comments || []).filter(
-        (c) => String(c._id) !== commentId
+        (c) =>
+          String(c._id) !== commentId &&
+          String(c.parentId || '') !== commentId,
       );
       updateCommentsOnPost(id, nextComments, data.commentsCount);
       showToast(t('common.commentDeleted'));
@@ -536,49 +559,6 @@ const Home: React.FC = () => {
     }
   };
 
-  const renderCommentComposer = (options: {
-    variant: 'feed' | 'sidebar';
-    text: string;
-    onTextChange: (value: string) => void;
-    onSubmit: () => void;
-  }) => (
-    <div
-      className={options.variant === 'feed' ? 'flex gap-2 border-t border-neutral-100 pt-3' : 'flex gap-2'}
-      onClick={(e) => e.stopPropagation()}
-    >
-      <input
-        type="text"
-        value={options.text}
-        onChange={(e) => options.onTextChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            options.onSubmit();
-          }
-        }}
-        onClick={(e) => e.stopPropagation()}
-        placeholder={token ? t('home.writeComment') : t('home.signInToComment')}
-        disabled={!token || commentSubmitting}
-        className="min-w-0 flex-1 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm outline-none focus:border-black/30 focus:ring-2 focus:ring-black/5 disabled:opacity-60"
-      />
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          options.onSubmit();
-        }}
-        disabled={!token || !options.text.trim() || commentSubmitting}
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-white transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {commentSubmitting ? (
-          <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-        ) : (
-          <Send size={16} />
-        )}
-      </button>
-    </div>
-  );
-
   const renderCommentsPanel = (
     post: Post,
     options: {
@@ -590,126 +570,33 @@ const Home: React.FC = () => {
     }
   ) => {
     const postId = String(post._id);
-    const isLoading = commentsLoadingPostId === postId;
-    const part = options.part ?? 'all';
-
-    if (part === 'composer') {
-      return renderCommentComposer({
-        variant: options.variant,
-        text: options.text,
-        onTextChange: options.onTextChange,
-        onSubmit: options.onSubmit,
-      });
-    }
-
-    const listMaxHeight = options.variant === 'feed' ? 'max-h-[240px]' : '';
-
     return (
-      <div
-        className={options.variant === 'feed' ? 'mt-3 pt-3 border-t border-neutral-200' : ''}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {options.variant === 'sidebar' && (
-          <p className="text-sm font-semibold text-neutral-900 mb-3">{t('home.commentsHeading')}</p>
-        )}
-        <div className={`overflow-y-auto ${listMaxHeight} pr-1 -mr-1`}>
-          {isLoading ? (
-            <div className="flex justify-center py-6">
-              <div className="animate-spin rounded-full h-6 w-6 border-2 border-neutral-300 border-t-black" />
-            </div>
-          ) : (
-            <>
-              {(!post.comments || post.comments.length === 0) && (
-                <p className="py-4 text-center cursor-default text-sm text-neutral-500">
-                  {t('home.noCommentsHint')}
-                </p>
-              )}
-              <ul className={`space-y-3 ${options.variant === 'feed' ? 'mb-2' : 'mb-4'}`}>
-                {(post.comments || []).map((c) => (
-                  <li key={c._id} className="flex gap-2 text-sm group/comment">
-                    <Link to={`/@${c.user.username}`} className="shrink-0" onClick={(e) => e.stopPropagation()}>
-                      <img
-                        src={
-                          c.user.avatar ||
-                          `https://ui-avatars.com/api/?name=${encodeURIComponent(c.user.fullName || c.user.username)}&background=000&color=fff&size=${options.variant === 'feed' ? 32 : 24}&bold=true`
-                        }
-                        alt={c.user.fullName}
-                        className={`${options.variant === 'feed' ? 'w-8 h-8' : 'w-6 h-6'} rounded-full object-cover`}
-                      />
-                    </Link>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start gap-1">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-neutral-900">
-                            <Link
-                              to={`/@${c.user.username}`}
-                              className="hover:underline"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {c.user.fullName}
-                            </Link>
-                            {options.variant === 'sidebar' ? (
-                              <>
-                                <span className="text-neutral-500 px-1">·</span>
-                                <span className="text-neutral-500 font-normal">{formatPostDate(c.createdAt)}</span>
-                              </>
-                            ) : (
-                              <span className="text-neutral-500 font-normal ml-1">@{c.user.username}</span>
-                            )}
-                          </p>
-                          {options.variant === 'feed' && (
-                            <p className="mt-0.5 text-xs text-neutral-400">{formatPostDate(c.createdAt)}</p>
-                          )}
-                          <p className="text-neutral-800 whitespace-pre-wrap break-words">{c.content}</p>
-                        </div>
-                        {isCommentOwner(c) && (
-                          <div
-                            className="relative shrink-0"
-                          >
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const btn = e.currentTarget;
-                                setOpenCommentMenu((prev) =>
-                                  prev?.commentId === c._id
-                                    ? null
-                                    : {
-                                        commentId: c._id,
-                                        postId,
-                                        content: c.content,
-                                        rect: btn.getBoundingClientRect(),
-                                      }
-                                );
-                              }}
-                              className={`p-1 rounded-full transition-all ${
-                                openCommentMenu?.commentId === c._id
-                                  ? 'bg-black/10 text-black opacity-100'
-                                  : 'text-neutral-500 opacity-0 group-hover/comment:opacity-100 hover:bg-black/5'
-                              }`}
-                              aria-expanded={openCommentMenu?.commentId === c._id}
-                              aria-haspopup="menu"
-                            >
-                              <MoreHorizontal size={14} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </div>
-        {part === 'all' &&
-          renderCommentComposer({
-            text: options.text,
-            onTextChange: options.onTextChange,
-            onSubmit: options.onSubmit,
-            variant: options.variant,
-          })}
-      </div>
+      <PostCommentsSection
+        post={post}
+        variant={options.variant}
+        part={options.part}
+        text={options.text}
+        onTextChange={options.onTextChange}
+        onSubmit={options.onSubmit}
+        onSubmitReply={(parentId, content) =>
+          void handleSubmitComment(postId, options.variant === 'feed' ? 'inline' : 'sidebar', {
+            parentId,
+            content,
+          })
+        }
+        token={token}
+        commentSubmitting={commentSubmitting}
+        commentsLoading={commentsLoadingPostId === postId}
+        isCommentOwner={isCommentOwner}
+        openCommentMenu={openCommentMenu}
+        onCommentMenuToggle={(c, pid, rect, isOpen) => {
+          setOpenCommentMenu(
+            isOpen
+              ? null
+              : { commentId: c._id, postId: pid, content: c.content, rect },
+          );
+        }}
+      />
     );
   };
 
@@ -768,11 +655,11 @@ const Home: React.FC = () => {
           <button
             type="button"
             onClick={() => copyPostLink(String(post._id))}
-            className="rounded-full p-2 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-black"
             aria-label={t('home.copyPostLinkAria')}
             title={t('home.copyLinkTitle')}
           >
-            <Unlink2 size={18} />
+            <AnimatedPostMenuIcon kind="link" size={18} />
           </button>
         </div>
         <div className="flex min-h-0 flex-1 flex-col">
@@ -871,27 +758,55 @@ const Home: React.FC = () => {
           </div>
         </div>
 
-        <PostComposer
-          isOpen={isCreateOpen}
-          onOpen={() => setIsCreateOpen(true)}
-          content={newPostContent}
-          onContentChange={setNewPostContent}
-          media={newPostMedia}
-          onMediaChange={setNewPostMedia}
-          linkAttachment={newPostLink}
-          onLinkAttachmentChange={setNewPostLink}
-          coinAttachment={newPostCoin}
-          onCoinAttachmentChange={setNewPostCoin}
-          onCancel={closeComposer}
-          onSubmit={() => void handleCreatePost()}
-          isPosting={isPosting}
-          userAvatar={user?.avatar}
-          userFullName={user?.fullName}
-          token={token}
-        />
+        {!HOME_FEED_UNDER_MAINTENANCE && (
+          <PostComposer
+            isOpen={isCreateOpen}
+            onOpen={() => setIsCreateOpen(true)}
+            content={newPostContent}
+            onContentChange={setNewPostContent}
+            media={newPostMedia}
+            onMediaChange={setNewPostMedia}
+            linkAttachment={newPostLink}
+            onLinkAttachmentChange={setNewPostLink}
+            coinAttachment={newPostCoin}
+            onCoinAttachmentChange={setNewPostCoin}
+            onCancel={closeComposer}
+            onSubmit={() => void handleCreatePost()}
+            isPosting={isPosting}
+            userAvatar={user?.avatar}
+            userFullName={user?.fullName}
+            token={token}
+          />
+        )}
 
         {/* Posts Feed */}
-        <div className={`min-h-0 flex-1 overflow-y-auto ${mobileComposerFull ? 'hidden' : ''}`}>
+        <div
+          className={`min-h-0 flex-1 ${
+            HOME_FEED_UNDER_MAINTENANCE ? 'overflow-hidden' : `overflow-y-auto ${mobileComposerFull ? 'hidden' : ''}`
+          }`}
+        >
+          {HOME_FEED_UNDER_MAINTENANCE ? (
+            <div className="flex h-full min-h-0 flex-col items-center px-4 py-6 text-center sm:px-8 sm:py-8">
+              <p className="max-w-md shrink-0 text-lg font-semibold text-neutral-900 sm:text-xl">
+                {t('home.feedMaintenanceTitle')}
+              </p>
+              <p className="mt-2 max-w-md shrink-0 text-sm text-neutral-500 sm:text-base">
+                {t('home.feedMaintenanceBody')}
+              </p>
+              <div className="mt-6 flex min-h-0 w-full max-w-lg flex-1 items-center justify-center">
+                <video
+                  className="max-h-full max-w-full object-contain"
+                  src="/edit-video.mp4"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+          <HomeRecommendedCommunities />
           {posts.length > 0 ? posts.map(post => {
             // Определяем, отображать ли от имени сообщества
             const displayAsCommunity = post.community && !post.isPrivate;
@@ -948,13 +863,13 @@ const Home: React.FC = () => {
                       <div className="ml-auto relative" ref={menuOpenPostId === post._id ? menuRef : null}>
                         <button 
                           onClick={(e) => { e.stopPropagation(); setMenuOpenPostId(menuOpenPostId === post._id ? null : post._id); }}
-                          className={`post-feed-card-menu p-1 rounded-full transition-all ${
+                          className={`post-feed-card-menu flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${
                             menuOpenPostId === post._id 
                               ? 'bg-black/10 text-black opacity-100' 
                               : 'text-neutral-500 opacity-60 hover:bg-black/5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/article:opacity-100'
                           }`}
                         >
-                          <MoreHorizontal size={16} />
+                          <AnimatedPostMenuIcon kind="ellipsis" size={16} />
                         </button>
                         
                         {menuOpenPostId === post._id && (
@@ -969,7 +884,7 @@ const Home: React.FC = () => {
                               }}
                               className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-50 transition-colors flex items-center gap-2"
                             >
-                              <Unlink2 size={14} />
+                              <AnimatedPostMenuIcon kind="link" size={14} />
                               {t('home.copyLink')}
                             </button>
                             {isPostOwner(post) && !displayAsCommunity && (
@@ -979,7 +894,7 @@ const Home: React.FC = () => {
                                   onClick={() => handleDeletePost(post._id)}
                                   className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-red-50 transition-colors flex items-center gap-2 text-red-600"
                                 >
-                                  <Trash size={14} />
+                                  <AnimatedPostMenuIcon kind="trash" size={14} color="#dc2626" />
                                   {t('home.delete')}
                                 </button>
                               </>
@@ -1005,45 +920,19 @@ const Home: React.FC = () => {
                       />
                     )}
 
-                    <div className="flex items-center gap-1 mt-1 max-w-md">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleLike(String(post._id)); }}
-                        className={`flex items-center transition-colors group ${likedPosts.has(String(post._id)) ? 'text-red-500' : 'text-neutral-500 hover:text-red-500'}`}
-                      >
-                        <div className="p-2 rounded-full group-hover:bg-red-50 transition-colors">
-                          <Heart size={16} fill={likedPosts.has(String(post._id)) ? 'currentColor' : 'none'} />
-                        </div>
-                        <span className="text-xs">{formatCount(post.likesCount || 0)}</span>
-                      </button>
-
-                      <button 
-                        onClick={(e) => toggleFeedComments(String(post._id), e)} 
-                        className={`flex items-center transition-colors group ${
-                          expandedCommentsPostId === String(post._id)
-                            ? 'text-black'
-                            : 'text-neutral-500 hover:text-black'
-                        }`}
-                      >
-                        <div className="p-2 rounded-full group-hover:bg-black/5 transition-colors">
-                          <MessageCircle size={16} />
-                        </div>
-                        <span className="text-xs">{formatCount(post.commentsCount || 0)}</span>
-                      </button>
-
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleRepost(String(post._id)); }}
-                        className={`flex items-center transition-colors group ${
-                          repostedPosts.has(String(post._id)) 
-                          ? 'text-black'
-                          : 'text-neutral-500 hover:text-black'
-                        }`}
-                      >
-                        <div className="p-2 rounded-full group-hover:bg-black/5 transition-colors">
-                          <Repeat2 size={16} fill={repostedPosts.has(String(post._id)) ? 'currentColor' : 'none'} />
-                        </div>
-                        <span className="text-xs">{formatCount(post.repostsCount || 0)}</span>
-                      </button>
-                    </div>
+                    <PostFeedActionButtons
+                      postId={String(post._id)}
+                      likesCount={post.likesCount || 0}
+                      commentsCount={post.commentsCount || 0}
+                      repostsCount={post.repostsCount || 0}
+                      liked={likedPosts.has(String(post._id))}
+                      reposted={repostedPosts.has(String(post._id))}
+                      commentsExpanded={expandedCommentsPostId === String(post._id)}
+                      formatCount={formatCount}
+                      onLike={handleLike}
+                      onToggleComments={toggleFeedComments}
+                      onRepost={handleRepost}
+                    />
 
                     {expandedCommentsPostId === String(post._id) &&
                       renderCommentsPanel(post, {
@@ -1062,19 +951,42 @@ const Home: React.FC = () => {
               <p className="text-neutral-500">{t('home.emptyFeedSubtitle')}</p>
             </div>
           )}
+            </>
+          )}
         </div>
       </div>
 
       {/* RIGHT COLUMN — post details + market promo */}
       <div className="hidden h-full min-h-0 w-[400px] shrink-0 flex-col gap-4 py-4 pr-4 lg:flex">
         <div className="flex min-h-0 flex-1 flex-col">
-        {selectedPost ? (
-          renderSelectedPostDetail(selectedPost)
-        ) : (
-          <div className="flex h-full min-h-0 items-center justify-center rounded-2xl border border-neutral-200 bg-white px-6 text-neutral-500 shadow-sm">
-            <p className="text-center">{t('home.selectPostDetails')}</p>
-          </div>
-        )}
+          {HOME_FEED_UNDER_MAINTENANCE ? (
+            <div className="relative h-full min-h-0 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
+              <video
+                className="absolute inset-0 h-full w-full object-cover"
+                src="/error-video.mp4"
+                autoPlay
+                muted
+                loop
+                playsInline
+              />
+              <div className="absolute inset-0">
+                <PixelTrail
+                  gridSize={50}
+                  trailSize={0.1}
+                  maxAge={250}
+                  interpolate={5}
+                  color="#5227FF"
+                  gooeyFilter={{ id: 'home-maintenance-goo-filter', strength: 2 }}
+                />
+              </div>
+            </div>
+          ) : selectedPost ? (
+            renderSelectedPostDetail(selectedPost)
+          ) : (
+            <div className="flex h-full min-h-0 items-center justify-center rounded-2xl border border-neutral-200 bg-white px-6 text-neutral-500 shadow-sm">
+              <p className="text-center">{t('home.selectPostDetails')}</p>
+            </div>
+          )}
         </div>
         <HomeSidebarPromoCarousel />
       </div>
@@ -1106,7 +1018,7 @@ const Home: React.FC = () => {
           }}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
         >
-          <Pen size={14} />
+          <AnimatedPostMenuIcon kind="edit" size={14} />
           {t('common.edit')}
         </button>
         <div className="my-1 h-px bg-neutral-100" />
@@ -1120,7 +1032,7 @@ const Home: React.FC = () => {
           }}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
         >
-          <Trash size={14} />
+          <AnimatedPostMenuIcon kind="trash" size={14} color="#dc2626" />
           {t('common.delete')}
         </button>
       </FloatingMenu>

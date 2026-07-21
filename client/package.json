@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@animateicons/react": "^0.3.4",
     "@heroicons/react": "^2.0.0",
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
     "@tonconnect/ui-react": "^2.4.4",
     "@types/node": "^16.18.0",
     "@types/react": "^18.2.0",
