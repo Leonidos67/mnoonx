@@ -30,6 +30,7 @@ declare module '@animateicons/react/lucide' {
   export const ChevronDownIcon: IconComponent;
   export const EllipsisIcon: IconComponent;
   export const LinkIcon: IconComponent;
+  export const ExternalLinkIcon: IconComponent;
   export const UserPenIcon: IconComponent;
   export const TrashIcon: IconComponent;
   export const MessageCircleIcon: IconComponent;

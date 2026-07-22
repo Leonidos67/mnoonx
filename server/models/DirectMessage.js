@@ -18,6 +18,13 @@ const DirectMessageSchema = new mongoose.Schema({
     default: null,
   },
   body: { type: String, required: true },
+  /**
+   * Support bot UI: { nodeId, actions: [{ id, label }], expectInput?, ticketCategory?, consumed? }
+   */
+  meta: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
   /** Links mirrored copies in DM inboxes (sender + recipient). */
   clientMessageId: {
     type: String,

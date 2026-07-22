@@ -18,6 +18,14 @@ const {
   installStickerPackForUser,
 } = require('../services/stickers');
 const { assertCanMessage, isBlockedEitherWay } = require('../services/userBlocks');
+const {
+  resolveNode,
+  resolveActionTarget,
+  guessNodeFromText,
+  resolveSlashCommand,
+  normalizeLocale,
+} = require('../services/supportBot');
+const { createMessengerSupportTicket } = require('../services/supportTickets');
 
 router.use(auth);
 router.use((req, res, next) => {
@@ -25,10 +33,11 @@ router.use((req, res, next) => {
   next();
 });
 
-function displayNameForKind(kind) {
-  if (kind === 'system_mnoonx') return 'Team Mnoonx';
-  if (kind === 'system_support') return 'Mnoonx Support';
-  return 'Chat';
+function displayNameForKind(kind, locale = 'en') {
+  const ru = normalizeLocale(locale) === 'ru';
+  if (kind === 'system_mnoonx') return ru ? 'Команда Mnoonx' : 'Team Mnoonx';
+  if (kind === 'system_support') return ru ? 'Поддержка Mnoonx' : 'Mnoonx Support';
+  return ru ? 'Чат' : 'Chat';
 }
 
 function avatarForKind(kind, peer) {
@@ -41,6 +50,119 @@ function avatarForKind(kind, peer) {
   if (peer?.avatar) return peer.avatar;
   const name = peer?.fullName || peer?.username || 'U';
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=000&color=fff&bold=true`;
+}
+
+function serializeDirectMessage(m, conv, userId, peerLastReadAt, locale = 'en') {
+  const sender =
+    m.senderType === 'system'
+      ? conv.kind === 'system_mnoonx'
+        ? 'mnoonx'
+        : 'support'
+      : m.senderUserId?.toString() === String(userId)
+        ? 'user'
+        : 'peer';
+
+  const status =
+    sender === 'user' ? resolveOutboundMessageStatus(conv, peerLastReadAt, m.createdAt) : 'read';
+
+  let meta = m.meta && typeof m.meta === 'object' ? { ...m.meta } : null;
+  let text = m.body;
+
+  if (conv.kind === 'system_support' && meta?.nodeId) {
+    const resolved = resolveNode(meta.nodeId, locale);
+    if (resolved) {
+      if (!meta.consumed && resolved.actions?.length) {
+        meta = { ...meta, actions: resolved.actions };
+      }
+      if (meta.nodeId === 'ticket_created') {
+        const enBase = resolveNode('ticket_created', 'en')?.body || '';
+        const ruBase = resolveNode('ticket_created', 'ru')?.body || '';
+        let suffix = '';
+        if (enBase && m.body.startsWith(enBase)) suffix = m.body.slice(enBase.length);
+        else if (ruBase && m.body.startsWith(ruBase)) suffix = m.body.slice(ruBase.length);
+        else {
+          const markerEn = m.body.indexOf('\n\nTicket #');
+          const markerRu = m.body.indexOf('\n\nНомер тикета');
+          const idx = markerEn >= 0 ? markerEn : markerRu;
+          if (idx >= 0) suffix = m.body.slice(idx);
+        }
+        // Re-localize ticket suffix language
+        if (suffix) {
+          const shortMatch = suffix.match(/#([a-f0-9]+)/i);
+          const idMatch = suffix.match(/\/docs\/support\/([a-f0-9]+)/i);
+          const shortId = shortMatch?.[1];
+          const ticketId = idMatch?.[1];
+          if (shortId && ticketId) {
+            suffix =
+              normalizeLocale(locale) === 'ru'
+                ? `\n\nНомер тикета: #${shortId}\nОткрыть: /docs/support/${ticketId}`
+                : `\n\nTicket #${shortId}\nOpen: /docs/support/${ticketId}`;
+          }
+        }
+        text = resolved.body + suffix;
+      } else {
+        text = resolved.body;
+      }
+    }
+  }
+
+  const actions =
+    meta?.actions && Array.isArray(meta.actions) && !meta.consumed
+      ? meta.actions.map((a) => ({ id: String(a.id), label: String(a.label) }))
+      : undefined;
+
+  return {
+    id: m._id.toString(),
+    text,
+    sender,
+    timestamp: m.createdAt,
+    status,
+    ...(actions?.length ? { actions } : {}),
+    ...(meta?.nodeId ? { nodeId: meta.nodeId } : {}),
+    ...(meta?.expectInput ? { expectInput: meta.expectInput } : {}),
+  };
+}
+
+async function postSupportBotReply(conv, resolved) {
+  const meta = {
+    nodeId: resolved.nodeId,
+    actions: resolved.actions || [],
+    expectInput: resolved.expectInput || null,
+    ticketCategory: resolved.ticketCategory || null,
+    consumed: false,
+  };
+  const auto = await DirectMessage.create({
+    conversationId: conv._id,
+    senderType: 'system',
+    body: resolved.body,
+    meta,
+  });
+  conv.lastMessageText = resolved.body.slice(0, 200);
+  conv.lastMessageAt = auto.createdAt;
+  conv.lastMessageSenderType = 'system';
+  conv.lastMessageSenderUserId = null;
+  if (resolved.expectInput === 'ticket_description' && resolved.ticketCategory) {
+    conv.botState = {
+      expectInput: 'ticket_description',
+      ticketCategory: resolved.ticketCategory,
+      locale: resolved.locale || 'en',
+    };
+  } else {
+    conv.botState = null;
+  }
+  await conv.save();
+  return auto;
+}
+
+function applyTicketCreatedBody(resolved, shortId, ticketId, locale) {
+  const linkHint =
+    locale === 'ru'
+      ? `\n\nНомер тикета: #${shortId}\nОткрыть: /docs/support/${ticketId}`
+      : `\n\nTicket #${shortId}\nOpen: /docs/support/${ticketId}`;
+  return {
+    ...resolved,
+    body: `${resolved.body}${linkHint}`,
+  };
 }
 
 async function unreadCountForConversation(conv, userId) {
@@ -93,7 +215,8 @@ function resolveOutboundMessageStatus(conv, peerLastReadAt, messageCreatedAt) {
 
 router.get('/unread-count', async (req, res) => {
   try {
-    await ensureUserMessaging(req.userId);
+    const locale = normalizeLocale(req.query.locale || req.headers['accept-language']);
+    await ensureUserMessaging(req.userId, locale);
     const count = await countUnreadMessages(req.userId);
     res.json({ count });
   } catch (err) {
@@ -104,7 +227,8 @@ router.get('/unread-count', async (req, res) => {
 
 router.get('/conversations', async (req, res) => {
   try {
-    await ensureUserMessaging(req.userId);
+    const locale = normalizeLocale(req.query.locale || req.headers['accept-language']);
+    await ensureUserMessaging(req.userId, locale, { refreshBotLocale: true });
     const me = await User.findById(req.userId).select('blockedUserIds').lean();
     const myBlocked = new Set((me?.blockedUserIds || []).map((id) => id.toString()));
     const blockers = await User.find({ blockedUserIds: req.userId }).select('_id').lean();
@@ -177,7 +301,7 @@ router.get('/conversations', async (req, res) => {
           name:
             c.kind === 'dm'
               ? peer?.fullName || peer?.username || 'User'
-              : displayNameForKind(c.kind),
+              : displayNameForKind(c.kind, locale),
           username: peer?.username || null,
           avatar: avatarForKind(c.kind, peer),
           lastMessage: c.lastMessageText,
@@ -201,6 +325,9 @@ router.get('/conversations', async (req, res) => {
 
 router.get('/conversations/:id', async (req, res) => {
   try {
+    const locale = normalizeLocale(req.query.locale || req.headers['accept-language']);
+    await ensureUserMessaging(req.userId, locale, { refreshBotLocale: true });
+
     const conv = await Conversation.findOne({
       _id: req.params.id,
       ownerUserId: req.userId,
@@ -240,36 +367,16 @@ router.get('/conversations/:id', async (req, res) => {
         name:
           conv.kind === 'dm'
             ? peer?.fullName || peer?.username || 'User'
-            : displayNameForKind(conv.kind),
+            : displayNameForKind(conv.kind, locale),
         username: peer?.username || null,
         avatar: avatarForKind(conv.kind, peer),
         isReadOnly: conv.kind === 'system_mnoonx',
         isOnline: conv.kind !== 'dm',
         officialChannel: conv.kind === 'system_mnoonx',
       },
-      messages: messages.map((m) => {
-        const sender =
-          m.senderType === 'system'
-            ? conv.kind === 'system_mnoonx'
-              ? 'mnoonx'
-              : 'support'
-            : m.senderUserId?.toString() === req.userId.toString()
-              ? 'user'
-              : 'peer';
-
-        const status =
-          sender === 'user'
-            ? resolveOutboundMessageStatus(conv, peerLastReadAt, m.createdAt)
-            : 'read';
-
-        return {
-          id: m._id.toString(),
-          text: m.body,
-          sender,
-          timestamp: m.createdAt,
-          status,
-        };
-      }),
+      messages: messages.map((m) =>
+        serializeDirectMessage(m, conv, req.userId, peerLastReadAt, locale)
+      ),
     });
   } catch (err) {
     console.error(err);
@@ -390,25 +497,44 @@ router.post('/conversations/:id/messages', async (req, res) => {
       outboundStatus = resolveOutboundMessageStatus(conv, peerLastReadAt, msg.createdAt);
     }
 
+    let botReply = null;
     if (conv.kind === 'system_support') {
-      setTimeout(async () => {
-        try {
-          const reply =
-            'Thanks for your message! Our support team will get back to you shortly. Typical response time is under 2 hours.';
-          const auto = await DirectMessage.create({
-            conversationId: conv._id,
-            senderType: 'system',
-            body: reply,
+      const locale = normalizeLocale(req.body?.locale || req.headers['accept-language']);
+      try {
+        const slashNode = resolveSlashCommand(text);
+        const awaitingTicket =
+          conv.botState?.expectInput === 'ticket_description' && conv.botState?.ticketCategory;
+
+        if (awaitingTicket && !slashNode) {
+          const { ticket, shortId } = await createMessengerSupportTicket({
+            userId: req.userId,
+            category: conv.botState.ticketCategory,
+            description: text,
           });
-          conv.lastMessageText = reply.slice(0, 200);
-          conv.lastMessageAt = auto.createdAt;
-          conv.lastMessageSenderType = 'system';
-          conv.lastMessageSenderUserId = null;
+          conv.botState = null;
           await conv.save();
-        } catch (e) {
-          console.error('Support auto-reply error:', e);
+          let resolved = resolveNode('ticket_created', locale);
+          resolved = applyTicketCreatedBody(resolved, shortId, ticket.id, locale);
+          resolved.locale = locale;
+          const auto = await postSupportBotReply(conv, resolved);
+          botReply = serializeDirectMessage(auto, conv, req.userId, null, locale);
+        } else {
+          if (slashNode && awaitingTicket) {
+            conv.botState = null;
+            await conv.save();
+          }
+          const guessed = slashNode || guessNodeFromText(text);
+          const nodeId = guessed || 'free_text_fallback';
+          const resolved = resolveNode(nodeId, locale);
+          if (resolved) {
+            resolved.locale = locale;
+            const auto = await postSupportBotReply(conv, resolved);
+            botReply = serializeDirectMessage(auto, conv, req.userId, null, locale);
+          }
         }
-      }, 800);
+      } catch (e) {
+        console.error('Support bot reply error:', e);
+      }
     }
 
     res.status(201).json({
@@ -417,9 +543,110 @@ router.post('/conversations/:id/messages', async (req, res) => {
       sender: 'user',
       timestamp: msg.createdAt,
       status: outboundStatus,
+      ...(botReply ? { botReply } : {}),
     });
   } catch (err) {
     console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/** Support bot button press */
+router.post('/conversations/:id/bot-action', async (req, res) => {
+  try {
+    const actionId = String(req.body?.actionId || '').trim();
+    const messageId = String(req.body?.messageId || '').trim();
+    const locale = normalizeLocale(req.body?.locale || req.headers['accept-language']);
+
+    if (!actionId) {
+      return res.status(400).json({ message: 'actionId is required' });
+    }
+
+    const conv = await Conversation.findOne({
+      _id: req.params.id,
+      ownerUserId: req.userId,
+      hiddenAt: null,
+    });
+    if (!conv) return res.status(404).json({ message: 'Conversation not found' });
+    if (conv.kind !== 'system_support') {
+      return res.status(400).json({ message: 'Bot actions only work in Support chat' });
+    }
+
+    let sourceMsg = null;
+    if (messageId) {
+      sourceMsg = await DirectMessage.findOne({
+        _id: messageId,
+        conversationId: conv._id,
+        senderType: 'system',
+        deletedAt: null,
+      });
+    }
+    if (!sourceMsg) {
+      sourceMsg = await DirectMessage.findOne({
+        conversationId: conv._id,
+        senderType: 'system',
+        deletedAt: null,
+        'meta.actions.0': { $exists: true },
+      }).sort({ createdAt: -1 });
+    }
+
+    const allowed =
+      sourceMsg?.meta?.actions?.some((a) => String(a.id) === actionId) ||
+      Boolean(resolveActionTarget(actionId));
+    if (!allowed) {
+      return res.status(400).json({ message: 'Unknown action' });
+    }
+
+    const targetId = resolveActionTarget(actionId);
+    if (!targetId) {
+      return res.status(400).json({ message: 'Unknown action' });
+    }
+
+    const sourceNodeId = sourceMsg?.meta?.nodeId || null;
+    const localizedSource = sourceNodeId ? resolveNode(sourceNodeId, locale) : null;
+    const label =
+      localizedSource?.actions?.find((a) => String(a.id) === actionId)?.label || actionId;
+
+    if (sourceMsg?.meta) {
+      sourceMsg.meta = { ...sourceMsg.meta, consumed: true };
+      sourceMsg.markModified('meta');
+      await sourceMsg.save();
+    }
+
+    const userMsg = await DirectMessage.create({
+      conversationId: conv._id,
+      senderType: 'user',
+      senderUserId: req.userId,
+      body: label,
+      clientMessageId: randomUUID(),
+    });
+    conv.lastMessageText = label.slice(0, 200);
+    conv.lastMessageAt = userMsg.createdAt;
+    conv.lastMessageSenderType = 'user';
+    conv.lastMessageSenderUserId = req.userId;
+
+    const resolved = resolveNode(targetId, locale);
+    if (!resolved) {
+      await conv.save();
+      return res.status(400).json({ message: 'Unknown bot node' });
+    }
+    // Always persist bot reply in the UI language
+    resolved.locale = locale;
+    const auto = await postSupportBotReply(conv, resolved);
+
+    await ConversationReadState.findOneAndUpdate(
+      { conversationId: conv._id, userId: req.userId },
+      { $set: { lastReadAt: auto.createdAt } },
+      { upsert: true }
+    );
+
+    res.status(201).json({
+      userMessage: serializeDirectMessage(userMsg, conv, req.userId, null, locale),
+      botMessage: serializeDirectMessage(auto, conv, req.userId, null, locale),
+      consumedMessageId: sourceMsg?._id?.toString() || null,
+    });
+  } catch (err) {
+    console.error('Support bot-action error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

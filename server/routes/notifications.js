@@ -5,6 +5,12 @@ const User = require('../models/User');
 const auth = require('../middleware/auth');
 const { ensureUserMessaging } = require('../services/messaging');
 
+function requestLocale(req) {
+  const raw = req.query.locale || req.headers['accept-language'] || 'en';
+  const s = String(raw).toLowerCase();
+  return s.startsWith('ru') ? 'ru' : 'en';
+}
+
 router.use(auth);
 router.use((req, res, next) => {
   if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
@@ -13,7 +19,7 @@ router.use((req, res, next) => {
 
 router.get('/unread-count', async (req, res) => {
   try {
-    await ensureUserMessaging(req.userId);
+    await ensureUserMessaging(req.userId, requestLocale(req));
     const mentions = await Notification.countDocuments({
       userId: req.userId,
       read: false,
@@ -32,7 +38,7 @@ router.get('/unread-count', async (req, res) => {
 
 router.get('/', async (req, res) => {
   try {
-    await ensureUserMessaging(req.userId);
+    await ensureUserMessaging(req.userId, requestLocale(req));
     const tab = req.query.tab === 'mentions' ? 'mentions' : 'all';
     const filter = { userId: req.userId };
     if (tab === 'mentions') filter.type = 'mention';

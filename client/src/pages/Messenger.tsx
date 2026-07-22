@@ -26,6 +26,9 @@ import MessengerAnimojiAttachPanel from '../components/Messenger/MessengerAnimoj
 import MessengerStickersAttachPanel from '../components/Messenger/MessengerStickersAttachPanel';
 import MessengerCoinAttachPanel from '../components/Messenger/MessengerCoinAttachPanel';
 import MessengerMessageBody from '../components/Messenger/MessengerMessageBody';
+import MessengerSupportBotActions from '../components/Messenger/MessengerSupportBotActions';
+import MessengerSupportSlashHints from '../components/Messenger/MessengerSupportSlashHints';
+import { filterSupportSlashCommands } from '../constants/supportSlashCommands';
 import MessengerChatContextMenu, {
   type ChatContextMenuAnchor,
   type MessengerChatActionId,
@@ -85,6 +88,10 @@ interface ApiMessage {
   sender: 'user' | 'support' | 'mnoonx' | 'peer';
   timestamp: string;
   status: 'sent' | 'delivered' | 'read';
+  actions?: { id: string; label: string }[];
+  nodeId?: string;
+  expectInput?: string;
+  botReply?: ApiMessage;
 }
 
 interface ApiConversation {
@@ -138,7 +145,7 @@ function dedupeSystemChats(list: ApiConversation[]): ApiConversation[] {
 const Messenger: React.FC = () => {
   const { token, user } = useAuth();
   const { refreshUnreads } = useUnreads();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
   const navigate = useNavigate();
@@ -164,6 +171,8 @@ const Messenger: React.FC = () => {
   const [loadingChats, setLoadingChats] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
+  const [botActionBusyId, setBotActionBusyId] = useState<string | null>(null);
+  const [slashHintIndex, setSlashHintIndex] = useState(0);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [attachMenuView, setAttachMenuView] = useState<'main' | 'animoji' | 'stickers' | 'coin'>(
     'main'
@@ -230,9 +239,12 @@ const Messenger: React.FC = () => {
       setLoadingChats(true);
     }
     try {
-      const res = await fetch(`${MSG_API}/conversations`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${MSG_API}/conversations?locale=${encodeURIComponent(locale)}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       if (res.ok) {
         const data: ApiConversation[] = await res.json();
         setChats(dedupeSystemChats(data));
@@ -242,7 +254,7 @@ const Messenger: React.FC = () => {
     } finally {
       setLoadingChats(false);
     }
-  }, [token]);
+  }, [token, locale]);
 
   const loadMessages = useCallback(
     async (conversationId: string, options?: { silent?: boolean }) => {
@@ -251,9 +263,12 @@ const Messenger: React.FC = () => {
         setLoadingMessages(true);
       }
       try {
-        const res = await fetch(`${MSG_API}/conversations/${conversationId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(
+          `${MSG_API}/conversations/${conversationId}?locale=${encodeURIComponent(locale)}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
         if (res.ok) {
           const data = await res.json();
           const incoming: ApiMessage[] = data.messages || [];
@@ -294,7 +309,7 @@ const Messenger: React.FC = () => {
         }
       }
     },
-    [token, loadChats, refreshUnreads]
+    [token, loadChats, refreshUnreads, locale]
   );
 
   const persistChatPrefs = useCallback((next: MessengerChatPrefs) => {
@@ -504,19 +519,20 @@ const Messenger: React.FC = () => {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ body: text.trim() }),
+          body: JSON.stringify({ body: text.trim(), locale }),
         });
         if (res.ok) {
           const sent: ApiMessage = await res.json();
           stickToBottomRef.current = true;
-          setMessages((prev) => [...prev, sent]);
+          setMessages((prev) => {
+            const next = [...prev, sent];
+            if (sent.botReply) next.push(sent.botReply);
+            return next;
+          });
           scrollToBottom('smooth');
           messageInputRef.current?.focus();
           void loadChats({ silent: true });
           refreshUnreads();
-          if (selectedMeta?.kind === 'system_support') {
-            window.setTimeout(() => void loadMessages(selectedId, { silent: true }), 1200);
-          }
         } else {
           const body = await res.json().catch(() => ({}));
           const msg = (body as { message?: string }).message;
@@ -530,7 +546,89 @@ const Messenger: React.FC = () => {
         setSending(false);
       }
     },
-    [selectedId, token, selectedMeta?.isReadOnly, selectedMeta?.kind, isChatBlocked, sending, loadChats, refreshUnreads, scrollToBottom, loadMessages, showToast, t]
+    [selectedId, token, selectedMeta?.isReadOnly, isChatBlocked, sending, loadChats, refreshUnreads, scrollToBottom, showToast, t, locale]
+  );
+
+  const lastSupportActionsMessageId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const m = messages[i];
+      if (m.sender === 'support' && m.actions && m.actions.length > 0) return m.id;
+    }
+    return null;
+  }, [messages]);
+
+  const supportSlashHints = useMemo(() => {
+    if (selectedMeta?.kind !== 'system_support') return [];
+    return filterSupportSlashCommands(newMessage);
+  }, [selectedMeta?.kind, newMessage]);
+
+  useEffect(() => {
+    setSlashHintIndex(0);
+  }, [newMessage, selectedMeta?.kind]);
+
+  const applySupportSlashCommand = useCallback(
+    (command: string) => {
+      setNewMessage(command);
+      setSlashHintIndex(0);
+      requestAnimationFrame(() => messageInputRef.current?.focus());
+    },
+    []
+  );
+
+  const handleSupportBotAction = useCallback(
+    async (messageId: string, actionId: string) => {
+      if (!selectedId || !token || selectedMeta?.kind !== 'system_support' || botActionBusyId) return;
+      setBotActionBusyId(actionId);
+      try {
+        const res = await fetch(`${MSG_API}/conversations/${selectedId}/bot-action`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ actionId, messageId, locale }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          showToast((body as { message?: string }).message || t('messenger.sendFailed'), 'error');
+          return;
+        }
+        const data = (await res.json()) as {
+          userMessage: ApiMessage;
+          botMessage: ApiMessage;
+          consumedMessageId?: string | null;
+        };
+        stickToBottomRef.current = true;
+        setMessages((prev) => {
+          const withoutActions = prev.map((m) =>
+            m.id === data.consumedMessageId || m.id === messageId
+              ? { ...m, actions: undefined }
+              : m
+          );
+          return [...withoutActions, data.userMessage, data.botMessage];
+        });
+        scrollToBottom('smooth');
+        void loadChats({ silent: true });
+        refreshUnreads();
+      } catch (e) {
+        console.error(e);
+        showToast(t('messenger.sendFailed'), 'error');
+      } finally {
+        setBotActionBusyId(null);
+      }
+    },
+    [
+      selectedId,
+      token,
+      selectedMeta?.kind,
+      botActionBusyId,
+      locale,
+      showToast,
+      t,
+      scrollToBottom,
+      loadChats,
+      refreshUnreads,
+    ]
   );
 
   const sendAnimoji = (item: MessengerEmojiItem) => {
@@ -1294,6 +1392,18 @@ const Messenger: React.FC = () => {
                           <MessengerMessageBody text={message.text} />
                         )}
                       </div>
+                      {selectedMeta.kind === 'system_support' &&
+                        message.sender === 'support' &&
+                        message.id === lastSupportActionsMessageId &&
+                        message.actions &&
+                        message.actions.length > 0 && (
+                          <MessengerSupportBotActions
+                            actions={message.actions}
+                            busyActionId={botActionBusyId}
+                            disabled={sending}
+                            onAction={(actionId) => void handleSupportBotAction(message.id, actionId)}
+                          />
+                        )}
                       <div
                         className={`mt-1 flex items-center gap-1 text-xs text-neutral-400 ${
                           message.sender === 'user' ? 'justify-end' : 'justify-start'
@@ -1314,13 +1424,11 @@ const Messenger: React.FC = () => {
               <div className="p-4 text-center">
                 <div className="mb-2 flex items-center justify-center gap-2">
                   <Lock className="h-4 w-4 text-neutral-500" />
-                  <span className="text-sm font-medium text-neutral-600">Official MNOONX Channel</span>
+                  <span className="text-sm font-medium text-neutral-600">
+                    {t('messenger.officialChannelTitle')}
+                  </span>
                 </div>
-                <p className="text-xs text-neutral-500">
-                  This is the official MNOONX notification channel.
-                  <br />
-                  MNOONX will always use verified accounts to communicate with you.
-                </p>
+                <p className="text-xs text-neutral-500">{t('messenger.officialChannelHint')}</p>
               </div>
             </div>
           ) : isChatBlocked ? (
@@ -1378,14 +1486,74 @@ const Messenger: React.FC = () => {
                 </div>
               )}
               <div className="relative min-w-0">
+                {supportSlashHints.length > 0 && (
+                  <MessengerSupportSlashHints
+                    commands={supportSlashHints}
+                    activeIndex={Math.min(slashHintIndex, supportSlashHints.length - 1)}
+                    getDescription={(key) => t(key)}
+                    onSelect={applySupportSlashCommand}
+                    onHoverIndex={setSlashHintIndex}
+                  />
+                )}
                 <input
                   ref={messageInputRef}
                   type="text"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && void sendMessage()}
-                  placeholder="Type a message..."
+                  onKeyDown={(e) => {
+                    if (supportSlashHints.length > 0) {
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setSlashHintIndex((i) => (i + 1) % supportSlashHints.length);
+                        return;
+                      }
+                      if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setSlashHintIndex(
+                          (i) => (i - 1 + supportSlashHints.length) % supportSlashHints.length
+                        );
+                        return;
+                      }
+                      if (e.key === 'Tab') {
+                        e.preventDefault();
+                        const cmd =
+                          supportSlashHints[
+                            Math.min(slashHintIndex, supportSlashHints.length - 1)
+                          ]?.command;
+                        if (cmd) applySupportSlashCommand(cmd);
+                        return;
+                      }
+                      if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setNewMessage('');
+                        return;
+                      }
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        const trimmed = newMessage.trim();
+                        const exact = supportSlashHints.find((c) => c.command === trimmed);
+                        const cmd =
+                          exact?.command ||
+                          supportSlashHints[
+                            Math.min(slashHintIndex, supportSlashHints.length - 1)
+                          ]?.command;
+                        if (!cmd) return;
+                        setSlashHintIndex(0);
+                        setNewMessage('');
+                        sendIconRef.current?.startAnimation();
+                        void sendMessageWithBody(cmd);
+                        return;
+                      }
+                    }
+                    if (e.key === 'Enter') void sendMessage();
+                  }}
+                  placeholder={
+                    selectedMeta.kind === 'system_support'
+                      ? t('messenger.supportCommands.placeholder')
+                      : t('messenger.typeMessage')
+                  }
                   className="w-full py-3 pl-11 pr-20 text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-black/10"
+                  autoComplete="off"
                 />
 
                 <div ref={attachMenuRef} className="absolute left-2 top-1/2 z-[3] -translate-y-1/2">

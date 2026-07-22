@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useState, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
+import { useLanguage } from './LanguageContext';
 
 import { API_BASE as API } from '../config/api';
 
@@ -14,6 +15,7 @@ const UnreadsContext = createContext<UnreadsContextType | undefined>(undefined);
 
 export const UnreadsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { token } = useAuth();
+  const { locale } = useLanguage();
   const [messageUnread, setMessageUnread] = useState(0);
   const [notificationUnread, setNotificationUnread] = useState(0);
   const [mentionUnread, setMentionUnread] = useState(0);
@@ -26,10 +28,11 @@ export const UnreadsProvider: React.FC<{ children: ReactNode }> = ({ children })
       return;
     }
     const headers = { Authorization: `Bearer ${token}` };
+    const q = `?locale=${encodeURIComponent(locale)}`;
     try {
       const [msgRes, notifRes] = await Promise.all([
-        fetch(`${API}/messages/unread-count`, { headers }),
-        fetch(`${API}/notifications/unread-count`, { headers }),
+        fetch(`${API}/messages/unread-count${q}`, { headers }),
+        fetch(`${API}/notifications/unread-count${q}`, { headers }),
       ]);
       if (msgRes.ok) {
         const data = await msgRes.json();
@@ -43,7 +46,7 @@ export const UnreadsProvider: React.FC<{ children: ReactNode }> = ({ children })
     } catch {
       /* ignore */
     }
-  }, [token]);
+  }, [token, locale]);
 
   useEffect(() => {
     void refreshUnreads();

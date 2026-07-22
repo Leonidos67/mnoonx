@@ -20,8 +20,18 @@ const NotificationSchema = new mongoose.Schema({
     default: null,
   },
   link: { type: String, default: '' },
+  /** Stable key for welcome/onboarding seeds — prevents duplicate inserts on race. */
+  seedKey: { type: String, default: null, trim: true },
   read: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now, index: true },
 });
+
+NotificationSchema.index(
+  { userId: 1, seedKey: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { seedKey: { $type: 'string' } },
+  }
+);
 
 module.exports = mongoose.model('Notification', NotificationSchema);

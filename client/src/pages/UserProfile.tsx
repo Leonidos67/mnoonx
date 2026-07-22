@@ -1750,14 +1750,6 @@ const UserProfileComponent: React.FC = () => {
                     <Pencil size={14} aria-hidden />
                     {t('userProfile.addBioDetails')}
                   </button>
-                  <button
-                    type="button"
-                    onClick={openProfileDetailsEditor}
-                    className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:underline"
-                  >
-                    <LinkIcon size={14} aria-hidden />
-                    {t('userProfile.addSocialLinks')}
-                  </button>
                 </div>
               ) : null}
             </>

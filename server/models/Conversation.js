@@ -32,6 +32,14 @@ const ConversationSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   /** When set, hidden from this user's inbox (soft delete) */
   hiddenAt: { type: Date, default: null },
+  /**
+   * Support bot pending state, e.g.
+   * { expectInput: 'ticket_description', ticketCategory: 'bug', locale: 'ru' }
+   */
+  botState: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
 });
 
 ConversationSchema.index(
