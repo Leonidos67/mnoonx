@@ -471,51 +471,72 @@ const CommunityFormsPanel: React.FC<CommunityFormsPanelProps> = ({
               {t('community.formsPanel.emptyWaitlist')}
             </p>
           ) : (
-            <ul className="mx-auto max-w-2xl space-y-3">
-              {submissions.map((s) => (
-                <li
-                  key={s._id}
-                  className="rounded-2xl border border-neutral-200 bg-white p-4"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <p className="text-xs text-neutral-500">
-                      {new Date(s.createdAt).toLocaleString()}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      {renderSelect(
-                        s.status,
-                        (v) => void setStatus(s._id, v as Submission['status']),
-                        [
-                          { value: 'new', label: t('community.formsPanel.statusNew') },
-                          { value: 'reviewed', label: t('community.formsPanel.statusReviewed') },
-                          { value: 'archived', label: t('community.formsPanel.statusArchived') },
-                        ],
-                        'min-w-[140px]'
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => void deleteSubmission(s._id)}
-                        className="flex h-10 w-10 items-center justify-center rounded-xl border border-neutral-200 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+            <div className="overflow-x-auto rounded-2xl border border-neutral-200">
+              <table className="w-full min-w-max border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-neutral-200 bg-neutral-50">
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500">
+                      {t('community.formsPanel.colSubmitted')}
+                    </th>
+                    {(form?.fields || []).map((field) => (
+                      <th
+                        key={field.id}
+                        className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500"
                       >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                  <dl className="mt-3 space-y-2">
-                    {s.answers.map((a) => (
-                      <div key={a.fieldId}>
-                        <dt className="text-xs font-medium text-neutral-500">
-                          {labelFor(a.fieldId)}
-                        </dt>
-                        <dd className="whitespace-pre-wrap text-sm text-neutral-900">
-                          {a.value || '—'}
-                        </dd>
-                      </div>
+                        {field.label || labelFor(field.id)}
+                      </th>
                     ))}
-                  </dl>
-                </li>
-              ))}
-            </ul>
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500">
+                      {t('community.formsPanel.colStatus')}
+                    </th>
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-neutral-500">
+                      {t('community.formsPanel.colActions')}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {submissions.map((s) => (
+                    <tr key={s._id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50/60">
+                      <td className="whitespace-nowrap px-4 py-3 text-neutral-500">
+                        {new Date(s.createdAt).toLocaleString()}
+                      </td>
+                      {(form?.fields || []).map((field) => {
+                        const answer = s.answers.find((a) => a.fieldId === field.id);
+                        return (
+                          <td key={field.id} className="max-w-xs px-4 py-3 text-neutral-900">
+                            <span className="line-clamp-2 whitespace-pre-wrap break-words">
+                              {answer?.value || '—'}
+                            </span>
+                          </td>
+                        );
+                      })}
+                      <td className="px-4 py-3">
+                        {renderSelect(
+                          s.status,
+                          (v) => void setStatus(s._id, v as Submission['status']),
+                          [
+                            { value: 'new', label: t('community.formsPanel.statusNew') },
+                            { value: 'reviewed', label: t('community.formsPanel.statusReviewed') },
+                            { value: 'archived', label: t('community.formsPanel.statusArchived') },
+                          ],
+                          'min-w-[140px]'
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => void deleteSubmission(s._id)}
+                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-neutral-200 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                          aria-label={t('community.formsPanel.deleteSubmission')}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

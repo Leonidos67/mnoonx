@@ -13,6 +13,7 @@ import DiscoverExportBackground from '../components/Discover/DiscoverExportBackg
 import DiscoverTabHeader from '../components/Discover/DiscoverTabHeader';
 import DiscoverTabSwitcher from '../components/Discover/DiscoverTabSwitcher';
 import MobileBottomSheet from '../components/Common/MobileBottomSheet';
+import { DiscoverCardSkeleton } from '../components/Common/Skeleton';
 import { COMMUNITIES_API as API_URL } from '../config/api';
 import { useTranslation } from '../i18n/useTranslation';
 
@@ -466,8 +467,10 @@ const Discover: React.FC = () => {
 
           <div className="mx-auto w-full">
           {loading ? (
-            <div className="flex h-48 items-center justify-center sm:h-64">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-black" />
+            <div className="flex flex-col gap-2 sm:grid sm:grid-cols-2 sm:gap-3 md:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <DiscoverCardSkeleton key={i} />
+              ))}
             </div>
           ) : isSearching ? (
             searchResults.length === 0 ? (

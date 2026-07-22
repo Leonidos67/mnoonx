@@ -71,12 +71,34 @@ async function serializeFeedPost(post, viewerUserId) {
     updatedAt: post.updatedAt,
     isLiked: uid ? (post.likes || []).some((id) => String(id) === uid) : false,
     isReposted: uid ? (post.reposts || []).some((id) => String(id) === uid) : false,
+    isBookmarked: uid ? (post.bookmarks || []).some((id) => String(id) === uid) : false,
+    bookmarksCount: post.bookmarksCount || 0,
+    hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
+    quoteOf: post.quoteOf || null,
+    quotedPost: null,
     isPrivate: post.isPrivate || false,
   };
+}
+
+async function attachQuotedPost(serialized, quoteOfId, viewerUserId) {
+  if (!quoteOfId) return serialized;
+  try {
+    const Post = require('../models/Post');
+    const original = await Post.findById(quoteOfId);
+    if (!original) {
+      serialized.quotedPost = { missing: true };
+      return serialized;
+    }
+    serialized.quotedPost = await serializeFeedPost(original, viewerUserId);
+  } catch {
+    serialized.quotedPost = { missing: true };
+  }
+  return serialized;
 }
 
 module.exports = {
   serializeCommunityInfo,
   serializePostAuthor,
   serializeFeedPost,
+  attachQuotedPost,
 };

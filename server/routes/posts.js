@@ -204,8 +204,9 @@ async function serializePostComments(comments) {
 // POST /api/posts - Создать пост
 router.post('/', auth, requireAuth, async (req, res) => {
   try {
-    const { content, media, community, isPrivate, linkAttachment: linkRaw, coinAttachment: coinRaw } = req.body;
+    const { content, media, community, isPrivate, linkAttachment: linkRaw, coinAttachment: coinRaw, quoteOf } = req.body;
     const authorId = req.userId.toString();
+    const { extractHashtags } = require('../utils/hashtags');
 
     console.log('\n📝 CREATE POST');
     console.log('  Content:', content?.substring(0, 50));
@@ -226,7 +227,16 @@ router.post('/', auth, requireAuth, async (req, res) => {
       return res.status(400).json({ message: coinParsed.error });
     }
 
-    if (!trimmedContent && mediaList.length === 0 && !linkParsed && !coinParsed) {
+    let quoteOfId = null;
+    if (quoteOf) {
+      const original = await Post.findById(String(quoteOf));
+      if (!original) {
+        return res.status(404).json({ message: 'Quoted post not found' });
+      }
+      quoteOfId = original._id.toString();
+    }
+
+    if (!trimmedContent && mediaList.length === 0 && !linkParsed && !coinParsed && !quoteOfId) {
       return res.status(400).json({ message: 'Add text, a link, a coin chart, or at least one image' });
     }
 
@@ -259,13 +269,16 @@ router.post('/', auth, requireAuth, async (req, res) => {
       isPrivate: isPrivate || false,
       linkAttachment: linkParsed || undefined,
       coinAttachment: coinParsed || undefined,
+      hashtags: extractHashtags(trimmedContent),
+      quoteOf: quoteOfId,
     });
 
     await post.save();
     console.log('✅ Post created successfully, ID:', post._id);
 
-    const { serializeFeedPost } = require('../services/postSerialize');
-    const postData = await serializeFeedPost(post, req.userId);
+    const { serializeFeedPost, attachQuotedPost } = require('../services/postSerialize');
+    let postData = await serializeFeedPost(post, req.userId);
+    postData = await attachQuotedPost(postData, quoteOfId, req.userId);
     postData.linkAttachment = serializeLinkAttachment(post.linkAttachment);
     postData.coinAttachment = serializeCoinAttachment(post.coinAttachment);
     postData.isBookmarked = false;
@@ -295,6 +308,83 @@ router.post('/media/upload', auth, (req, res) => {
     const urls = files.map((f) => `/uploads/post-media/${f.filename}`);
     res.json({ urls });
   });
+});
+
+// GET /api/posts/search?q=&hashtag=
+router.get('/search', auth, async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    const hashtag = String(req.query.hashtag || '')
+      .trim()
+      .replace(/^#/, '')
+      .toLowerCase();
+    const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit || '20'), 10) || 20));
+
+    if (!q && !hashtag) {
+      return res.json({ posts: [], hashtags: [] });
+    }
+
+    const filter = { isPrivate: false };
+    if (hashtag) {
+      filter.hashtags = hashtag;
+    } else if (q.startsWith('#')) {
+      filter.hashtags = q.slice(1).toLowerCase();
+    } else if (q.length >= 2) {
+      filter.$or = [
+        { content: { $regex: q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' } },
+        { hashtags: q.toLowerCase().replace(/^#/, '') },
+      ];
+    }
+
+    const posts = await Post.find(filter).sort({ createdAt: -1 }).limit(limit);
+    const { serializeFeedPost, attachQuotedPost } = require('../services/postSerialize');
+    const postsData = await Promise.all(
+      posts.map(async (post) => {
+        let data = await serializeFeedPost(post, req.userId);
+        data = await attachQuotedPost(data, post.quoteOf, req.userId);
+        return data;
+      }),
+    );
+
+    let hashtags = [];
+    if (q && !hashtag && !q.startsWith('#')) {
+      const escapedQ = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const agg = await Post.aggregate([
+        { $match: { isPrivate: false, hashtags: { $regex: '^' + escapedQ, $options: 'i' } } },
+        { $unwind: '$hashtags' },
+        { $match: { hashtags: { $regex: '^' + escapedQ, $options: 'i' } } },
+        { $group: { _id: '$hashtags', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 10 },
+      ]);
+      hashtags = agg.map((a) => ({ tag: a._id, count: a.count }));
+    }
+
+    res.json({ posts: postsData, hashtags });
+  } catch (error) {
+    console.error('Post search error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/posts/bookmarks — current user's bookmarked posts
+router.get('/bookmarks', auth, requireAuth, async (req, res) => {
+  try {
+    const uid = String(req.userId);
+    const posts = await Post.find({ bookmarks: uid }).sort({ updatedAt: -1 }).limit(50);
+    const { serializeFeedPost, attachQuotedPost } = require('../services/postSerialize');
+    const postsData = await Promise.all(
+      posts.map(async (post) => {
+        let data = await serializeFeedPost(post, req.userId);
+        data = await attachQuotedPost(data, post.quoteOf, req.userId);
+        return data;
+      }),
+    );
+    res.json(postsData);
+  } catch (error) {
+    console.error('Bookmarks list error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // GET /api/posts - Главная лента (ranked по умолчанию, ?feed=recent — хронология)
@@ -338,8 +428,8 @@ router.get('/', auth, async (req, res) => {
       const uid = req.userId ? String(req.userId) : null;
       const isLiked = uid ? post.likes.some((id) => String(id) === uid) : false;
       const isReposted = uid ? post.reposts.some((id) => String(id) === uid) : false;
-      
-      return {
+      const { attachQuotedPost } = require('../services/postSerialize');
+      let row = {
         _id: post._id,
         content: post.content,
         author: author ? {
@@ -356,12 +446,18 @@ router.get('/', auth, async (req, res) => {
         commentsCount: post.commentsCount || 0,
         repostsCount: post.repostsCount || 0,
         viewsCount: post.viewsCount || 0,
+        bookmarksCount: post.bookmarksCount || 0,
+        hashtags: post.hashtags || [],
+        quoteOf: post.quoteOf || null,
+        quotedPost: null,
         createdAt: post.createdAt,
         isLiked: isLiked,
         isReposted: isReposted,
         isBookmarked: uid ? post.bookmarks.some((id) => String(id) === uid) : false,
         isPrivate: post.isPrivate || false
       };
+      row = await attachQuotedPost(row, post.quoteOf, req.userId);
+      return row;
     }));
 
     console.log(`Returning ${postsData.length} posts with like status`);

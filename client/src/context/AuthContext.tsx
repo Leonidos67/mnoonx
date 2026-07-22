@@ -13,11 +13,17 @@ interface User {
   followingCount: number;
   postsCount: number;
   createdAt: string;
+  twoFactorEnabled?: boolean;
 }
+
+export type LoginResult =
+  | { ok: true }
+  | { ok: false; requires2fa: true; tempToken: string };
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  complete2faLogin: (tempToken: string, totpCode: string) => Promise<void>;
   register: (username: string, email: string, password: string, fullName: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
@@ -79,38 +85,55 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const applyAuth = (nextToken: string, nextUser: User) => {
+    setToken(nextToken);
+    setUser(nextUser);
+    localStorage.setItem('token', nextToken);
+    localStorage.setItem('user', JSON.stringify(nextUser));
+  };
+
+  const login = async (email: string, password: string): Promise<LoginResult> => {
     const res = await fetch(`${API_URL}/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password }),
     });
 
     const data = await res.json();
 
     if (!res.ok) throw new Error(data.message || 'Invalid credentials');
 
-    setToken(data.token);
-    setUser(data.user);
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
+    if (data.requires2fa && data.tempToken) {
+      return { ok: false, requires2fa: true, tempToken: data.tempToken };
+    }
+
+    applyAuth(data.token, data.user);
+    return { ok: true };
+  };
+
+  const complete2faLogin = async (tempToken: string, totpCode: string) => {
+    const res = await fetch(`${API_URL}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tempToken, totpCode }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Invalid authenticator code');
+    applyAuth(data.token, data.user);
   };
 
   const register = async (username: string, email: string, password: string, fullName: string) => {
     const res = await fetch(`${API_URL}/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password, fullName })
+      body: JSON.stringify({ username, email, password, fullName }),
     });
 
     const data = await res.json();
 
     if (!res.ok) throw new Error(data.message || 'Registration failed');
 
-    setToken(data.token);
-    setUser(data.user);
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
+    applyAuth(data.token, data.user);
   };
 
   const logout = () => {
@@ -121,15 +144,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      login, 
-      register, 
-      logout, 
-      isAuthenticated: !!user,
-      loading,
-      token
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        login,
+        complete2faLogin,
+        register,
+        logout,
+        isAuthenticated: !!user,
+        loading,
+        token,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -4,6 +4,7 @@ import { EMPTY_SOCIAL_LINKS } from '../../types/socialLinks';
 import { socialLinkLabel, socialLinkUrl } from '../../utils/socialLinks';
 import { useTranslation } from '../../i18n/useTranslation';
 import SocialPlatformIcon from './SocialPlatformIcon';
+import ExternalLink from '../Common/ExternalLink';
 
 const DISPLAY_PLATFORMS: SocialPlatform[] = ['twitter', 'telegram', 'instagram', 'youtube', 'tiktok', 'discord'];
 
@@ -61,14 +62,14 @@ const ProfileSocialLinks: React.FC<ProfileSocialLinksProps> = ({ links, showHead
         </p>
       ) : null}
 
-      {/* Mobile: horizontal scroll, icon + short handle */}
-      <div role="list" className="flex gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:hidden [&::-webkit-scrollbar]:hidden">
+      <div
+        role="list"
+        className="flex gap-1 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] sm:hidden [&::-webkit-scrollbar]:hidden"
+      >
         {items.map((item) => (
-          <a
+          <ExternalLink
             key={item.platform}
             href={item.href}
-            target="_blank"
-            rel="noopener noreferrer"
             role="listitem"
             className={`inline-flex items-center justify-center gap-1 shrink-0 rounded-full border px-2 py-1.5 transition-colors active:scale-[0.98] ${platformStyles[item.platform]}`}
             aria-label={`${item.name}: ${item.handle}`}
@@ -79,28 +80,25 @@ const ProfileSocialLinks: React.FC<ProfileSocialLinksProps> = ({ links, showHead
             <span className="w-full truncate text-center text-[12px] font-semibold leading-tight">
               {item.name}
             </span>
-          </a>
+          </ExternalLink>
         ))}
       </div>
 
-      {/* Desktop / tablet: horizontal scroll or wrap with flex-nowrap */}
-      <div role="list" className="hidden sm:flex sm:gap-1 sm:overflow-x-auto sm:overscroll-x-contain sm:pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        role="list"
+        className="hidden sm:flex sm:gap-1 sm:overflow-x-auto sm:overscroll-x-contain sm:pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {items.map((item) => (
-          <a
+          <ExternalLink
             key={item.platform}
             href={item.href}
-            target="_blank"
-            rel="noopener noreferrer"
             role="listitem"
             className={`inline-flex shrink-0 max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${platformStyles[item.platform]}`}
             title={`${item.name} · ${item.handle}`}
           >
             <SocialPlatformIcon platform={item.platform} className="h-4 w-4 shrink-0" />
             <span className="shrink-0 font-medium">{item.name}</span>
-            {/* {item.platform !== 'twitter' ? (
-              <span className="min-w-0 truncate text-xs opacity-75">{item.handle}</span>
-            ) : null} */}
-          </a>
+          </ExternalLink>
         ))}
       </div>
     </div>

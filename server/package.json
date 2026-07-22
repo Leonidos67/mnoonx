@@ -18,7 +18,9 @@
     "fix:post-likes": "node scripts/fixSeedPostEngagement.js",
     "seed:mnoonx-members": "node scripts/seedMnoonxBulkMembers.js",
     "seed:post-engagement": "node scripts/seedPostEngagement.js",
-    "restore:mnoonx-posts": "node scripts/restoreMnoonxPostsFromBackup.js --replace-wrong"
+    "restore:mnoonx-posts": "node scripts/restoreMnoonxPostsFromBackup.js --replace-wrong",
+    "setup:resend": "node scripts/setupResendDomain.js",
+    "setup:resend:verify": "node scripts/setupResendDomain.js --verify-only"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -27,7 +29,8 @@
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.0",
-    "multer": "^2.0.0"
+    "multer": "^2.0.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "nodemon": "^3.1.4"

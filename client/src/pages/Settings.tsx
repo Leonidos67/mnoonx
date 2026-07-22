@@ -43,6 +43,13 @@ type MenuItem = {
   id: SettingsSectionId;
   label: string;
   icon: SettingsNavIconKind;
+  description?: string;
+};
+
+type MenuGroup = {
+  id: string;
+  label: string;
+  items: MenuItem[];
 };
 
 const Settings: React.FC = () => {
@@ -68,18 +75,72 @@ const Settings: React.FC = () => {
   });
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({ ...EMPTY_SOCIAL_LINKS });
 
-  const menuItems: MenuItem[] = useMemo(
+  const menuGroups: MenuGroup[] = useMemo(
     () => [
-      { id: 'account', label: t('settings.accountSettings'), icon: 'account' },
-      { id: 'edit-profile', label: t('settings.editProfile'), icon: 'editProfile' },
-      { id: 'connected', label: t('settings.connectedAccounts'), icon: 'connected' },
-      { id: 'security', label: t('settings.accountSecurity'), icon: 'security' },
-      { id: 'orders', label: t('settings.orders'), icon: 'orders' },
-      { id: 'notifications', label: t('settings.notifications'), icon: 'notifications' },
-      { id: 'payments', label: t('settings.paymentMethods'), icon: 'payments' },
-      { id: 'resolution', label: t('settings.resolutionCenter'), icon: 'resolution' },
+      {
+        id: 'profile',
+        label: t('settings.groupProfile'),
+        items: [
+          {
+            id: 'account',
+            label: t('settings.accountSettings'),
+            icon: 'account',
+            description: t('settings.accountNavHint'),
+          },
+          {
+            id: 'edit-profile',
+            label: t('settings.editProfile'),
+            icon: 'editProfile',
+            description: t('settings.editProfileNavHint'),
+          },
+          {
+            id: 'connected',
+            label: t('settings.connectedAccounts'),
+            icon: 'connected',
+            description: t('settings.connectedNavHint'),
+          },
+        ],
+      },
+      {
+        id: 'security',
+        label: t('settings.groupSecurity'),
+        items: [
+          {
+            id: 'security',
+            label: t('settings.accountSecurity'),
+            icon: 'security',
+            description: t('settings.securityNavHint'),
+          },
+          {
+            id: 'notifications',
+            label: t('settings.notifications'),
+            icon: 'notifications',
+            description: t('settings.notificationsNavHint'),
+          },
+        ],
+      },
+      {
+        id: 'billing',
+        label: t('settings.groupBilling'),
+        items: [
+          { id: 'orders', label: t('settings.orders'), icon: 'orders' },
+          { id: 'payments', label: t('settings.paymentMethods'), icon: 'payments' },
+        ],
+      },
+      {
+        id: 'support',
+        label: t('settings.groupSupport'),
+        items: [
+          { id: 'resolution', label: t('settings.resolutionCenter'), icon: 'resolution' },
+        ],
+      },
     ],
-    [t]
+    [t],
+  );
+
+  const menuItems: MenuItem[] = useMemo(
+    () => menuGroups.flatMap((group) => group.items),
+    [menuGroups],
   );
 
   useEffect(() => {
@@ -88,11 +149,24 @@ const Settings: React.FC = () => {
 
   useEffect(() => {
     const section = searchParams.get('section');
-    if (section === 'connected') {
-      setActiveSection('connected');
+    if (section === 'connected' || section === 'security') {
+      setActiveSection(section);
       if (!isDesktop) setMobileView('content');
     }
   }, [searchParams, isDesktop]);
+
+  useEffect(() => {
+    if (searchParams.get('focus') !== 'links') return;
+    if (activeSection !== 'security') return;
+    if (!isDesktop && mobileView !== 'content') return;
+    const timer = window.setTimeout(() => {
+      document.getElementById('settings-link-opening')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start',
+      });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [searchParams, activeSection, isDesktop, mobileView]);
 
   const loadProfile = useCallback(async () => {
     if (!token) {

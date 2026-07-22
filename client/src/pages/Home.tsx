@@ -10,6 +10,8 @@ import PostComposer from '../components/Posts/PostComposer';
 import PostContentBody from '../components/Posts/PostContentBody';
 import { AnimatedPostMenuIcon } from '../components/Posts/PostMenuAnimatedIcons';
 import PostFeedActionButtons from '../components/Posts/PostFeedActionButtons';
+import QuotedPostCard from '../components/Posts/QuotedPostCard';
+import QuoteComposerModal from '../components/Posts/QuoteComposerModal';
 import { PostCommentsSection } from '../components/Posts/PostCommentsSection';
 import type { PostCoinAttachment } from '../types/postCoin';
 import type { PostLinkAttachment } from '../types/postLink';
@@ -19,6 +21,8 @@ import HomeRecommendedCommunities from '../components/Home/HomeRecommendedCommun
 import PixelTrail from '../components/Home/PixelTrail';
 import FloatingMenu from '../components/Common/FloatingMenu';
 import EditTextModal from '../components/Common/EditTextModal';
+import PullToRefresh from '../components/Common/PullToRefresh';
+import { FeedSkeleton } from '../components/Common/Skeleton';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import MobileBottomSheet from '../components/Common/MobileBottomSheet';
@@ -71,6 +75,10 @@ interface Post {
   isLiked?: boolean;
   isReposted?: boolean;
   isPrivate?: boolean;
+  isBookmarked?: boolean;
+  bookmarksCount?: number;
+  quoteOf?: string | null;
+  quotedPost?: Post | { missing: true } | null;
 }
 
 interface SuggestedUser {
@@ -92,6 +100,9 @@ const Home: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [repostedPosts, setRepostedPosts] = useState<Set<string>>(new Set());
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<string>>(new Set());
+  const [quoteTarget, setQuoteTarget] = useState<Post | null>(null);
+  const [quoteSubmitting, setQuoteSubmitting] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [commentText, setCommentText] = useState('');
   const [inlineCommentText, setInlineCommentText] = useState('');
@@ -190,17 +201,17 @@ const Home: React.FC = () => {
       // ВАЖНО: Загружаем начальное состояние лайков и репостов из данных с сервера
       const likedIds = new Set<string>();
       const repostedIds = new Set<string>();
+      const bookmarkedIds = new Set<string>();
       data.forEach((post: Post) => {
         const pid = String(post._id);
         if (post.isLiked) likedIds.add(pid);
         if (post.isReposted) repostedIds.add(pid);
+        if (post.isBookmarked) bookmarkedIds.add(pid);
       });
-      
-      console.log('Loaded liked posts from server:', Array.from(likedIds));
-      console.log('Loaded reposted posts from server:', Array.from(repostedIds));
       
       setLikedPosts(likedIds);
       setRepostedPosts(repostedIds);
+      setBookmarkedPosts(bookmarkedIds);
     } catch (err) {
       console.error('Fetch posts error:', err);
     } finally {
@@ -241,37 +252,59 @@ const Home: React.FC = () => {
     setNewPostCoin(null);
   }, []);
 
+  const getPostFromState = (postId: string): Post | undefined => {
+    const fromFeed = posts.find((p) => String(p._id) === postId);
+    if (fromFeed) return fromFeed;
+    if (selectedPost && String(selectedPost._id) === postId) return selectedPost;
+    return undefined;
+  };
+
+  const applyPostPatch = (id: string, patch: Partial<Post>) => {
+    setPosts(prev => prev.map(post => (String(post._id) === id ? { ...post, ...patch } : post)));
+    setSelectedPost(prev => (prev && String(prev._id) === id ? { ...prev, ...patch } : prev));
+  };
+
   const handleLike = async (postId: string) => {
     if (!token) {
       window.dispatchEvent(new CustomEvent('openLogin'));
       return;
     }
     const id = String(postId);
+    const current = getPostFromState(id);
+    const wasLiked = likedPosts.has(id);
+    const prevCount = current?.likesCount || 0;
+    const nextLiked = !wasLiked;
+    const nextCount = Math.max(0, prevCount + (nextLiked ? 1 : -1));
+
+    setLikedPosts(prev => {
+      const newSet = new Set(prev);
+      nextLiked ? newSet.add(id) : newSet.delete(id);
+      return newSet;
+    });
+    applyPostPatch(id, { likesCount: nextCount, isLiked: nextLiked });
+
     try {
       const res = await fetch(`${API_URL}/${id}/like`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setLikedPosts(prev => {
-          const newSet = new Set(prev);
-          if (data.liked) {
-            newSet.add(id);
-          } else {
-            newSet.delete(id);
-          }
-          return newSet;
-        });
-        setPosts(prev => prev.map(post => 
-          String(post._id) === id ? { ...post, likesCount: data.likesCount, isLiked: data.liked } : post
-        ));
-        if (selectedPost && String(selectedPost._id) === id) {
-          setSelectedPost(prev => prev ? { ...prev, likesCount: data.likesCount, isLiked: data.liked } : null);
-        }
-      }
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setLikedPosts(prev => {
+        const newSet = new Set(prev);
+        data.liked ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      applyPostPatch(id, { likesCount: data.likesCount, isLiked: data.liked });
     } catch (err) {
       console.error('Like error:', err);
+      setLikedPosts(prev => {
+        const newSet = new Set(prev);
+        wasLiked ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      applyPostPatch(id, { likesCount: prevCount, isLiked: wasLiked });
+      showToast(t('common.likeFailed'), 'error');
     }
   };
 
@@ -281,39 +314,130 @@ const Home: React.FC = () => {
       return;
     }
     const id = String(postId);
+    const current = getPostFromState(id);
+    const wasReposted = repostedPosts.has(id);
+    const prevCount = current?.repostsCount || 0;
+    const nextReposted = !wasReposted;
+    const nextCount = Math.max(0, prevCount + (nextReposted ? 1 : -1));
+
+    setRepostedPosts(prev => {
+      const newSet = new Set(prev);
+      nextReposted ? newSet.add(id) : newSet.delete(id);
+      return newSet;
+    });
+    applyPostPatch(id, { repostsCount: nextCount, isReposted: nextReposted });
+
     try {
       const res = await fetch(`${API_URL}/${id}/repost`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setRepostedPosts(prev => {
-          const newSet = new Set(prev);
-          if (data.reposted) {
-            newSet.add(id);
-          } else {
-            newSet.delete(id);
-          }
-          return newSet;
-        });
-        setPosts(prev => prev.map(post => 
-          String(post._id) === id ? { ...post, repostsCount: data.repostsCount, isReposted: data.reposted } : post
-        ));
-        if (selectedPost && String(selectedPost._id) === id) {
-          setSelectedPost(prev => prev ? { ...prev, repostsCount: data.repostsCount, isReposted: data.reposted } : null);
-        }
-      }
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setRepostedPosts(prev => {
+        const newSet = new Set(prev);
+        data.reposted ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      applyPostPatch(id, { repostsCount: data.repostsCount, isReposted: data.reposted });
     } catch (err) {
       console.error('Repost error:', err);
+      setRepostedPosts(prev => {
+        const newSet = new Set(prev);
+        wasReposted ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      applyPostPatch(id, { repostsCount: prevCount, isReposted: wasReposted });
+      showToast(t('common.repostFailed'), 'error');
     }
   };
 
-  const getPostFromState = (postId: string): Post | undefined => {
-    const fromFeed = posts.find((p) => String(p._id) === postId);
-    if (fromFeed) return fromFeed;
-    if (selectedPost && String(selectedPost._id) === postId) return selectedPost;
-    return undefined;
+  const handleBookmark = async (postId: string) => {
+    if (!token) {
+      window.dispatchEvent(new CustomEvent('openLogin'));
+      return;
+    }
+    const id = String(postId);
+    const current = getPostFromState(id);
+    const wasBookmarked = bookmarkedPosts.has(id);
+    const prevCount = current?.bookmarksCount || 0;
+    const nextBookmarked = !wasBookmarked;
+    const nextCount = Math.max(0, prevCount + (nextBookmarked ? 1 : -1));
+
+    setBookmarkedPosts(prev => {
+      const newSet = new Set(prev);
+      nextBookmarked ? newSet.add(id) : newSet.delete(id);
+      return newSet;
+    });
+    applyPostPatch(id, { bookmarksCount: nextCount, isBookmarked: nextBookmarked });
+
+    try {
+      const res = await fetch(`${API_URL}/${id}/bookmark`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setBookmarkedPosts(prev => {
+        const newSet = new Set(prev);
+        data.bookmarked ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      applyPostPatch(id, { bookmarksCount: data.bookmarksCount, isBookmarked: data.bookmarked });
+      showToast(data.bookmarked ? t('common.bookmarkAdded') : t('common.bookmarkRemoved'));
+    } catch (err) {
+      console.error('Bookmark error:', err);
+      setBookmarkedPosts(prev => {
+        const newSet = new Set(prev);
+        wasBookmarked ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      applyPostPatch(id, { bookmarksCount: prevCount, isBookmarked: wasBookmarked });
+      showToast(t('common.bookmarkFailed'), 'error');
+    }
+  };
+
+  const openQuoteComposer = (postId: string) => {
+    if (!token) {
+      window.dispatchEvent(new CustomEvent('openLogin'));
+      return;
+    }
+    const post = getPostFromState(String(postId));
+    if (post) setQuoteTarget(post);
+  };
+
+  const closeQuoteComposer = () => {
+    if (quoteSubmitting) return;
+    setQuoteTarget(null);
+  };
+
+  const submitQuote = async (content: string) => {
+    if (!quoteTarget || !token || quoteSubmitting) return;
+    try {
+      setQuoteSubmitting(true);
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          content,
+          quoteOf: String(quoteTarget._id),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { message?: string }).message || t('common.failedToCreatePost'));
+
+      setPosts(prev => [data, ...prev]);
+      setQuoteTarget(null);
+      showToast(t('common.postPublished'));
+    } catch (err: unknown) {
+      console.error('Quote post error:', err);
+      showToast(err instanceof Error ? err.message : t('common.failedToCreatePost'), 'error');
+    } finally {
+      setQuoteSubmitting(false);
+    }
   };
 
   const updateCommentsOnPost = (postId: string, comments: PostComment[], commentsCount: number) => {
@@ -700,6 +824,8 @@ const Home: React.FC = () => {
               </div>
             )}
 
+            {post.quotedPost ? <QuotedPostCard quotedPost={post.quotedPost} /> : null}
+
             <div className="mt-4 flex items-center gap-4 border-t border-neutral-100 py-4 text-sm">
               <span>
                 <span className="font-bold text-neutral-900">{formatCount(post.repostsCount)}</span>
@@ -741,8 +867,17 @@ const Home: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex h-full min-h-0 items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-neutral-300 border-t-black"></div>
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1200px] gap-6">
+        <div className="flex h-full min-h-0 max-w-[600px] flex-1 flex-col border-x border-neutral-200 bg-white">
+          <div className="z-10 shrink-0 border-b border-neutral-200 bg-white/80 backdrop-blur-md">
+            <div className="px-4 py-3">
+              <h1 className="text-xl font-bold">{t('home.title')}</h1>
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <FeedSkeleton count={5} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -780,11 +915,7 @@ const Home: React.FC = () => {
         )}
 
         {/* Posts Feed */}
-        <div
-          className={`min-h-0 flex-1 ${
-            HOME_FEED_UNDER_MAINTENANCE ? 'overflow-hidden' : `overflow-y-auto ${mobileComposerFull ? 'hidden' : ''}`
-          }`}
-        >
+        <div className={`min-h-0 flex-1 overflow-hidden`}>
           {HOME_FEED_UNDER_MAINTENANCE ? (
             <div className="flex h-full min-h-0 flex-col items-center px-4 py-6 text-center sm:px-8 sm:py-8">
               <p className="max-w-md shrink-0 text-lg font-semibold text-neutral-900 sm:text-xl">
@@ -805,7 +936,15 @@ const Home: React.FC = () => {
               </div>
             </div>
           ) : (
-            <>
+            <PullToRefresh
+              onRefresh={fetchPosts}
+              className={`h-full ${mobileComposerFull ? 'hidden' : ''}`}
+              labels={{
+                pull: t('common.pullToRefresh'),
+                release: t('common.releaseToRefresh'),
+                refreshing: t('common.refreshing'),
+              }}
+            >
           <HomeRecommendedCommunities />
           {posts.length > 0 ? posts.map(post => {
             // Определяем, отображать ли от имени сообщества
@@ -920,6 +1059,8 @@ const Home: React.FC = () => {
                       />
                     )}
 
+                    {post.quotedPost ? <QuotedPostCard quotedPost={post.quotedPost} /> : null}
+
                     <PostFeedActionButtons
                       postId={String(post._id)}
                       likesCount={post.likesCount || 0}
@@ -927,11 +1068,14 @@ const Home: React.FC = () => {
                       repostsCount={post.repostsCount || 0}
                       liked={likedPosts.has(String(post._id))}
                       reposted={repostedPosts.has(String(post._id))}
+                      bookmarked={bookmarkedPosts.has(String(post._id))}
                       commentsExpanded={expandedCommentsPostId === String(post._id)}
                       formatCount={formatCount}
                       onLike={handleLike}
                       onToggleComments={toggleFeedComments}
                       onRepost={handleRepost}
+                      onBookmark={handleBookmark}
+                      onQuote={openQuoteComposer}
                     />
 
                     {expandedCommentsPostId === String(post._id) &&
@@ -951,7 +1095,7 @@ const Home: React.FC = () => {
               <p className="text-neutral-500">{t('home.emptyFeedSubtitle')}</p>
             </div>
           )}
-            </>
+            </PullToRefresh>
           )}
         </div>
       </div>
@@ -1050,6 +1194,14 @@ const Home: React.FC = () => {
           if (!editCommentSaving) setEditCommentTarget(null);
         }}
         onSubmit={(value) => void submitEditComment(value)}
+      />
+
+      <QuoteComposerModal
+        open={quoteTarget !== null}
+        quotedPost={quoteTarget}
+        submitting={quoteSubmitting}
+        onClose={closeQuoteComposer}
+        onSubmit={(content) => void submitQuote(content)}
       />
     </div>
   );

@@ -6,6 +6,7 @@ import MobileBottomNav from './MobileBottomNav';
 import AIChatDrawer from '../AI/AIChatDrawer';
 import { AIChatPanelProvider, useAIChatPanel } from '../../context/AIChatPanelContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useSwipeBack } from '../../hooks/useSwipeBack';
 
 const LG_MEDIA = '(min-width: 1024px)';
 
@@ -50,6 +51,8 @@ const AppMain: React.FC<{ children: ReactNode }> = ({ children }) => {
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const headerRef = useRef<HTMLDivElement>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
+  const isDesktop = useMediaQuery(LG_MEDIA);
+  useSwipeBack({ enabled: !isDesktop });
 
   const collapseSidebar = useCallback(() => {
     setSidebarCollapsed(true);

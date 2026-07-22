@@ -119,6 +119,57 @@ const userSchema = new mongoose.Schema({
     default: '',
     maxlength: 32,
   },
+  /** In-app / push notification toggles (synced from client) */
+  notificationPreferences: {
+    type: mongoose.Schema.Types.Mixed,
+    default: () => ({}),
+  },
+  /** Activity gamification state (synced from client) */
+  activityState: {
+    balance: { type: Number, default: 0 },
+    log: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    claimedRuleIds: { type: [String], default: [] },
+    streak: { type: Number, default: 0 },
+    lastDailyVisit: { type: String, default: '' },
+  },
+  twoFactorEnabled: {
+    type: Boolean,
+    default: false,
+  },
+  twoFactorSecret: {
+    type: String,
+    default: '',
+    select: false,
+  },
+  twoFactorPendingSecret: {
+    type: String,
+    default: '',
+    select: false,
+  },
+  isBanned: {
+    type: Boolean,
+    default: false,
+  },
+  /** Users this account has blocked (user-to-user, not admin ban) */
+  blockedUserIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+  passwordResetHash: {
+    type: String,
+    default: '',
+    select: false,
+  },
+  passwordResetExpiresAt: {
+    type: Date,
+    default: null,
+    select: false,
+  },
+  passwordResetLastSentAt: {
+    type: Date,
+    default: null,
+    select: false,
+  },
 }, {
   timestamps: true // createdAt и updatedAt
 });
@@ -170,6 +221,8 @@ userSchema.set('toJSON', {
   virtuals: true,
   transform: function(doc, ret) {
     delete ret.password;
+    delete ret.twoFactorSecret;
+    delete ret.twoFactorPendingSecret;
     delete ret.__v;
     return ret;
   }

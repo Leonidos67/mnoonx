@@ -126,6 +126,67 @@ function saveActivityLog(entries: ActivityLogEntry[]): void {
   }
 }
 
+export interface ActivityStateSnapshot {
+  balance: number;
+  log: ActivityLogEntry[];
+  claimedRuleIds: ActivityRuleId[];
+  streak: number;
+  lastDailyVisit: string;
+}
+
+/** Current local activity state, shaped for the `PUT /users/me/activity` sync endpoint. */
+export function getActivityStateSnapshot(): ActivityStateSnapshot {
+  return {
+    balance: loadActivityPointsBalance(),
+    log: loadActivityLog(),
+    claimedRuleIds: Array.from(loadClaimedRuleIds()),
+    streak: getVisitStreak(),
+    lastDailyVisit: loadStreakState().lastDate,
+  };
+}
+
+export interface ActivityStateServerPayload {
+  balance?: number;
+  log?: ActivityLogEntry[];
+  claimedRuleIds?: string[];
+  streak?: number;
+  lastDailyVisit?: string;
+}
+
+/** Overwrites local activity storage with a server snapshot (used on login/sync). */
+export function hydrateActivityState(state: ActivityStateServerPayload): void {
+  if (typeof state.balance === 'number') {
+    saveActivityPointsBalance(state.balance);
+  }
+  if (Array.isArray(state.log)) {
+    saveActivityLog(
+      state.log.filter(
+        (e): e is ActivityLogEntry =>
+          Boolean(e) &&
+          typeof e.id === 'string' &&
+          ACTIVITY_RULE_IDS.includes(e.ruleId as ActivityRuleId) &&
+          typeof e.points === 'number' &&
+          typeof e.createdAt === 'string'
+      )
+    );
+  }
+  if (Array.isArray(state.claimedRuleIds)) {
+    saveClaimedRuleIds(
+      new Set(state.claimedRuleIds.filter((id): id is ActivityRuleId =>
+        (ACTIVITY_RULE_IDS as readonly string[]).includes(id)
+      ))
+    );
+  }
+  if (typeof state.streak === 'number' || typeof state.lastDailyVisit === 'string') {
+    const current = loadStreakState();
+    saveStreakState({
+      count: typeof state.streak === 'number' ? state.streak : current.count,
+      lastDate:
+        typeof state.lastDailyVisit === 'string' ? state.lastDailyVisit : current.lastDate,
+    });
+  }
+}
+
 export function getActivityLevel(points: number): {
   id: ActivityLevelId;
   next: ActivityLevelId | null;

@@ -8,6 +8,8 @@ import PostContentBody from '../components/Posts/PostContentBody';
 import type { PostCoinAttachment } from '../types/postCoin';
 import type { PostLinkAttachment } from '../types/postLink';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
+import { setDocumentMeta } from '../utils/documentMeta';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 import { POSTS_API as API_URL, USERS_API } from '../config/api';
 import { useTranslation } from '../i18n/useTranslation';
@@ -48,6 +50,18 @@ const PostPage: React.FC = () => {
       fetchPost(postId);
     }
   }, [postId, token, t]);
+
+  useEffect(() => {
+    if (!post) return;
+    const authorName = post.author?.fullName || post.author?.username || '';
+    return setDocumentMeta({
+      title: authorName ? `${authorName} on MNOONX` : 'Post',
+      description: post.content,
+      image: post.media?.[0] ? resolveMediaUrl(post.media[0]) : undefined,
+      url: typeof window !== 'undefined' ? window.location.href : undefined,
+      type: 'article',
+    });
+  }, [post]);
 
   // В PostPage.tsx, после получения данных:
     const fetchPost = async (id: string) => {

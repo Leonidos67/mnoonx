@@ -1,14 +1,16 @@
 // middleware/auth.js
 const jwt = require('jsonwebtoken');
+const UserSession = require('../models/UserSession');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-module.exports = (req, res, next) => {
+module.exports = async (req, res, next) => {
   try {
     const authHeader = req.header('Authorization');
 
     if (!authHeader) {
       req.userId = null;
+      req.tokenSid = null;
       return next();
     }
 
@@ -16,21 +18,41 @@ module.exports = (req, res, next) => {
 
     if (!token) {
       req.userId = null;
+      req.tokenSid = null;
       return next();
     }
 
     if (!JWT_SECRET) {
       req.userId = null;
+      req.tokenSid = null;
       return next();
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.purpose === '2fa') {
+      req.userId = null;
+      req.tokenSid = null;
+      return next();
+    }
     const raw = decoded.userId;
     req.userId = raw != null ? String(raw) : null;
+    req.tokenSid = decoded.sid ? String(decoded.sid) : null;
+
+    if (req.userId && req.tokenSid) {
+      const session = await UserSession.findOne({
+        userId: req.userId,
+        tokenId: req.tokenSid,
+      }).lean();
+      if (session?.revokedAt) {
+        req.userId = null;
+        req.tokenSid = null;
+      }
+    }
+
     next();
   } catch (error) {
-    // При любой ошибке токена - просто продолжаем без userId
     req.userId = null;
+    req.tokenSid = null;
     next();
   }
 };

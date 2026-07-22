@@ -30,6 +30,8 @@ const ConversationSchema = new mongoose.Schema({
     default: null,
   },
   createdAt: { type: Date, default: Date.now },
+  /** When set, hidden from this user's inbox (soft delete) */
+  hiddenAt: { type: Date, default: null },
 });
 
 ConversationSchema.index(

@@ -9,15 +9,21 @@ import {
   Calendar,
   MapPin,
   Link as LinkIcon,
-  MessageCircle,
   Search,
   Zap,
   Globe,
   Lock,
   Repeat2,
+  Pencil,
 } from 'lucide-react';
+import { MessageCircleIcon, type IconHandle } from '@animateicons/react/lucide';
 import { AnimatedPostMenuIcon } from '../components/Posts/PostMenuAnimatedIcons';
+import { useAnimateOnParentHover } from '../hooks/useAnimateOnParentHover';
 import PostFeedActionButtons from '../components/Posts/PostFeedActionButtons';
+import QuotedPostCard from '../components/Posts/QuotedPostCard';
+import QuoteComposerModal from '../components/Posts/QuoteComposerModal';
+import PullToRefresh from '../components/Common/PullToRefresh';
+import { FeedSkeleton, ProfileHeaderSkeleton } from '../components/Common/Skeleton';
 import ProfileBgEmojiDecor from '../components/Profile/ProfileBgEmojiDecor';
 import {
   PROFILE_HEADER_BG_DISABLED,
@@ -31,6 +37,7 @@ import ProfileUserActionsMenu, {
   type ProfileUserActionId,
 } from '../components/Profile/ProfileUserActionsMenu';
 import ProfileFollowersSheet from '../components/Profile/ProfileFollowersSheet';
+import ExternalLink from '../components/Common/ExternalLink';
 import { profilePath } from '../constants/paths';
 import { hasProSubscription } from '../utils/userPlan';
 import MobileBottomSheet from '../components/Common/MobileBottomSheet';
@@ -49,12 +56,41 @@ import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 import { getPostDisplayMeta } from '../utils/postDisplay';
 import { tryAwardActivity } from '../utils/awardActivity';
 import { resolveMediaUrl } from '../utils/mediaUrl';
+import { setDocumentMeta } from '../utils/documentMeta';
 
 import { USERS_API as API_URL, POSTS_API as POSTS_API_URL, MESSAGES_API } from '../config/api';
 import { useTranslation } from '../i18n/useTranslation';
 import ProfileSocialLinks from '../components/Profile/ProfileSocialLinks';
-import type { SocialLinks } from '../types/socialLinks';
-import { hasAnySocialLink } from '../utils/socialLinks';
+import SocialLinksEditor from '../components/Profile/SocialLinksEditor';
+import type { SocialLinks, SocialPlatform } from '../types/socialLinks';
+import { EMPTY_SOCIAL_LINKS } from '../types/socialLinks';
+import { hasAnySocialLink, normalizeSocialLinksInput } from '../utils/socialLinks';
+import { blockUser, reportUser, unblockUser } from '../utils/userModeration';
+
+const ProfileMessengerIcon: React.FC<{ size?: number; color?: string }> = ({
+  size = 16,
+  color = 'currentColor',
+}) => {
+  const iconRef = useRef<IconHandle>(null);
+  const nodeRef = useRef<HTMLSpanElement>(null);
+  useAnimateOnParentHover(iconRef, nodeRef);
+  return (
+    <span
+      ref={nodeRef}
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden"
+      style={{ width: size, height: size }}
+    >
+      <MessageCircleIcon
+        ref={iconRef}
+        size={size}
+        duration={1}
+        color={color}
+        isAnimated={false}
+        className="!h-full !w-full !min-h-0 !min-w-0"
+      />
+    </span>
+  );
+};
 
 type Post = FeedPost;
 
@@ -87,6 +123,7 @@ interface UserProfile {
   postsCount: number;
   createdAt: string;
   isFollowing: boolean;
+  isBlockedByMe?: boolean;
   profileStatusIcon?: string;
   profileNameColor?: string;
   profileBgEmoji?: string;
@@ -122,20 +159,21 @@ const UserProfileComponent: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followLoading, setFollowLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'posts' | 'reposts' | 'replies' | 'media'>('posts');
+  const [activeTab, setActiveTab] = useState<'posts' | 'reposts' | 'replies' | 'media' | 'bookmarks'>('posts');
   const [reposts, setReposts] = useState<FeedPost[]>([]);
   const [repostsLoading, setRepostsLoading] = useState(false);
   const [replies, setReplies] = useState<ProfileReply[]>([]);
   const [repliesLoading, setRepliesLoading] = useState(false);
   const [mediaPosts, setMediaPosts] = useState<FeedPost[]>([]);
   const [mediaLoading, setMediaLoading] = useState(false);
+  const [bookmarks, setBookmarks] = useState<FeedPost[]>([]);
+  const [bookmarksLoading, setBookmarksLoading] = useState(false);
   const [searchFollower, setSearchFollower] = useState('');
   const [connectionsTab, setConnectionsTab] = useState<'followers' | 'following'>('followers');
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [profileMenuAnchor, setProfileMenuAnchor] = useState<{ rect: DOMRect } | null>(null);
   const [followersSheetOpen, setFollowersSheetOpen] = useState(false);
   const [followingSheetOpen, setFollowingSheetOpen] = useState(false);
-  const [messagingLoading, setMessagingLoading] = useState(false);
   const [premiumModalOpen, setPremiumModalOpen] = useState(false);
   const [styleSaving, setStyleSaving] = useState(false);
   const [hasProPlan, setHasProPlan] = useState(hasProSubscription);
@@ -151,9 +189,19 @@ const UserProfileComponent: React.FC = () => {
 
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [repostedPosts, setRepostedPosts] = useState<Set<string>>(new Set());
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<string>>(new Set());
   const [menuOpenPostId, setMenuOpenPostId] = useState<string | null>(null);
   const [editPostTarget, setEditPostTarget] = useState<{ postId: string; content: string } | null>(null);
   const [editPostSaving, setEditPostSaving] = useState(false);
+  const [quoteTarget, setQuoteTarget] = useState<FeedPost | null>(null);
+  const [quoteSubmitting, setQuoteSubmitting] = useState(false);
+
+  // Inline / modal "bio / location / website / social" edit (own profile only)
+  const [editingProfileInfo, setEditingProfileInfo] = useState(false);
+  const [profileDetailsModalOpen, setProfileDetailsModalOpen] = useState(false);
+  const [profileInfoDraft, setProfileInfoDraft] = useState({ bio: '', location: '', website: '' });
+  const [socialLinksDraft, setSocialLinksDraft] = useState<SocialLinks>({ ...EMPTY_SOCIAL_LINKS });
+  const [profileInfoSaving, setProfileInfoSaving] = useState(false);
 
   const postDetail = usePostDetail(posts, reposts, setPosts, setReposts, mediaPosts, setMediaPosts);
   const {
@@ -248,6 +296,17 @@ const UserProfileComponent: React.FC = () => {
   }, [profile?.username]);
 
   useEffect(() => {
+    if (!profile) return;
+    return setDocumentMeta({
+      title: profile.fullName || profile.username,
+      description: profile.bio || `@${profile.username} on MNOONX`,
+      image: profile.avatar ? resolveMediaUrl(profile.avatar) : undefined,
+      url: typeof window !== 'undefined' ? window.location.href : undefined,
+      type: 'profile',
+    });
+  }, [profile?.username, profile?.fullName, profile?.bio, profile?.avatar]);
+
+  useEffect(() => {
     const syncPlan = () => setHasProPlan(hasProSubscription());
     window.addEventListener('planTierChanged', syncPlan);
     window.addEventListener('storage', syncPlan);
@@ -257,27 +316,71 @@ const UserProfileComponent: React.FC = () => {
     };
   }, []);
 
+  const findPostAnywhere = useCallback(
+    (postId: string): Post | undefined => {
+      const id = String(postId);
+      return (
+        posts.find((p) => String(p._id) === id) ||
+        reposts.find((p) => String(p._id) === id) ||
+        mediaPosts.find((p) => String(p._id) === id) ||
+        bookmarks.find((p) => String(p._id) === id) ||
+        (selectedPost && String(selectedPost._id) === id ? selectedPost : undefined)
+      );
+    },
+    [posts, reposts, mediaPosts, bookmarks, selectedPost],
+  );
+
+  const patchBookmarks = useCallback(
+    (postId: string, patch: Partial<FeedPost>) => {
+      setBookmarks((prev) => prev.map((p) => (String(p._id) === postId ? { ...p, ...patch } : p)));
+    },
+    [],
+  );
+
   const handleLike = async (postId: string) => {
     if (!token) {
       window.dispatchEvent(new CustomEvent('openLogin'));
       return;
     }
+    const id = String(postId);
+    const current = findPostAnywhere(id);
+    const wasLiked = likedPosts.has(id);
+    const prevCount = current?.likesCount || 0;
+    const nextLiked = !wasLiked;
+    const nextCount = Math.max(0, prevCount + (nextLiked ? 1 : -1));
+
+    setLikedPosts((prev) => {
+      const newSet = new Set(prev);
+      nextLiked ? newSet.add(id) : newSet.delete(id);
+      return newSet;
+    });
+    patchPostInLists(id, { likesCount: nextCount, isLiked: nextLiked });
+    patchBookmarks(id, { likesCount: nextCount, isLiked: nextLiked });
+
     try {
-      const res = await fetch(`${POSTS_API_URL}/${postId}/like`, {
+      const res = await fetch(`${POSTS_API_URL}/${id}/like`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setLikedPosts(prev => {
-          const newSet = new Set(prev);
-          data.liked ? newSet.add(postId) : newSet.delete(postId);
-          return newSet;
-        });
-        patchPostInLists(postId, { likesCount: data.likesCount, isLiked: data.liked });
-      }
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setLikedPosts(prev => {
+        const newSet = new Set(prev);
+        data.liked ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      patchPostInLists(id, { likesCount: data.likesCount, isLiked: data.liked });
+      patchBookmarks(id, { likesCount: data.likesCount, isLiked: data.liked });
     } catch (err) {
       console.error('Like error:', err);
+      setLikedPosts((prev) => {
+        const newSet = new Set(prev);
+        wasLiked ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      patchPostInLists(id, { likesCount: prevCount, isLiked: wasLiked });
+      patchBookmarks(id, { likesCount: prevCount, isLiked: wasLiked });
+      showToast(t('common.likeFailed'), 'error');
     }
   };
 
@@ -286,31 +389,175 @@ const UserProfileComponent: React.FC = () => {
       window.dispatchEvent(new CustomEvent('openLogin'));
       return;
     }
+    const id = String(postId);
+    const current = findPostAnywhere(id);
+    const wasReposted = repostedPosts.has(id);
+    const prevCount = current?.repostsCount || 0;
+    const nextReposted = !wasReposted;
+    const nextCount = Math.max(0, prevCount + (nextReposted ? 1 : -1));
+
+    setRepostedPosts((prev) => {
+      const newSet = new Set(prev);
+      nextReposted ? newSet.add(id) : newSet.delete(id);
+      return newSet;
+    });
+    patchPostInLists(id, { repostsCount: nextCount, isReposted: nextReposted });
+    patchBookmarks(id, { repostsCount: nextCount, isReposted: nextReposted });
+
     try {
-      const res = await fetch(`${POSTS_API_URL}/${postId}/repost`, {
+      const res = await fetch(`${POSTS_API_URL}/${id}/repost`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setRepostedPosts(prev => {
-          const newSet = new Set(prev);
-          data.reposted ? newSet.add(postId) : newSet.delete(postId);
-          return newSet;
-        });
-        patchPostInLists(postId, { repostsCount: data.repostsCount, isReposted: data.reposted });
-        if (profileSlug) {
-          if (data.reposted) {
-            fetchReposts(profileSlug);
-          } else {
-            setReposts((prev) => prev.filter((p) => String(p._id) !== postId));
-          }
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setRepostedPosts(prev => {
+        const newSet = new Set(prev);
+        data.reposted ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      patchPostInLists(id, { repostsCount: data.repostsCount, isReposted: data.reposted });
+      patchBookmarks(id, { repostsCount: data.repostsCount, isReposted: data.reposted });
+      if (profileSlug) {
+        if (data.reposted) {
+          fetchReposts(profileSlug);
+        } else {
+          setReposts((prev) => prev.filter((p) => String(p._id) !== id));
         }
       }
     } catch (err) {
       console.error('Repost error:', err);
+      setRepostedPosts((prev) => {
+        const newSet = new Set(prev);
+        wasReposted ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      patchPostInLists(id, { repostsCount: prevCount, isReposted: wasReposted });
+      patchBookmarks(id, { repostsCount: prevCount, isReposted: wasReposted });
+      showToast(t('common.repostFailed'), 'error');
     }
   };
+
+  const handleBookmark = async (postId: string) => {
+    if (!token) {
+      window.dispatchEvent(new CustomEvent('openLogin'));
+      return;
+    }
+    const id = String(postId);
+    const current = findPostAnywhere(id);
+    const wasBookmarked = bookmarkedPosts.has(id);
+    const prevCount = current?.bookmarksCount || 0;
+    const nextBookmarked = !wasBookmarked;
+    const nextCount = Math.max(0, prevCount + (nextBookmarked ? 1 : -1));
+
+    setBookmarkedPosts((prev) => {
+      const newSet = new Set(prev);
+      nextBookmarked ? newSet.add(id) : newSet.delete(id);
+      return newSet;
+    });
+    patchPostInLists(id, { bookmarksCount: nextCount, isBookmarked: nextBookmarked });
+    patchBookmarks(id, { bookmarksCount: nextCount, isBookmarked: nextBookmarked });
+    if (!nextBookmarked) {
+      setBookmarks((prev) => prev.filter((p) => String(p._id) !== id));
+    }
+
+    try {
+      const res = await fetch(`${POSTS_API_URL}/${id}/bookmark`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setBookmarkedPosts((prev) => {
+        const newSet = new Set(prev);
+        data.bookmarked ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      patchPostInLists(id, { bookmarksCount: data.bookmarksCount, isBookmarked: data.bookmarked });
+      patchBookmarks(id, { bookmarksCount: data.bookmarksCount, isBookmarked: data.bookmarked });
+      showToast(data.bookmarked ? t('common.bookmarkAdded') : t('common.bookmarkRemoved'));
+    } catch (err) {
+      console.error('Bookmark error:', err);
+      setBookmarkedPosts((prev) => {
+        const newSet = new Set(prev);
+        wasBookmarked ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      patchPostInLists(id, { bookmarksCount: prevCount, isBookmarked: wasBookmarked });
+      patchBookmarks(id, { bookmarksCount: prevCount, isBookmarked: wasBookmarked });
+      showToast(t('common.bookmarkFailed'), 'error');
+    }
+  };
+
+  const openQuoteComposer = (postId: string) => {
+    if (!token) {
+      window.dispatchEvent(new CustomEvent('openLogin'));
+      return;
+    }
+    const post = findPostAnywhere(String(postId));
+    if (post) setQuoteTarget(post);
+  };
+
+  const closeQuoteComposer = () => {
+    if (quoteSubmitting) return;
+    setQuoteTarget(null);
+  };
+
+  const submitQuote = async (content: string) => {
+    if (!quoteTarget || !token || quoteSubmitting) return;
+    try {
+      setQuoteSubmitting(true);
+      const res = await fetch(POSTS_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content, quoteOf: String(quoteTarget._id) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { message?: string }).message || t('common.failedToCreatePost'));
+
+      if (profile && user?.username === profile.username) {
+        setPosts((prev) => [data, ...prev]);
+        setProfile((prev) => (prev ? { ...prev, postsCount: (prev.postsCount || 0) + 1 } : null));
+      }
+      setQuoteTarget(null);
+      showToast(t('common.postPublished'));
+    } catch (err: unknown) {
+      console.error('Quote post error:', err);
+      showToast(err instanceof Error ? err.message : t('common.failedToCreatePost'), 'error');
+    } finally {
+      setQuoteSubmitting(false);
+    }
+  };
+
+  const fetchBookmarks = useCallback(async () => {
+    if (!token) return;
+    try {
+      setBookmarksLoading(true);
+      const res = await fetch(`${POSTS_API_URL}/bookmarks`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        setBookmarks([]);
+        return;
+      }
+      const data = await res.json();
+      const list: Post[] = Array.isArray(data) ? data : data.posts || [];
+      setBookmarks(list);
+      setBookmarkedPosts((prev) => {
+        const merged = new Set(prev);
+        list.forEach((p) => merged.add(String(p._id)));
+        return merged;
+      });
+    } catch (err) {
+      console.error('Fetch bookmarks error:', err);
+      setBookmarks([]);
+    } finally {
+      setBookmarksLoading(false);
+    }
+  }, [token]);
 
   const copyPostLink = (postId: string) => {
     const link = `${window.location.origin}/post/${postId}`;
@@ -423,17 +670,24 @@ const UserProfileComponent: React.FC = () => {
       setPosts(data.posts || []);
       setIsFollowing(data.isFollowing === true);
       
-      // Загружаем начальное состояние лайков и репостов
+      // Загружаем начальное состояние лайков, репостов и закладок
       const likedIds = new Set<string>();
       const repostedIds = new Set<string>();
+      const bookmarkedIds = new Set<string>();
       
       (data.posts || []).forEach((post: any) => {
         if (post.isLiked) likedIds.add(post._id);
         if (post.isReposted) repostedIds.add(post._id);
+        if (post.isBookmarked) bookmarkedIds.add(String(post._id));
       });
       
       setLikedPosts(likedIds);
       setRepostedPosts(repostedIds);
+      setBookmarkedPosts((prev) => {
+        const merged = new Set(prev);
+        bookmarkedIds.forEach((id) => merged.add(id));
+        return merged;
+      });
       
     } catch (err) {
       console.error('Fetch profile error:', err);
@@ -472,10 +726,12 @@ const UserProfileComponent: React.FC = () => {
   const syncLikeRepostSets = useCallback((postList: Post[]) => {
     const likedIds = new Set<string>();
     const repostedIds = new Set<string>();
+    const bookmarkedIds = new Set<string>();
     postList.forEach((post) => {
       const pid = String(post._id);
       if (post.isLiked) likedIds.add(pid);
       if (post.isReposted) repostedIds.add(pid);
+      if (post.isBookmarked) bookmarkedIds.add(pid);
     });
     setLikedPosts((prev) => {
       const merged = new Set(prev);
@@ -485,6 +741,11 @@ const UserProfileComponent: React.FC = () => {
     setRepostedPosts((prev) => {
       const merged = new Set(prev);
       repostedIds.forEach((id) => merged.add(id));
+      return merged;
+    });
+    setBookmarkedPosts((prev) => {
+      const merged = new Set(prev);
+      bookmarkedIds.forEach((id) => merged.add(id));
       return merged;
     });
   }, []);
@@ -568,6 +829,9 @@ const UserProfileComponent: React.FC = () => {
   useEffect(() => {
     setSelectedPost(null);
     setExpandedCommentsPostId(null);
+    setActiveTab('posts');
+    setBookmarks([]);
+    setEditingProfileInfo(false);
   }, [profileSlug, setSelectedPost]);
 
   useEffect(() => {
@@ -592,7 +856,35 @@ const UserProfileComponent: React.FC = () => {
     if (activeTab === 'media' && profileSlug) {
       fetchMedia(profileSlug);
     }
-  }, [activeTab, profileSlug, fetchReposts, fetchReplies, fetchMedia]);
+    if (activeTab === 'bookmarks' && user?.username === profileSlug) {
+      fetchBookmarks();
+    }
+  }, [activeTab, profileSlug, fetchReposts, fetchReplies, fetchMedia, fetchBookmarks, user?.username]);
+
+  const handlePullRefresh = useCallback(async () => {
+    if (!profileSlug || profileSlug === 'undefined') return;
+    const tasks: Promise<unknown>[] = [
+      fetchProfile(profileSlug),
+      fetchFollowers(profileSlug),
+      fetchFollowing(profileSlug),
+    ];
+    if (activeTab === 'reposts') tasks.push(fetchReposts(profileSlug));
+    if (activeTab === 'replies') tasks.push(fetchReplies(profileSlug));
+    if (activeTab === 'media') tasks.push(fetchMedia(profileSlug));
+    if (activeTab === 'bookmarks' && user?.username === profileSlug) tasks.push(fetchBookmarks());
+    await Promise.all(tasks);
+  }, [
+    profileSlug,
+    activeTab,
+    fetchProfile,
+    fetchFollowers,
+    fetchFollowing,
+    fetchReposts,
+    fetchReplies,
+    fetchMedia,
+    fetchBookmarks,
+    user?.username,
+  ]);
 
   const closeComposer = useCallback(() => {
     setShowPostCreator(false);
@@ -654,9 +946,16 @@ const UserProfileComponent: React.FC = () => {
   const handleFollow = async () => {
     if (!token) { window.dispatchEvent(new CustomEvent('openLogin')); return; }
     if (!profile) return;
+    const wasFollowing = isFollowing;
+    const action = wasFollowing ? 'unfollow' : 'follow';
+    const prevFollowersCount = profile.followersCount || 0;
+    const optimisticCount = Math.max(0, prevFollowersCount + (wasFollowing ? -1 : 1));
+
+    setIsFollowing(!wasFollowing);
+    setProfile((prev) => (prev ? { ...prev, followersCount: optimisticCount } : null));
+
     try {
       setFollowLoading(true);
-      const action = isFollowing ? 'unfollow' : 'follow';
       const res = await fetch(`${API_URL}/${profile.username}/${action}`, {
         method: 'POST',
         headers: {
@@ -686,11 +985,146 @@ const UserProfileComponent: React.FC = () => {
       if (profileSlug) fetchFollowers(profileSlug);
     } catch (err: any) {
       console.error('Follow error:', err);
-      if (profileSlug) fetchProfile(profileSlug);
+      setIsFollowing(wasFollowing);
+      setProfile((prev) => (prev ? { ...prev, followersCount: prevFollowersCount } : null));
+      showToast(t('common.followFailed'), 'error');
     } finally {
       setFollowLoading(false);
     }
   };
+
+  const openProfileDetailsEditor = () => {
+    if (!profile) return;
+    setProfileInfoDraft({
+      bio: profile.bio || '',
+      location: profile.location || '',
+      website: profile.website || '',
+    });
+    setSocialLinksDraft(normalizeSocialLinksInput(profile.socialLinks));
+    if (isLgUp) {
+      setEditingProfileInfo(true);
+    } else {
+      setProfileDetailsModalOpen(true);
+    }
+  };
+
+  const cancelEditProfileInfo = () => {
+    if (profileInfoSaving) return;
+    setEditingProfileInfo(false);
+    setProfileDetailsModalOpen(false);
+  };
+
+  const handleSocialDraftChange = (platform: SocialPlatform, next: string) => {
+    setSocialLinksDraft((prev) => ({ ...prev, [platform]: next }));
+  };
+
+  const saveProfileInfo = async () => {
+    if (!token || profileInfoSaving) return;
+    try {
+      setProfileInfoSaving(true);
+      const res = await fetch(`${API_URL}/me/profile`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          bio: profileInfoDraft.bio.trim(),
+          location: profileInfoDraft.location.trim(),
+          website: profileInfoDraft.website.trim(),
+          socialLinks: socialLinksDraft,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data as { message?: string }).message || t('userProfile.profileUpdateFailed'));
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              bio: data.bio ?? profileInfoDraft.bio.trim(),
+              location: data.location ?? profileInfoDraft.location.trim(),
+              website: data.website ?? profileInfoDraft.website.trim(),
+              socialLinks: normalizeSocialLinksInput(data.socialLinks ?? socialLinksDraft),
+            }
+          : null
+      );
+      setEditingProfileInfo(false);
+      setProfileDetailsModalOpen(false);
+      showToast(t('userProfile.profileUpdated'));
+    } catch (err: unknown) {
+      console.error('Update profile info error:', err);
+      showToast(err instanceof Error ? err.message : t('userProfile.profileUpdateFailed'), 'error');
+    } finally {
+      setProfileInfoSaving(false);
+    }
+  };
+
+  const profileDetailsForm = (
+    <div className="space-y-3">
+      <div>
+        <label className="mb-1 block text-xs font-semibold text-neutral-500">
+          {t('userProfile.bioLabel')}
+        </label>
+        <textarea
+          value={profileInfoDraft.bio}
+          onChange={(e) => setProfileInfoDraft((prev) => ({ ...prev, bio: e.target.value.slice(0, 280) }))}
+          placeholder={t('userProfile.bioPlaceholder')}
+          rows={3}
+          maxLength={280}
+          disabled={profileInfoSaving}
+          className="w-full resize-none rounded-xl border border-neutral-200 bg-white px-3 py-2 text-[15px] text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-black/5 disabled:opacity-60"
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-semibold text-neutral-500">
+          {t('userProfile.locationLabel')}
+        </label>
+        <input
+          type="text"
+          value={profileInfoDraft.location}
+          onChange={(e) => setProfileInfoDraft((prev) => ({ ...prev, location: e.target.value.slice(0, 100) }))}
+          placeholder={t('userProfile.locationPlaceholder')}
+          disabled={profileInfoSaving}
+          className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-black/5 disabled:opacity-60"
+        />
+      </div>
+      <div>
+        <label className="mb-1 block text-xs font-semibold text-neutral-500">
+          {t('userProfile.websiteLabel')}
+        </label>
+        <input
+          type="text"
+          value={profileInfoDraft.website}
+          onChange={(e) => setProfileInfoDraft((prev) => ({ ...prev, website: e.target.value.slice(0, 200) }))}
+          placeholder={t('userProfile.websitePlaceholder')}
+          disabled={profileInfoSaving}
+          className="w-full rounded-xl border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-400 focus:outline-none focus:ring-2 focus:ring-black/5 disabled:opacity-60"
+        />
+      </div>
+      <div className="border-t border-neutral-100 pt-3">
+        <p className="mb-3 text-sm font-semibold text-neutral-900">{t('settings.connectedAccounts')}</p>
+        <SocialLinksEditor value={socialLinksDraft} onChange={handleSocialDraftChange} />
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={cancelEditProfileInfo}
+          disabled={profileInfoSaving}
+          className="rounded-full border border-neutral-300 px-4 py-1.5 text-sm font-semibold text-neutral-700 transition-colors hover:bg-neutral-100 disabled:opacity-50"
+        >
+          {t('common.cancel')}
+        </button>
+        <button
+          type="button"
+          onClick={() => void saveProfileInfo()}
+          disabled={profileInfoSaving}
+          className="rounded-full bg-black px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {profileInfoSaving ? t('common.saving') : t('common.save')}
+        </button>
+      </div>
+    </div>
+  );
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
@@ -725,6 +1159,7 @@ const UserProfileComponent: React.FC = () => {
       reposts: 'userProfile.reposts',
       replies: 'userProfile.replies',
       media: 'userProfile.media',
+      bookmarks: 'userProfile.bookmarks',
     } as const;
     return t(keys[activeTab]);
   }, [activeTab, t]);
@@ -783,7 +1218,7 @@ const UserProfileComponent: React.FC = () => {
           onClick={() => void startMessage(person.username)}
           className="inline-flex items-center rounded-full p-2 text-neutral-500 transition-colors hover:text-black"
         >
-          <MessageCircle className="h-4 w-4" />
+          <ProfileMessengerIcon size={16} />
         </button>
       )}
     </Link>
@@ -793,43 +1228,6 @@ const UserProfileComponent: React.FC = () => {
     setProfileMenuAnchor({ rect: e.currentTarget.getBoundingClientRect() });
     setProfileMenuOpen(true);
   };
-
-  const openMessengerWithUser = useCallback(
-    async (targetUsername: string) => {
-      if (!token) {
-        showToast(t('userProfile.menu.signInToMessage'), 'info');
-        window.dispatchEvent(new CustomEvent('openLogin'));
-        return;
-      }
-      if (messagingLoading) return;
-      setMessagingLoading(true);
-      try {
-        const res = await fetch(`${MESSAGES_API}/dm/${encodeURIComponent(targetUsername)}`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          showToast(
-            (data as { message?: string }).message || t('userProfile.menu.openChatFailed'),
-            'error'
-          );
-          return;
-        }
-        const conversationId = (data as { conversationId?: string }).conversationId;
-        if (!conversationId) {
-          showToast(t('userProfile.menu.openChatFailed'), 'error');
-          return;
-        }
-        navigate(`/messenger?chat=${encodeURIComponent(conversationId)}`);
-      } catch {
-        showToast(t('userProfile.menu.openChatFailed'), 'error');
-      } finally {
-        setMessagingLoading(false);
-      }
-    },
-    [token, navigate, showToast, t]
-  );
 
   const copyProfileLink = useCallback(async () => {
     if (!profile) return;
@@ -843,25 +1241,59 @@ const UserProfileComponent: React.FC = () => {
   }, [profile, showToast, t]);
 
   const handleProfileMenuAction = useCallback(
-    (action: ProfileUserActionId) => {
+    async (action: ProfileUserActionId) => {
       if (!profile) return;
-      if (action === 'message') {
-        void openMessengerWithUser(profile.username);
-        return;
-      }
       if (action === 'copyLink') {
         void copyProfileLink();
         return;
       }
       if (action === 'report') {
-        showToast(t('userProfile.menu.reportSent'), 'info');
+        if (!token) {
+          showToast(t('userProfile.menu.signInToMessage'), 'error');
+          return;
+        }
+        const ok = await reportUser(token, profile._id, `Reported from profile @${profile.username}`);
+        showToast(
+          ok ? t('userProfile.menu.reportSent') : t('userProfile.menu.reportFailed'),
+          ok ? 'info' : 'error'
+        );
         return;
       }
       if (action === 'block') {
+        if (!token) {
+          showToast(t('userProfile.menu.signInToMessage'), 'error');
+          return;
+        }
+        if (profile.isBlockedByMe) {
+          const ok = await unblockUser(token, profile.username);
+          if (!ok) {
+            showToast(t('userProfile.menu.unblockFailed'), 'error');
+            return;
+          }
+          setProfile((prev) => (prev ? { ...prev, isBlockedByMe: false } : null));
+          showToast(t('userProfile.menu.unblocked'), 'info');
+          return;
+        }
+        const okConfirm = await confirm({
+          title: t('userProfile.menu.blockTitle'),
+          message: t('userProfile.menu.blockMessage', { name: profile.username }),
+          confirmLabel: t('userProfile.menu.blockConfirm'),
+          variant: 'danger',
+        });
+        if (!okConfirm) return;
+        const ok = await blockUser(token, profile.username);
+        if (!ok) {
+          showToast(t('userProfile.menu.blockFailed'), 'error');
+          return;
+        }
+        setProfile((prev) =>
+          prev ? { ...prev, isBlockedByMe: true, isFollowing: false } : null
+        );
+        setIsFollowing(false);
         showToast(t('userProfile.menu.blocked'), 'info');
       }
     },
-    [profile, openMessengerWithUser, copyProfileLink, showToast, t]
+    [profile, copyProfileLink, showToast, t, token, confirm]
   );
 
   const renderPostCard = (post: Post, options?: { showRepostBanner?: boolean }) => {
@@ -971,6 +1403,7 @@ const UserProfileComponent: React.FC = () => {
             {post.media && post.media.length > 0 && (
               <PostMediaGallery media={post.media} meta={buildPostLightboxMeta(post)} />
             )}
+            {post.quotedPost ? <QuotedPostCard quotedPost={post.quotedPost} /> : null}
             <PostFeedActionButtons
               postId={postId}
               likesCount={post.likesCount || 0}
@@ -978,11 +1411,14 @@ const UserProfileComponent: React.FC = () => {
               repostsCount={post.repostsCount || 0}
               liked={likedPosts.has(postId)}
               reposted={repostedPosts.has(postId)}
+              bookmarked={bookmarkedPosts.has(postId)}
               commentsExpanded={expandedCommentsPostId === postId}
               formatCount={formatCount}
               onLike={handleLike}
               onToggleComments={toggleFeedComments}
               onRepost={handleRepost}
+              onBookmark={handleBookmark}
+              onQuote={openQuoteComposer}
             />
 
             {expandedCommentsPostId === postId && (
@@ -1015,8 +1451,14 @@ const UserProfileComponent: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-neutral-300 border-t-black"></div>
+      <div className="mx-auto flex h-full min-h-0 w-full min-w-0 max-w-[1200px] gap-0 overflow-x-hidden">
+        <div className="flex h-full min-h-0 min-w-0 max-w-[600px] flex-1 flex-col overflow-hidden border-x border-neutral-200 bg-white">
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+            <ProfileHeaderSkeleton />
+            <FeedSkeleton count={4} />
+          </div>
+        </div>
+        <div className="hidden h-full min-h-0 w-[400px] min-w-0 shrink-0 border-r border-neutral-200 lg:block" />
       </div>
     );
   }
@@ -1099,11 +1541,15 @@ const UserProfileComponent: React.FC = () => {
     <div className="mx-auto flex h-full min-h-0 w-full min-w-0 max-w-[1200px] gap-0 overflow-x-hidden">
 
       <div className="flex h-full min-h-0 min-w-0 max-w-[600px] flex-1 flex-col overflow-hidden border-x border-neutral-200 bg-white">
-        <div
-          ref={profileScrollRef}
-          className={`min-h-0 min-w-0 flex-1 ${
-            mobileComposerFull ? 'overflow-hidden' : 'overflow-x-hidden overflow-y-auto'
-          }`}
+        <PullToRefresh
+          onRefresh={handlePullRefresh}
+          scrollRef={profileScrollRef}
+          className="min-h-0 min-w-0 flex-1 overflow-x-hidden"
+          labels={{
+            pull: t('common.pullToRefresh'),
+            release: t('common.releaseToRefresh'),
+            refreshing: t('common.refreshing'),
+          }}
         >
         {/* Compact bar — after scrolling past full profile header */}
         <div
@@ -1161,7 +1607,7 @@ const UserProfileComponent: React.FC = () => {
                     disabled={messagingId === profile.username}
                     className="inline-flex items-center gap-1.5 rounded-full bg-[#315efb] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#2547c4] disabled:opacity-60"
                   >
-                    <MessageCircle className="h-4 w-4" />
+                    <ProfileMessengerIcon size={16} color="#ffffff" />
                     {messagingId === profile.username ? t('users.opening') : t('users.message')}
                   </button>
                   <button
@@ -1244,7 +1690,7 @@ const UserProfileComponent: React.FC = () => {
                   disabled={messagingId === profile.username}
                   className="inline-flex items-center gap-1.5 rounded-full bg-[#315efb] px-5 py-2 text-sm font-medium text-white hover:bg-[#2547c4] disabled:opacity-60"
                 >
-                  <MessageCircle className="h-4 w-4" />
+                  <ProfileMessengerIcon size={16} color="#ffffff" />
                   {messagingId === profile.username ? t('users.opening') : t('users.message')}
                 </button>
                 <button
@@ -1260,11 +1706,62 @@ const UserProfileComponent: React.FC = () => {
               </>
             )}
           </div>
-          {profile.bio ? (
-            <p className="mt-3 break-words text-[15px] leading-relaxed text-neutral-900 sm:text-base">
-              {profile.bio}
-            </p>
-          ) : null}
+          {editingProfileInfo && isLgUp ? (
+            <div className="mt-3 rounded-2xl border border-neutral-200 bg-neutral-50/60 p-3">
+              {profileDetailsForm}
+            </div>
+          ) : (
+            <>
+              {profile.bio ? (
+                <div className="mt-3">
+                  <div className="flex items-start gap-1.5">
+                    <p className="break-words text-[15px] leading-relaxed text-neutral-900 sm:text-base">
+                      {profile.bio}
+                    </p>
+                    {isOwnProfile ? (
+                      <button
+                        type="button"
+                        onClick={openProfileDetailsEditor}
+                        aria-label={t('userProfile.editBioDetails')}
+                        className="mt-0.5 shrink-0 rounded-full p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+                      >
+                        <Pencil size={14} aria-hidden />
+                      </button>
+                    ) : null}
+                  </div>
+                  {isOwnProfile && !hasAnySocialLink(profile.socialLinks) ? (
+                    <button
+                      type="button"
+                      onClick={openProfileDetailsEditor}
+                      className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:underline"
+                    >
+                      <LinkIcon size={14} aria-hidden />
+                      {t('userProfile.addSocialLinks')}
+                    </button>
+                  ) : null}
+                </div>
+              ) : isOwnProfile ? (
+                <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <button
+                    type="button"
+                    onClick={openProfileDetailsEditor}
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:underline"
+                  >
+                    <Pencil size={14} aria-hidden />
+                    {t('userProfile.addBioDetails')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openProfileDetailsEditor}
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 transition-colors hover:underline"
+                  >
+                    <LinkIcon size={14} aria-hidden />
+                    {t('userProfile.addSocialLinks')}
+                  </button>
+                </div>
+              ) : null}
+            </>
+          )}
           
           <div className="my-2 flex gap-4 text-md">
             <div
@@ -1281,59 +1778,65 @@ const UserProfileComponent: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex text-sm items-center gap-1"><Calendar size={14} /><span>{t('userProfile.joinedLine', { date: formatDate(profile.createdAt) })}</span></div>
+          <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-neutral-600">
+            <span className="inline-flex items-center gap-1">
+              <Calendar size={14} className="shrink-0 text-neutral-400" aria-hidden />
+              <span>{t('userProfile.joinedLine', { date: formatDate(profile.createdAt) })}</span>
+            </span>
+            {profile.location ? (
+              <>
+                <span className="text-neutral-300" aria-hidden>
+                  ·
+                </span>
+                <span className="inline-flex min-w-0 items-center gap-1">
+                  <MapPin size={14} className="shrink-0 text-neutral-400" aria-hidden />
+                  <span className="min-w-0 break-words">{profile.location}</span>
+                </span>
+              </>
+            ) : null}
+            {profile.website ? (
+              <>
+                <span className="text-neutral-300" aria-hidden>
+                  ·
+                </span>
+                <span className="inline-flex min-w-0 items-center gap-1">
+                  <LinkIcon size={14} className="shrink-0 text-neutral-400" aria-hidden />
+                  <ExternalLink
+                    href={
+                      profile.website.startsWith('http')
+                        ? profile.website
+                        : `https://${profile.website}`
+                    }
+                    className="min-w-0 break-all text-blue-600 hover:underline"
+                  >
+                    {profile.website.replace(/^https?:\/\//, '')}
+                  </ExternalLink>
+                </span>
+              </>
+            ) : null}
+          </div>
           </div>
 
-          {(profile.location ||
-            profile.website ||
-            hasAnySocialLink(profile.socialLinks) ||
-            isOwnProfile) && (
+          {hasAnySocialLink(profile.socialLinks) ? (
             <div className="mt-3 min-w-0 space-y-1 rounded-2xl border border-neutral-100 bg-neutral-50/80 p-1">
-              {(profile.location || profile.website) && (
-                <div className="flex min-w-0 flex-col gap-1 text-sm text-neutral-600">
-                  {profile.location ? (
-                    <div className="flex min-w-0 items-start gap-1">
-                      <MapPin size={16} className="mt-0.5 shrink-0 text-neutral-400" aria-hidden />
-                      <span className="min-w-0 break-words">{profile.location}</span>
-                    </div>
-                  ) : null}
-                  {profile.website ? (
-                    <div className="flex min-w-0 items-start gap-1">
-                      <LinkIcon size={16} className="mt-0.5 shrink-0 text-neutral-400" aria-hidden />
-                      <a
-                        href={
-                          profile.website.startsWith('http')
-                            ? profile.website
-                            : `https://${profile.website}`
-                        }
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="min-w-0 break-all text-blue-600 hover:underline"
-                      >
-                        {profile.website.replace(/^https?:\/\//, '')}
-                      </a>
-                    </div>
-                  ) : null}
-                </div>
-              )}
-
-              {hasAnySocialLink(profile.socialLinks) ? (
-                <ProfileSocialLinks
-                  links={profile.socialLinks}
-                  showHeading={Boolean(profile.location || profile.website)}
-                />
-              ) : isOwnProfile ? (
-                <button
-                  type="button"
-                  onClick={() => navigate('/settings?section=connected')}
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:border-blue-300 hover:bg-blue-50/50 active:scale-[0.99] sm:w-auto sm:justify-start"
-                >
-                  <LinkIcon size={16} className="shrink-0" aria-hidden />
-                  {t('userProfile.addSocialLinks')}
-                </button>
-              ) : null}
+              <div className="flex items-center justify-between gap-2 px-2 pt-1">
+                <span className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+                  {t('settings.connectedAccounts')}
+                </span>
+                {isOwnProfile ? (
+                  <button
+                    type="button"
+                    onClick={openProfileDetailsEditor}
+                    className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium text-blue-600 transition-colors hover:bg-blue-50"
+                  >
+                    <Pencil size={12} aria-hidden />
+                    {t('common.edit')}
+                  </button>
+                ) : null}
+              </div>
+              <ProfileSocialLinks links={profile.socialLinks} />
             </div>
-          )}
+          ) : null}
         </div>
         <div ref={profileHeaderEndRef} className="h-px w-full shrink-0" aria-hidden />
 
@@ -1353,6 +1856,7 @@ const UserProfileComponent: React.FC = () => {
             { id: 'reposts', label: t('userProfile.reposts') },
             { id: 'replies', label: t('userProfile.replies') },
             { id: 'media', label: t('userProfile.media') },
+            ...(isOwnProfile ? [{ id: 'bookmarks', label: t('userProfile.bookmarks') }] : []),
           ].map((tab) => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)}
               className={`flex-1 py-2 text-sm font-medium text-center hover:bg-neutral-50 transition-colors relative ${activeTab === tab.id ? 'text-neutral-900 bg-neutral-50' : 'text-neutral-500'}`}>
@@ -1534,8 +2038,23 @@ const UserProfileComponent: React.FC = () => {
             )}
           </div>
         )}
+
+        {activeTab === 'bookmarks' && isOwnProfile && (
+          <div>
+            {bookmarksLoading ? (
+              <FeedSkeleton count={3} />
+            ) : bookmarks.length > 0 ? (
+              bookmarks.map((post) => renderPostCard(post))
+            ) : (
+              <div className="text-center py-20 px-4">
+                <h2 className="text-2xl font-bold text-neutral-900 mb-2">{t('userProfile.noBookmarks')}</h2>
+                <p className="text-neutral-500">{t('userProfile.noBookmarksHint')}</p>
+              </div>
+            )}
+          </div>
+        )}
         </div>
-        </div>
+        </PullToRefresh>
 
       </div>
 
@@ -1661,6 +2180,16 @@ const UserProfileComponent: React.FC = () => {
         ) : null}
       </MobileBottomSheet>
 
+      <MobileBottomSheet
+        open={profileDetailsModalOpen}
+        onClose={cancelEditProfileInfo}
+        title={t('userProfile.editBioDetails')}
+        padded
+        dismissible={!profileInfoSaving}
+      >
+        {profileDetailsForm}
+      </MobileBottomSheet>
+
       <FloatingMenu
         open={!!openCommentMenu}
         anchor={openCommentMenu ? { rect: openCommentMenu.rect } : null}
@@ -1724,11 +2253,11 @@ const UserProfileComponent: React.FC = () => {
           username={profile.username}
           title={t('userProfile.menu.title')}
           labels={{
-            sendMessage: t('userProfile.menu.sendMessage'),
             copyLink: t('userProfile.menu.copyLink'),
             report: t('userProfile.menu.report'),
-            block: t('userProfile.menu.block'),
+            block: profile.isBlockedByMe ? t('userProfile.menu.unblock') : t('userProfile.menu.block'),
           }}
+          isBlocked={Boolean(profile.isBlockedByMe)}
           onAction={handleProfileMenuAction}
         />
       ) : null}
@@ -1776,6 +2305,14 @@ const UserProfileComponent: React.FC = () => {
           if (!editCommentSaving) setEditCommentTarget(null);
         }}
         onSubmit={(value) => void submitEditComment(value)}
+      />
+
+      <QuoteComposerModal
+        open={quoteTarget !== null}
+        quotedPost={quoteTarget}
+        submitting={quoteSubmitting}
+        onClose={closeQuoteComposer}
+        onSubmit={(content) => void submitQuote(content)}
       />
     </div>
   );

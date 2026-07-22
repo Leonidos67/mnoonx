@@ -9,7 +9,8 @@ export type NotificationPrefKey =
   | 'upcomingPaymentReminders'
   | 'withdrawalStatusChange'
   | 'transferReceived'
-  | 'waitlistAccepted';
+  | 'waitlistAccepted'
+  | 'pushEnabled';
 
 export type NotificationPreferences = Record<NotificationPrefKey, boolean>;
 
@@ -25,6 +26,7 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPreferences = {
   withdrawalStatusChange: true,
   transferReceived: true,
   waitlistAccepted: true,
+  pushEnabled: false,
 };
 
 const storageKey = (userId: string) => `mnoonx:notificationPrefs:${userId}`;

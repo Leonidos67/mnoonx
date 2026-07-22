@@ -17,6 +17,7 @@ const {
   getInstalledStickerPacksForUser,
   installStickerPackForUser,
 } = require('../services/stickers');
+const { assertCanMessage, isBlockedEitherWay } = require('../services/userBlocks');
 
 router.use(auth);
 router.use((req, res, next) => {
@@ -104,7 +105,12 @@ router.get('/unread-count', async (req, res) => {
 router.get('/conversations', async (req, res) => {
   try {
     await ensureUserMessaging(req.userId);
-    const convs = await Conversation.find({ ownerUserId: req.userId })
+    const me = await User.findById(req.userId).select('blockedUserIds').lean();
+    const myBlocked = new Set((me?.blockedUserIds || []).map((id) => id.toString()));
+    const blockers = await User.find({ blockedUserIds: req.userId }).select('_id').lean();
+    const theirBlockers = new Set(blockers.map((u) => u._id.toString()));
+
+    const convs = await Conversation.find({ ownerUserId: req.userId, hiddenAt: null })
       .sort({ lastMessageAt: -1 })
       .lean();
 
@@ -158,9 +164,16 @@ router.get('/conversations', async (req, res) => {
           }
         }
 
+        const peerId = c.peerUserId ? c.peerUserId.toString() : null;
+        const blockedByMe = peerId ? myBlocked.has(peerId) : false;
+        const blockedByThem = peerId ? theirBlockers.has(peerId) : false;
+
         return {
           id: c._id.toString(),
           kind: c.kind,
+          peerUserId: peerId,
+          blockedByMe,
+          blockedByThem,
           name:
             c.kind === 'dm'
               ? peer?.fullName || peer?.username || 'User'
@@ -191,6 +204,7 @@ router.get('/conversations/:id', async (req, res) => {
     const conv = await Conversation.findOne({
       _id: req.params.id,
       ownerUserId: req.userId,
+      hiddenAt: null,
     }).lean();
     if (!conv) return res.status(404).json({ message: 'Conversation not found' });
 
@@ -208,10 +222,21 @@ router.get('/conversations/:id', async (req, res) => {
         ? await getPeerLastReadAt(req.userId, conv.peerUserId)
         : null;
 
+    let blockedByMe = false;
+    let blockedByThem = false;
+    if (conv.kind === 'dm' && conv.peerUserId) {
+      const blockState = await isBlockedEitherWay(req.userId, conv.peerUserId);
+      blockedByMe = blockState.blockedByMe;
+      blockedByThem = blockState.blockedByThem;
+    }
+
     res.json({
       conversation: {
         id: conv._id.toString(),
         kind: conv.kind,
+        peerUserId: conv.peerUserId ? conv.peerUserId.toString() : null,
+        blockedByMe,
+        blockedByThem,
         name:
           conv.kind === 'dm'
             ? peer?.fullName || peer?.username || 'User'
@@ -299,10 +324,19 @@ router.post('/conversations/:id/messages', async (req, res) => {
     const conv = await Conversation.findOne({
       _id: req.params.id,
       ownerUserId: req.userId,
+      hiddenAt: null,
     });
     if (!conv) return res.status(404).json({ message: 'Conversation not found' });
     if (conv.kind === 'system_mnoonx') {
       return res.status(403).json({ message: 'This channel is read-only' });
+    }
+
+    if (conv.kind === 'dm' && conv.peerUserId) {
+      try {
+        await assertCanMessage(req.userId, conv.peerUserId);
+      } catch (err) {
+        return res.status(err.status || 403).json({ message: err.message, code: err.code });
+      }
     }
 
     const text = String(body).trim();
@@ -423,6 +457,26 @@ async function findPeerDmMirrorMessage(conv, message) {
   });
 }
 
+router.delete('/conversations/:id', async (req, res) => {
+  try {
+    const conv = await Conversation.findOne({
+      _id: req.params.id,
+      ownerUserId: req.userId,
+    });
+    if (!conv) return res.status(404).json({ message: 'Conversation not found' });
+    if (conv.kind === 'system_mnoonx' || conv.kind === 'system_support') {
+      return res.status(403).json({ message: 'System chats cannot be deleted' });
+    }
+
+    conv.hiddenAt = new Date();
+    await conv.save();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Hide conversation error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 router.delete('/conversations/:conversationId/messages/:messageId', async (req, res) => {
   try {
     const conv = await Conversation.findOne({
@@ -477,6 +531,14 @@ router.post('/dm/:username', async (req, res) => {
     if (!peer) return res.status(404).json({ message: 'User not found' });
     if (peer._id.toString() === req.userId.toString()) {
       return res.status(400).json({ message: 'Cannot message yourself' });
+    }
+
+    const blockState = await isBlockedEitherWay(req.userId, peer._id);
+    if (blockState.blocked) {
+      return res.status(403).json({
+        message: blockState.blockedByMe ? 'You blocked this user' : 'This user is unavailable',
+        code: blockState.blockedByMe ? 'blocked_by_me' : 'blocked_by_them',
+      });
     }
 
     const { convA } = await getOrCreateDmConversation(req.userId, peer._id);

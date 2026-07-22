@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Headphones, LayoutDashboard, LogOut, ScrollText, Users, X } from 'lucide-react';
+import { Flag, Headphones, LayoutDashboard, LogOut, ScrollText, Users, X } from 'lucide-react';
 import { useAdminAuth } from '../../context/AdminAuthContext';
 
 interface AdminSidebarProps {
@@ -54,6 +54,10 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ mobileOpen, onCloseMobile }
         <NavLink to="/admin/logs" className={linkClass} onClick={onCloseMobile}>
           <ScrollText size={18} />
           Логи БД
+        </NavLink>
+        <NavLink to="/admin/moderation" className={linkClass} onClick={onCloseMobile}>
+          <Flag size={18} />
+          Модерация
         </NavLink>
         <NavLink to="/admin/support" className={linkClass} onClick={onCloseMobile}>
           <Headphones size={18} />

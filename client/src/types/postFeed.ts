@@ -43,4 +43,10 @@ export interface FeedPost {
   isLiked?: boolean;
   isReposted?: boolean;
   isPrivate?: boolean;
+  isBookmarked?: boolean;
+  bookmarksCount?: number;
+  /** Present when this post is a quote-repost of another post */
+  quoteOf?: string | null;
+  /** Serialized original post when this is a quote-repost, or `{ missing: true }` if deleted */
+  quotedPost?: FeedPost | { missing: true } | null;
 }

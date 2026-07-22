@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Users, LayoutGrid, Landmark, ArrowRight } from 'lucide-react';
+import { Search, Users, LayoutGrid, Landmark, ArrowRight, Hash, FileText } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { COMMUNITIES_API, USERS_API } from '../../config/api';
+import { COMMUNITIES_API, POSTS_API, USERS_API } from '../../config/api';
 import { profilePath } from '../../constants/paths';
 import { communityPath } from '../../constants/communityRoutes';
 import {
@@ -24,7 +24,7 @@ interface SearchBarProps {
   onDismiss?: () => void;
 }
 
-type SearchCategory = 'all' | 'communities' | 'people';
+type SearchCategory = 'all' | 'communities' | 'people' | 'posts';
 
 interface PopularCommunity {
   kind: 'community';
@@ -46,12 +46,14 @@ interface PopularPerson {
 type PopularItem = PopularCommunity | PopularPerson;
 
 interface SearchHit {
-  kind: 'community' | 'person';
+  kind: 'community' | 'person' | 'post' | 'hashtag';
   id: string;
   title: string;
   subtitle: string;
   avatar: string;
   to: string;
+  /** For hashtag hits: sets the search query instead of navigating. */
+  hashtagQuery?: string;
 }
 
 const COMMUNITY_AVATAR_CLASS = 'h-9 w-9 shrink-0 rounded-2xl object-cover';
@@ -74,6 +76,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
   const [activeCategory, setActiveCategory] = useState<SearchCategory>('all');
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [searchResults, setSearchResults] = useState<SearchHit[]>([]);
+  const [postHits, setPostHits] = useState<SearchHit[]>([]);
+  const [postSearchLoading, setPostSearchLoading] = useState(false);
   const [popularItems, setPopularItems] = useState<PopularItem[]>([]);
   const [popularLoading, setPopularLoading] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -86,6 +90,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
       { id: 'all' as const, label: t('search.all'), icon: LayoutGrid },
       { id: 'communities' as const, label: t('search.communities'), icon: Landmark },
       { id: 'people' as const, label: t('search.people'), icon: Users },
+      { id: 'posts' as const, label: t('search.posts'), icon: Hash },
     ],
     [t]
   );
@@ -254,6 +259,74 @@ const SearchBar: React.FC<SearchBarProps> = ({
   );
 
   useEffect(() => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setPostHits([]);
+      setPostSearchLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setPostSearchLoading(true);
+      try {
+        const headers: Record<string, string> = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+        const res = await fetch(
+          `${POSTS_API}/search?q=${encodeURIComponent(trimmed)}&limit=8`,
+          { headers }
+        );
+        if (!res.ok) {
+          if (!cancelled) setPostHits([]);
+          return;
+        }
+        const data = (await res.json()) as {
+          posts?: Array<{
+            _id: string;
+            content?: string;
+            author?: { username: string; fullName: string; avatar?: string };
+          }>;
+          hashtags?: Array<{ tag: string; count: number }>;
+        };
+        if (cancelled) return;
+        const hashtagHits: SearchHit[] = (data.hashtags || []).map((h) => ({
+          kind: 'hashtag' as const,
+          id: `hashtag-${h.tag}`,
+          title: `#${h.tag}`,
+          subtitle: t('search.hashtagCount', { count: h.count }),
+          avatar: '',
+          to: '',
+          hashtagQuery: `#${h.tag}`,
+        }));
+        const postResultHits: SearchHit[] = (data.posts || []).map((p) => ({
+          kind: 'post' as const,
+          id: String(p._id),
+          title: (p.content || '').trim().slice(0, 90) || `@${p.author?.username || ''}`,
+          subtitle: p.author ? `@${p.author.username}` : '',
+          avatar: p.author?.avatar
+            ? resolveMediaUrl(p.author.avatar)
+            : personAvatarUrl(p.author?.fullName || p.author?.username || 'Post'),
+          to: `/post/${p._id}`,
+        }));
+        setPostHits([...hashtagHits, ...postResultHits]);
+      } catch {
+        if (!cancelled) setPostHits([]);
+      } finally {
+        if (!cancelled) setPostSearchLoading(false);
+      }
+    }, 300);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [query, token, t]);
+
+  const combinedResults = useMemo(() => {
+    if (activeCategory === 'communities' || activeCategory === 'people') return searchResults;
+    if (activeCategory === 'posts') return postHits;
+    return [...searchResults, ...postHits].slice(0, 12);
+  }, [searchResults, postHits, activeCategory]);
+
+  useEffect(() => {
     const saved = localStorage.getItem('recentSearches');
     if (saved) {
       try {
@@ -287,6 +360,12 @@ const SearchBar: React.FC<SearchBarProps> = ({
   };
 
   const openSearchHit = (hit: SearchHit) => {
+    if (hit.kind === 'hashtag' && hit.hashtagQuery) {
+      setQuery(hit.hashtagQuery);
+      setActiveCategory('posts');
+      performSearch(hit.hashtagQuery, 'posts');
+      return;
+    }
     if (!isModal) setDropdownOpen(false);
     onDismiss?.();
     navigate(hit.to);
@@ -364,23 +443,35 @@ const SearchBar: React.FC<SearchBarProps> = ({
               <Search className="h-3 w-3" />
               {t('search.resultsFor', { query })}
             </div>
-            {popularLoading ? (
+            {popularLoading || postSearchLoading ? (
               <p className="px-4 py-8 text-center text-sm text-neutral-400">{t('search.searching')}</p>
-            ) : searchResults.length > 0 ? (
-              searchResults.map((hit) => (
+            ) : combinedResults.length > 0 ? (
+              combinedResults.map((hit) => (
                 <button
                   key={`${hit.kind}-${hit.id}`}
                   type="button"
                   onClick={() => openSearchHit(hit)}
                   className="group flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-neutral-50"
                 >
-                  <img
-                    src={hit.avatar}
-                    alt=""
-                    className={
-                      hit.kind === 'community' ? COMMUNITY_AVATAR_CLASS : PERSON_AVATAR_CLASS
-                    }
-                  />
+                  {hit.kind === 'hashtag' ? (
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+                      <Hash className="h-4 w-4" />
+                    </span>
+                  ) : hit.kind === 'post' ? (
+                    hit.avatar ? (
+                      <img src={hit.avatar} alt="" className={PERSON_AVATAR_CLASS} />
+                    ) : (
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+                        <FileText className="h-4 w-4" />
+                      </span>
+                    )
+                  ) : (
+                    <img
+                      src={hit.avatar}
+                      alt=""
+                      className={hit.kind === 'community' ? COMMUNITY_AVATAR_CLASS : PERSON_AVATAR_CLASS}
+                    />
+                  )}
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-neutral-800">
                       {hit.title}
@@ -388,7 +479,13 @@ const SearchBar: React.FC<SearchBarProps> = ({
                     <span className="block truncate text-xs text-neutral-500">{hit.subtitle}</span>
                   </span>
                   <span className="text-xs capitalize text-neutral-400">
-                    {hit.kind === 'community' ? t('search.kindCommunity') : t('search.kindPerson')}
+                    {hit.kind === 'community'
+                      ? t('search.kindCommunity')
+                      : hit.kind === 'person'
+                        ? t('search.kindPerson')
+                        : hit.kind === 'post'
+                          ? t('search.kindPost')
+                          : t('search.kindHashtag')}
                   </span>
                   <ArrowRight className="h-3 w-3 text-neutral-400 opacity-0 transition-opacity group-hover:opacity-100" />
                 </button>

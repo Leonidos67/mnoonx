@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import AnimojiPlayer from './AnimojiPlayer';
 import MessengerCoinMessageCard from './MessengerCoinMessageCard';
+import MessengerLinkPreviewCard from './MessengerLinkPreviewCard';
+import ExternalLink from '../Common/ExternalLink';
 import {
   formatMessagePreview,
   getMessageBody,
@@ -10,6 +12,59 @@ import {
   parseMessageParts,
   splitReplyMessage,
 } from '../../utils/messengerAnimoji';
+
+const URL_RE = /(https?:\/\/[^\s<]+)/g;
+
+function extractFirstUrl(text: string): string | null {
+  const match = text.match(URL_RE);
+  if (!match || match.length === 0) return null;
+  return match[0].replace(/[).,!?]+$/, '');
+}
+
+function renderTextWithLinks(value: string, keyPrefix: string): React.ReactNode[] {
+  if (!value) return [];
+  const nodes: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let index = 0;
+  const re = new RegExp(URL_RE.source, 'g');
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(value)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(
+        <React.Fragment key={`${keyPrefix}-t-${index}`}>
+          {value.slice(lastIndex, match.index)}
+        </React.Fragment>
+      );
+      index += 1;
+    }
+    const rawUrl = match[0].replace(/[).,!?]+$/, '');
+    const trailing = match[0].slice(rawUrl.length);
+    nodes.push(
+      <ExternalLink
+        key={`${keyPrefix}-a-${index}`}
+        href={rawUrl}
+        onClick={(e) => e.stopPropagation()}
+        className="underline decoration-current/40 underline-offset-2 hover:opacity-80 break-all"
+      >
+        {rawUrl}
+      </ExternalLink>
+    );
+    index += 1;
+    if (trailing) {
+      nodes.push(
+        <React.Fragment key={`${keyPrefix}-tt-${index}`}>{trailing}</React.Fragment>
+      );
+      index += 1;
+    }
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < value.length) {
+    nodes.push(
+      <React.Fragment key={`${keyPrefix}-t-${index}`}>{value.slice(lastIndex)}</React.Fragment>
+    );
+  }
+  return nodes;
+}
 
 interface MessengerMessageBodyProps {
   text: string;
@@ -36,6 +91,11 @@ const MessengerMessageBody: React.FC<MessengerMessageBodyProps> = ({
       .map((line) => line.replace(/^>\s?/, ''))
       .join('\n')
       .trim();
+
+  const firstUrl = useMemo(() => {
+    if (animojiOnly || stickerOnly || coinOnly) return null;
+    return extractFirstUrl(displayText);
+  }, [displayText, animojiOnly, stickerOnly, coinOnly]);
 
   if (animojiOnly && parts[0]?.type === 'animoji') {
     const part = parts[0];
@@ -126,9 +186,12 @@ const MessengerMessageBody: React.FC<MessengerMessageBodyProps> = ({
             );
           }
           if (!part.value) return null;
-          return <span key={`text-${index}`}>{part.value}</span>;
+          return (
+            <span key={`text-${index}`}>{renderTextWithLinks(part.value, `text-${index}`)}</span>
+          );
         })}
       </p>
+      {firstUrl ? <MessengerLinkPreviewCard url={firstUrl} /> : null}
     </div>
   );
 };

@@ -8,6 +8,7 @@ import AdminDashboard from './AdminDashboard';
 import AdminSupport from './AdminSupport';
 import AdminUsers from './AdminUsers';
 import AdminLogs from './AdminLogs';
+import AdminModeration from './AdminModeration';
 
 const AdminRoutes: React.FC = () => (
   <AdminAuthProvider>
@@ -23,6 +24,7 @@ const AdminRoutes: React.FC = () => (
         <Route index element={<AdminDashboard />} />
         <Route path="users" element={<AdminUsers />} />
         <Route path="logs" element={<AdminLogs />} />
+        <Route path="moderation" element={<AdminModeration />} />
         <Route path="support" element={<AdminSupport />} />
       </Route>
       <Route path="*" element={<Navigate to="/admin" replace />} />

@@ -6,6 +6,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import { UnreadsProvider } from './context/UnreadsContext';
 import { ToastProvider } from './context/ToastContext';
 import { ConfirmProvider } from './context/ConfirmContext';
+import { InAppBrowserProvider } from './context/InAppBrowserContext';
 
 import AppLayout from './components/Layout/AppLayout';
 
@@ -74,6 +75,7 @@ function App() {
           v7_relativeSplatPath: true,
         }}
       >
+      <InAppBrowserProvider>
         <Routes>
           <Route path="/admin/*" element={<AdminRoutes />} />
           <Route path="/docs/*" element={<DocsRoutes />} />
@@ -205,6 +207,7 @@ function App() {
           }} 
         />
 
+      </InAppBrowserProvider>
       </Router>
       </TonConnectAppProvider>
       </UnreadsProvider>

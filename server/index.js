@@ -42,6 +42,11 @@ app.use('/api/ai', require('./routes/ai'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/support', require('./routes/support'));
 app.use('/api/portfolio', require('./routes/portfolio'));
+app.use('/api/push', require('./routes/push'));
+app.use('/api/reports', require('./routes/reports'));
+app.use('/api/link-preview', require('./routes/linkPreview'));
+app.use('/api/browse', require('./routes/browse'));
+app.use('/api/og', require('./routes/og'));
 
 const { sendTonConnectManifest } = require('./tonConnectManifest');
 app.get('/tonconnect-manifest.json', sendTonConnectManifest);

@@ -91,7 +91,19 @@ const postSchema = new mongoose.Schema({
   bookmarksCount: {
     type: Number,
     default: 0
-  }
+  },
+  /** Lowercase hashtags extracted from content (#foo) */
+  hashtags: [{
+    type: String,
+    lowercase: true,
+    trim: true,
+  }],
+  /** Quote-repost: original post id */
+  quoteOf: {
+    type: String,
+    default: null,
+    index: true,
+  },
 }, {
   timestamps: true
 });
@@ -100,6 +112,8 @@ const postSchema = new mongoose.Schema({
 postSchema.index({ author: 1, createdAt: -1 });
 postSchema.index({ createdAt: -1 });
 postSchema.index({ community: 1, isPrivate: 1, createdAt: -1 });
+postSchema.index({ hashtags: 1, createdAt: -1 });
+postSchema.index({ content: 'text' });
 
 // Middleware: обновляем счетчик постов пользователя
 postSchema.post('save', async function() {

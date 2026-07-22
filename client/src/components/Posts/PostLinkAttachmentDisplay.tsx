@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import type { PostLinkAttachment } from '../../types/postLink';
+import ExternalLink from '../Common/ExternalLink';
 
 interface PostLinkAttachmentDisplayProps {
   link: PostLinkAttachment;
@@ -26,9 +27,9 @@ const PostLinkAttachmentDisplay: React.FC<PostLinkAttachmentDisplayProps> = ({ l
 
   return (
     <p className="mt-2">
-      <a href={url} target="_blank" rel="noopener noreferrer" className={`${linkClass} break-all`}>
+      <ExternalLink href={url} className={`${linkClass} break-all`}>
         {title}
-      </a>
+      </ExternalLink>
     </p>
   );
 };

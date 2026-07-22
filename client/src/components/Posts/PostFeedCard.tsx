@@ -6,6 +6,7 @@ import PostMediaGallery from './PostMediaGallery';
 import { PostCommentsSection } from './PostCommentsSection';
 import { AnimatedPostMenuIcon } from './PostMenuAnimatedIcons';
 import PostFeedActionButtons from './PostFeedActionButtons';
+import QuotedPostCard from './QuotedPostCard';
 import { buildPostLightboxMeta } from '../../utils/buildPostLightboxMeta';
 import type { FeedPost } from '../../types/postFeed';
 import { useTranslation } from '../../i18n/useTranslation';
@@ -22,8 +23,11 @@ export interface PostFeedCardProps {
   formatCount: (count: number) => string;
   likedPosts: Set<string>;
   repostedPosts: Set<string>;
+  bookmarkedPosts?: Set<string>;
   onLike: (postId: string) => void;
   onRepost: (postId: string) => void;
+  onBookmark?: (postId: string) => void;
+  onQuote?: (postId: string) => void;
   onToggleComments: (postId: string, e: React.MouseEvent) => void;
   expandedCommentsPostId: string | null;
   menuOpenPostId: string | null;
@@ -59,8 +63,11 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
   formatCount,
   likedPosts,
   repostedPosts,
+  bookmarkedPosts,
   onLike,
   onRepost,
+  onBookmark,
+  onQuote,
   onToggleComments,
   expandedCommentsPostId,
   menuOpenPostId,
@@ -214,6 +221,8 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
             <PostMediaGallery media={post.media} meta={lightboxMeta} />
           )}
 
+          {post.quotedPost ? <QuotedPostCard quotedPost={post.quotedPost} /> : null}
+
           <PostFeedActionButtons
             postId={postId}
             likesCount={post.likesCount || 0}
@@ -221,11 +230,14 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
             repostsCount={post.repostsCount || 0}
             liked={likedPosts.has(postId)}
             reposted={repostedPosts.has(postId)}
+            bookmarked={bookmarkedPosts?.has(postId) ?? post.isBookmarked ?? false}
             commentsExpanded={expandedCommentsPostId === postId}
             formatCount={formatCount}
             onLike={onLike}
             onToggleComments={onToggleComments}
             onRepost={onRepost}
+            onBookmark={onBookmark}
+            onQuote={onQuote}
           />
 
           {expandedCommentsPostId === postId && (

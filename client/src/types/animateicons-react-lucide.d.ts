@@ -61,4 +61,6 @@ declare module '@animateicons/react/lucide' {
   export const CreditCardIcon: IconComponent;
   export const InfoIcon: IconComponent;
   export const MenuIcon: IconComponent;
+  export const HeadsetIcon: IconComponent;
+  export const LockIcon: IconComponent;
 }

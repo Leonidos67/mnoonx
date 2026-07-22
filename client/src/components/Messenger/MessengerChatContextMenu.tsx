@@ -12,6 +12,7 @@ export interface MessengerChatActionTarget {
   avatar: string;
   kind: string;
   username: string | null;
+  peerUserId: string | null;
 }
 
 export type MessengerChatActionId =

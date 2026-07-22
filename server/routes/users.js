@@ -12,6 +12,7 @@ const {
   serializeSocialLinks,
   profilePayload,
 } = require('../services/socialLinks');
+const { loadBlockedSets } = require('../services/userBlocks');
 
 async function serializePostWithAuthor(post, viewerUserId) {
   return serializeFeedPost(post, viewerUserId);
@@ -84,6 +85,103 @@ router.get('/suggested', auth, async (req, res) => {
     res.json({ users });
   } catch (error) {
     console.error('Suggested users error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+const DEFAULT_NOTIF_PREFS = {
+  popupNotifications: true,
+  soundEffects: true,
+  aiChatMessage: true,
+  aiChatQuestion: true,
+  bountyClaimed: true,
+  newFollower: true,
+  paymentFailed: true,
+  upcomingPaymentReminders: true,
+  withdrawalStatusChange: true,
+  transferReceived: true,
+  waitlistAccepted: true,
+  pushEnabled: false,
+};
+
+// GET /api/users/me/preferences
+router.get('/me/preferences', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const user = await User.findById(req.userId).select('notificationPreferences');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({
+      ...DEFAULT_NOTIF_PREFS,
+      ...(user.notificationPreferences || {}),
+    });
+  } catch (error) {
+    console.error('Get preferences error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PATCH /api/users/me/preferences
+router.patch('/me/preferences', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const incoming = req.body && typeof req.body === 'object' ? req.body : {};
+    const next = { ...DEFAULT_NOTIF_PREFS, ...(user.notificationPreferences || {}) };
+    for (const key of Object.keys(DEFAULT_NOTIF_PREFS)) {
+      if (typeof incoming[key] === 'boolean') next[key] = incoming[key];
+    }
+    user.notificationPreferences = next;
+    user.markModified('notificationPreferences');
+    await user.save();
+    res.json(next);
+  } catch (error) {
+    console.error('Patch preferences error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/users/me/activity
+router.get('/me/activity', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const user = await User.findById(req.userId).select('activityState');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const state = user.activityState || {};
+    res.json({
+      balance: state.balance || 0,
+      log: Array.isArray(state.log) ? state.log : [],
+      claimedRuleIds: Array.isArray(state.claimedRuleIds) ? state.claimedRuleIds : [],
+      streak: state.streak || 0,
+      lastDailyVisit: state.lastDailyVisit || '',
+    });
+  } catch (error) {
+    console.error('Get activity error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// PUT /api/users/me/activity — sync client activity state to server
+router.put('/me/activity', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const body = req.body || {};
+    const balance = Math.max(0, Math.min(1_000_000, Number(body.balance) || 0));
+    const log = Array.isArray(body.log) ? body.log.slice(0, 80) : [];
+    const claimedRuleIds = Array.isArray(body.claimedRuleIds)
+      ? body.claimedRuleIds.map(String).slice(0, 50)
+      : [];
+    const streak = Math.max(0, Math.min(3650, Number(body.streak) || 0));
+    const lastDailyVisit =
+      typeof body.lastDailyVisit === 'string' ? body.lastDailyVisit.slice(0, 32) : '';
+    user.activityState = { balance, log, claimedRuleIds, streak, lastDailyVisit };
+    user.markModified('activityState');
+    await user.save();
+    res.json(user.activityState);
+  } catch (error) {
+    console.error('Put activity error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
@@ -342,8 +440,9 @@ router.get('/:username', auth, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Проверяем подписку
+    // Проверяем подписку и блокировку
     let isFollowing = false;
+    let isBlockedByMe = false;
     if (req.userId) {
       const currentUserId = req.userId.toString();
       const profileUserId = user._id.toString();
@@ -364,6 +463,9 @@ router.get('/:username', auth, async (req, res) => {
           }
         }
       }
+
+      const { myBlocked } = await loadBlockedSets(req.userId, user._id);
+      isBlockedByMe = myBlocked.has(profileUserId);
     }
 
     console.log('FINAL isFollowing:', isFollowing);
@@ -381,6 +483,7 @@ router.get('/:username', auth, async (req, res) => {
       ...json,
       socialLinks: serializeSocialLinks(user.socialLinks),
       isFollowing,
+      isBlockedByMe,
       posts: postsWithAuthor,
     });
     
@@ -572,9 +675,25 @@ router.post('/:username/follow', auth, async (req, res) => {
 
     // Получаем обновленного пользователя
     const updatedUser = await User.findById(profileUserId)
-      .select('followersCount followingCount');
+      .select('followersCount followingCount username');
 
     console.log('Follow created! New followersCount:', updatedUser.followersCount);
+
+    try {
+      const follower = await User.findById(currentUserId).select('username fullName').lean();
+      const { dispatchNotification } = require('../services/notificationDispatch');
+      await dispatchNotification({
+        userId: profileUserId,
+        type: 'community',
+        title: 'New follower',
+        body: `@${follower?.username || 'someone'} started following you`,
+        actorUserId: currentUserId,
+        pushUrl: follower?.username ? `/@${follower.username}` : '/notifications',
+        prefKey: 'newFollower',
+      });
+    } catch (notifyErr) {
+      console.error('Follow notification error:', notifyErr);
+    }
 
     res.json({
       message: 'Successfully followed',
@@ -631,6 +750,67 @@ router.post('/:username/unfollow', auth, async (req, res) => {
   } catch (error) {
     console.error('Unfollow error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+// POST /api/users/:username/block
+router.post('/:username/block', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const target = await User.findOne({ username: req.params.username });
+    if (!target) return res.status(404).json({ message: 'User not found' });
+
+    const currentUserId = req.userId.toString();
+    const targetUserId = target._id.toString();
+    if (currentUserId === targetUserId) {
+      return res.status(400).json({ message: 'Cannot block yourself' });
+    }
+
+    const me = await User.findById(currentUserId);
+    if (!me) return res.status(404).json({ message: 'User not found' });
+
+    const blocked = (me.blockedUserIds || []).map((id) => id.toString());
+    if (!blocked.includes(targetUserId)) {
+      me.blockedUserIds = [...(me.blockedUserIds || []), target._id];
+      await me.save();
+    }
+
+    await Follow.deleteMany({
+      $or: [
+        { follower: currentUserId, following: targetUserId },
+        { follower: targetUserId, following: currentUserId },
+      ],
+    });
+
+    res.json({ ok: true, blocked: true });
+  } catch (error) {
+    console.error('Block user error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/users/:username/unblock
+router.post('/:username/unblock', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const target = await User.findOne({ username: req.params.username });
+    if (!target) return res.status(404).json({ message: 'User not found' });
+
+    const targetUserId = target._id.toString();
+    const me = await User.findById(req.userId);
+    if (!me) return res.status(404).json({ message: 'User not found' });
+
+    me.blockedUserIds = (me.blockedUserIds || []).filter(
+      (id) => id.toString() !== targetUserId
+    );
+    await me.save();
+
+    res.json({ ok: true, blocked: false });
+  } catch (error) {
+    console.error('Unblock user error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

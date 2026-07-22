@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, X } from 'lucide-react';
 import PostMediaGallery from './PostMediaGallery';
 import PostContentBody from './PostContentBody';
+import QuotedPostCard from './QuotedPostCard';
 import { buildPostLightboxMeta } from '../../utils/buildPostLightboxMeta';
 import { PostCommentsSection } from './PostCommentsSection';
 import { AnimatedPostMenuIcon } from './PostMenuAnimatedIcons';
@@ -116,6 +117,7 @@ const PostDetailPanel: React.FC<PostDetailPanelProps> = ({
               <PostMediaGallery media={post.media} meta={buildPostLightboxMeta(post)} className="!mt-0" />
             </div>
           )}
+          {post.quotedPost ? <QuotedPostCard quotedPost={post.quotedPost} /> : null}
           <div className="mt-4 flex items-center gap-4 border-t border-neutral-100 py-4 text-sm">
             <span>
               <span className="font-bold text-neutral-900">{formatCount(post.repostsCount)}</span>

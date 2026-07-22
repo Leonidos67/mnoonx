@@ -675,4 +675,8 @@ router.post('/support/tickets/:userId/reply', requireAdmin, async (req, res) => 
   }
 });
 
+const { listReports, patchReport } = require('./reports');
+router.get('/reports', requireAdmin, listReports);
+router.patch('/reports/:id', requireAdmin, patchReport);
+
 module.exports = router;

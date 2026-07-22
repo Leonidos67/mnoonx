@@ -53,6 +53,7 @@ import type { FeedPost } from '../types/postFeed';
 import EditTextModal from '../components/Common/EditTextModal';
 import FloatingMenu from '../components/Common/FloatingMenu';
 import MobileBottomSheet from '../components/Common/MobileBottomSheet';
+import { FeedSkeleton, SkeletonPulse } from '../components/Common/Skeleton';
 import { usePostDetail } from '../hooks/usePostDetail';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import AddCommunityAdminModal from '../components/Community/AddCommunityAdminModal';
@@ -62,6 +63,8 @@ import { isPopulatedCommunity } from '../utils/postDisplay';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
 import { useTranslation } from '../i18n/useTranslation';
+import { setDocumentMeta } from '../utils/documentMeta';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 import { COMMUNITIES_API as API_URL, POSTS_API as POSTS_API_URL } from '../config/api';
 const OWNER_ONLY_POST_NOTICE_KEY = 'communityOwnerOnlyPostNoticeDismissed';
@@ -147,6 +150,7 @@ const CommunityPage: React.FC = () => {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [repostedPosts, setRepostedPosts] = useState<Set<string>>(new Set());
+  const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<string>>(new Set());
   const [leftNav, setLeftNav] = useState<CommunityLeftNav>('home');
   const [activeChatInstanceId, setActiveChatInstanceId] = useState<string | null>(null);
   const [activeCoursesInstanceId, setActiveCoursesInstanceId] = useState<string | null>(null);
@@ -224,6 +228,16 @@ const CommunityPage: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!community) return;
+    return setDocumentMeta({
+      title: community.name,
+      description: community.description || `@${community.handle} on MNOONX`,
+      image: community.avatar ? resolveMediaUrl(community.avatar) : undefined,
+      url: typeof window !== 'undefined' ? window.location.href : undefined,
+    });
+  }, [community?.handle, community?.name, community?.description, community?.avatar]);
+
   const dismissOwnerOnlyPostNotice = useCallback(() => {
     if (handle) {
       localStorage.setItem(`${OWNER_ONLY_POST_NOTICE_KEY}:${handle}`, '1');
@@ -299,13 +313,16 @@ const CommunityPage: React.FC = () => {
         
         const likedIds = new Set<string>();
         const repostedIds = new Set<string>();
+        const bookmarkedIds = new Set<string>();
         data.forEach((post: Post) => {
           const pid = String(post._id);
           if (post.isLiked) likedIds.add(pid);
           if (post.isReposted) repostedIds.add(pid);
+          if (post.isBookmarked) bookmarkedIds.add(pid);
         });
         setLikedPosts(likedIds);
         setRepostedPosts(repostedIds);
+        setBookmarkedPosts(bookmarkedIds);
       }
     } catch (err) {
       console.error('Fetch posts error:', err);
@@ -749,22 +766,41 @@ const CommunityPage: React.FC = () => {
       return;
     }
     const id = String(postId);
+    const current = posts.find((p) => String(p._id) === id) || (selectedPost && String(selectedPost._id) === id ? selectedPost : undefined);
+    const wasLiked = likedPosts.has(id);
+    const prevCount = current?.likesCount || 0;
+    const nextLiked = !wasLiked;
+    const nextCount = Math.max(0, prevCount + (nextLiked ? 1 : -1));
+
+    setLikedPosts((prev) => {
+      const newSet = new Set(prev);
+      nextLiked ? newSet.add(id) : newSet.delete(id);
+      return newSet;
+    });
+    patchPostInLists(id, { likesCount: nextCount, isLiked: nextLiked });
+
     try {
       const res = await fetch(`${POSTS_API_URL}/${id}/like`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setLikedPosts(prev => {
-          const newSet = new Set(prev);
-          data.liked ? newSet.add(id) : newSet.delete(id);
-          return newSet;
-        });
-        patchPostInLists(id, { likesCount: data.likesCount, isLiked: data.liked });
-      }
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setLikedPosts(prev => {
+        const newSet = new Set(prev);
+        data.liked ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      patchPostInLists(id, { likesCount: data.likesCount, isLiked: data.liked });
     } catch (err) {
       console.error('Like error:', err);
+      setLikedPosts((prev) => {
+        const newSet = new Set(prev);
+        wasLiked ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      patchPostInLists(id, { likesCount: prevCount, isLiked: wasLiked });
+      showToast(t('common.likeFailed'), 'error');
     }
   };
 
@@ -774,22 +810,86 @@ const CommunityPage: React.FC = () => {
       return;
     }
     const id = String(postId);
+    const current = posts.find((p) => String(p._id) === id) || (selectedPost && String(selectedPost._id) === id ? selectedPost : undefined);
+    const wasReposted = repostedPosts.has(id);
+    const prevCount = current?.repostsCount || 0;
+    const nextReposted = !wasReposted;
+    const nextCount = Math.max(0, prevCount + (nextReposted ? 1 : -1));
+
+    setRepostedPosts((prev) => {
+      const newSet = new Set(prev);
+      nextReposted ? newSet.add(id) : newSet.delete(id);
+      return newSet;
+    });
+    patchPostInLists(id, { repostsCount: nextCount, isReposted: nextReposted });
+
     try {
       const res = await fetch(`${POSTS_API_URL}/${id}/repost`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setRepostedPosts(prev => {
-          const newSet = new Set(prev);
-          data.reposted ? newSet.add(id) : newSet.delete(id);
-          return newSet;
-        });
-        patchPostInLists(id, { repostsCount: data.repostsCount, isReposted: data.reposted });
-      }
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setRepostedPosts(prev => {
+        const newSet = new Set(prev);
+        data.reposted ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      patchPostInLists(id, { repostsCount: data.repostsCount, isReposted: data.reposted });
     } catch (err) {
       console.error('Repost error:', err);
+      setRepostedPosts((prev) => {
+        const newSet = new Set(prev);
+        wasReposted ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      patchPostInLists(id, { repostsCount: prevCount, isReposted: wasReposted });
+      showToast(t('common.repostFailed'), 'error');
+    }
+  };
+
+  const handleBookmark = async (postId: string) => {
+    if (!token) {
+      window.dispatchEvent(new CustomEvent('openLogin'));
+      return;
+    }
+    const id = String(postId);
+    const current = posts.find((p) => String(p._id) === id) || (selectedPost && String(selectedPost._id) === id ? selectedPost : undefined);
+    const wasBookmarked = bookmarkedPosts.has(id);
+    const prevCount = current?.bookmarksCount || 0;
+    const nextBookmarked = !wasBookmarked;
+    const nextCount = Math.max(0, prevCount + (nextBookmarked ? 1 : -1));
+
+    setBookmarkedPosts((prev) => {
+      const newSet = new Set(prev);
+      nextBookmarked ? newSet.add(id) : newSet.delete(id);
+      return newSet;
+    });
+    patchPostInLists(id, { bookmarksCount: nextCount, isBookmarked: nextBookmarked });
+
+    try {
+      const res = await fetch(`${POSTS_API_URL}/${id}/bookmark`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      setBookmarkedPosts((prev) => {
+        const newSet = new Set(prev);
+        data.bookmarked ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      patchPostInLists(id, { bookmarksCount: data.bookmarksCount, isBookmarked: data.bookmarked });
+      showToast(data.bookmarked ? t('common.bookmarkAdded') : t('common.bookmarkRemoved'));
+    } catch (err) {
+      console.error('Bookmark error:', err);
+      setBookmarkedPosts((prev) => {
+        const newSet = new Set(prev);
+        wasBookmarked ? newSet.add(id) : newSet.delete(id);
+        return newSet;
+      });
+      patchPostInLists(id, { bookmarksCount: prevCount, isBookmarked: wasBookmarked });
+      showToast(t('common.bookmarkFailed'), 'error');
     }
   };
 
@@ -1329,8 +1429,21 @@ const CommunityPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex h-full min-h-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-black" />
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[1200px] gap-6 overflow-hidden px-0 sm:px-4">
+        <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden border-x border-neutral-200 bg-white sm:max-w-[680px]">
+          <div className="border-b border-neutral-200 p-4">
+            <div className="flex items-center gap-3">
+              <SkeletonPulse className="h-14 w-14 shrink-0 rounded-2xl" />
+              <div className="min-w-0 flex-1 space-y-2">
+                <SkeletonPulse className="h-4 w-40" />
+                <SkeletonPulse className="h-3 w-24" />
+              </div>
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <FeedSkeleton count={4} />
+          </div>
+        </div>
       </div>
     );
   }
@@ -1605,8 +1718,8 @@ const CommunityPage: React.FC = () => {
               }
             >
           <div
-            className={`flex min-h-full flex-col overflow-hidden rounded-xl border border-[#e7e7e7] bg-white max-lg:rounded-none max-lg:border-x-0 ${
-              mobileComposerFull ? 'min-h-0 flex-1 overflow-hidden' : 'flex-1'
+            className={`flex min-h-full flex-col rounded-xl border border-[#e7e7e7] bg-white max-lg:rounded-none max-lg:border-x-0 ${
+              mobileComposerFull ? 'min-h-0 flex-1 overflow-hidden' : ''
             }`}
           >
             {/* BANNER — top radius matches parent card */}
@@ -1840,8 +1953,10 @@ const CommunityPage: React.FC = () => {
                         formatCount={formatCount}
                         likedPosts={likedPosts}
                         repostedPosts={repostedPosts}
+                        bookmarkedPosts={bookmarkedPosts}
                         onLike={handleLike}
                         onRepost={handleRepost}
+                        onBookmark={handleBookmark}
                         onToggleComments={toggleFeedComments}
                         expandedCommentsPostId={expandedCommentsPostId}
                         menuOpenPostId={menuOpenPostId}
@@ -2014,7 +2129,6 @@ const CommunityPage: React.FC = () => {
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1 text-neutral-400">
-                          <AnimatedPostMenuIcon kind="ellipsis" size={20} color="#a3a3a3" />
                           {productsBundleOpen ? (
                             <ChevronUp className="h-5 w-5 text-neutral-600" />
                           ) : (

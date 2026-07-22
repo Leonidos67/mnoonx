@@ -78,11 +78,16 @@ const MessengerChatListItem: React.FC<MessengerChatListItemProps> = ({
 
   const actionsRightClass = chat.unreadCount > 0 ? 'right-9' : 'right-2';
 
+  const rowBgClass = selected
+    ? 'bg-neutral-100'
+    : isPinned
+      ? 'bg-neutral-50'
+      : '';
+  const rowHoverClass = selected || isPinned ? 'hover:bg-neutral-100' : 'hover:bg-neutral-50';
+
   return (
     <div
-      className={`group relative flex w-full items-stretch border-b border-neutral-100 hover:bg-neutral-50 ${
-        selected ? 'bg-neutral-50' : ''
-      }`}
+      className={`group relative flex w-full items-stretch border-b border-neutral-100 ${rowBgClass} ${rowHoverClass}`}
     >
       <button
         ref={rowRef}

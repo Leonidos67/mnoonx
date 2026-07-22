@@ -119,7 +119,7 @@ async function syncConversationLastMessage(conv) {
 
 async function countUnreadMessages(userId) {
   const ownerId = toOwnerId(userId);
-  const convs = await Conversation.find({ ownerUserId: ownerId }).lean();
+  const convs = await Conversation.find({ ownerUserId: ownerId, hiddenAt: null }).lean();
   if (!convs.length) return 0;
 
   const readStates = await ConversationReadState.find({
@@ -167,6 +167,9 @@ async function getOrCreateDmConversation(userId, peerUserId) {
       lastMessageText: '',
       lastMessageAt: new Date(),
     });
+  } else if (convA.hiddenAt) {
+    convA.hiddenAt = null;
+    await convA.save();
   }
   if (!convB) {
     convB = await Conversation.create({
@@ -176,6 +179,9 @@ async function getOrCreateDmConversation(userId, peerUserId) {
       lastMessageText: '',
       lastMessageAt: new Date(),
     });
+  } else if (convB.hiddenAt) {
+    convB.hiddenAt = null;
+    await convB.save();
   }
 
   return { convA, convB };

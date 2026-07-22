@@ -13,6 +13,7 @@ import {
   Lock,
   ChevronRight,
   CirclePlus,
+  Ban,
 } from 'lucide-react';
 import AnimatedSendIcon, { type AnimatedSendIconHandle } from '../components/Common/AnimatedSendIcon';
 import { useAuth } from '../context/AuthContext';
@@ -70,6 +71,7 @@ import {
 } from '../utils/messengerMessagePrefs';
 
 import { MESSAGES_API as MSG_API, USERS_API as USERS_API } from '../config/api';
+import { blockUser, hideConversation, reportUser, unblockUser } from '../utils/userModeration';
 
 /** Within this distance from the bottom, new messages auto-scroll. */
 const SCROLL_NEAR_BOTTOM_PX = 72;
@@ -88,6 +90,9 @@ interface ApiMessage {
 interface ApiConversation {
   id: string;
   kind: string;
+  peerUserId?: string | null;
+  blockedByMe?: boolean;
+  blockedByThem?: boolean;
   name: string;
   username: string | null;
   avatar: string;
@@ -99,6 +104,17 @@ interface ApiConversation {
   isReadOnly?: boolean;
   isOnline?: boolean;
   officialChannel?: boolean;
+}
+
+interface ConversationMeta {
+  name: string;
+  avatar: string;
+  username?: string | null;
+  isReadOnly?: boolean;
+  isOnline?: boolean;
+  kind: string;
+  blockedByMe?: boolean;
+  blockedByThem?: boolean;
 }
 
 interface UserHit {
@@ -141,13 +157,7 @@ const Messenger: React.FC = () => {
   const [chats, setChats] = useState<ApiConversation[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ApiMessage[]>([]);
-  const [selectedMeta, setSelectedMeta] = useState<{
-    name: string;
-    avatar: string;
-    isReadOnly?: boolean;
-    isOnline?: boolean;
-    kind: string;
-  } | null>(null);
+  const [selectedMeta, setSelectedMeta] = useState<ConversationMeta | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [userHits, setUserHits] = useState<UserHit[]>([]);
@@ -182,6 +192,26 @@ const Messenger: React.FC = () => {
       messagesEndRef.current?.scrollIntoView({ behavior });
     });
   }, []);
+
+  const isChatBlocked = Boolean(selectedMeta?.blockedByMe || selectedMeta?.blockedByThem);
+
+  const handleUnblockPeer = useCallback(async () => {
+    if (!token || !selectedMeta?.username || !selectedId) return;
+    const ok = await unblockUser(token, selectedMeta.username);
+    if (!ok) {
+      showToast(t('messenger.unblockFailed'), 'error');
+      return;
+    }
+    setSelectedMeta((prev) =>
+      prev ? { ...prev, blockedByMe: false, blockedByThem: false } : null
+    );
+    setChats((prev) =>
+      prev.map((c) =>
+        c.id === selectedId ? { ...c, blockedByMe: false, blockedByThem: false } : c
+      )
+    );
+    showToast(t('messenger.unblocked'), 'info');
+  }, [token, selectedMeta?.username, selectedId, showToast, t]);
 
   const updateStickToBottom = useCallback(() => {
     const el = messagesScrollRef.current;
@@ -417,9 +447,9 @@ const Messenger: React.FC = () => {
   }, [selectedId, loadingMessages, messages.length, scrollToBottom]);
 
   useEffect(() => {
-    if (!selectedId || !selectedMeta || selectedMeta.isReadOnly || loadingMessages) return;
+    if (!selectedId || !selectedMeta || selectedMeta.isReadOnly || isChatBlocked || loadingMessages) return;
     messageInputRef.current?.focus();
-  }, [selectedId, selectedMeta, loadingMessages]);
+  }, [selectedId, selectedMeta, isChatBlocked, loadingMessages]);
 
   useEffect(() => {
     setMessageActionAnchor(null);
@@ -465,7 +495,7 @@ const Messenger: React.FC = () => {
 
   const sendMessageWithBody = useCallback(
     async (text: string) => {
-      if (!text.trim() || !selectedId || !token || selectedMeta?.isReadOnly || sending) return;
+      if (!text.trim() || !selectedId || !token || selectedMeta?.isReadOnly || isChatBlocked || sending) return;
       setSending(true);
       try {
         const res = await fetch(`${MSG_API}/conversations/${selectedId}/messages`, {
@@ -487,15 +517,20 @@ const Messenger: React.FC = () => {
           if (selectedMeta?.kind === 'system_support') {
             window.setTimeout(() => void loadMessages(selectedId, { silent: true }), 1200);
           }
+        } else {
+          const body = await res.json().catch(() => ({}));
+          const msg = (body as { message?: string }).message;
+          showToast(msg || t('messenger.sendFailed'), 'error');
         }
       } catch (e) {
         console.error(e);
+        showToast(t('messenger.sendFailed'), 'error');
         throw e;
       } finally {
         setSending(false);
       }
     },
-    [selectedId, token, selectedMeta?.isReadOnly, selectedMeta?.kind, sending, loadChats, refreshUnreads, scrollToBottom]
+    [selectedId, token, selectedMeta?.isReadOnly, selectedMeta?.kind, isChatBlocked, sending, loadChats, refreshUnreads, scrollToBottom, loadMessages, showToast, t]
   );
 
   const sendAnimoji = (item: MessengerEmojiItem) => {
@@ -598,7 +633,7 @@ const Messenger: React.FC = () => {
   const openMessageMenu = useCallback(
     (message: ApiMessage, rect: DOMRect) => {
       if (!selectedId) return;
-      const canCompose = !selectedMeta?.isReadOnly;
+      const canCompose = !selectedMeta?.isReadOnly && !isChatBlocked;
       setMessageActionAnchor((prev) => {
         if (prev?.messageId === message.id) return null;
         return {
@@ -611,7 +646,7 @@ const Messenger: React.FC = () => {
         };
       });
     },
-    [selectedId, selectedMeta?.isReadOnly, pinnedIdSet]
+    [selectedId, selectedMeta?.isReadOnly, isChatBlocked, pinnedIdSet]
   );
 
   const clearComposerMode = useCallback(() => {
@@ -866,6 +901,7 @@ const Messenger: React.FC = () => {
           avatar: chat.avatar,
           kind: chat.kind,
           username: chat.username,
+          peerUserId: chat.peerUserId ?? null,
         },
       };
     });
@@ -901,11 +937,53 @@ const Messenger: React.FC = () => {
       }
 
       if (action === 'report') {
-        showToast(t('messenger.chatActions.reportSent'), 'info');
+        if (!token) {
+          showToast(t('messenger.chatActions.signInRequired'), 'error');
+          return;
+        }
+        const targetId = chat.peerUserId;
+        if (!targetId) {
+          showToast(t('messenger.chatActions.reportFailed'), 'error');
+          return;
+        }
+        const ok = await reportUser(token, targetId, `Reported from messenger chat: ${chat.name}`);
+        showToast(
+          ok ? t('messenger.chatActions.reportSent') : t('messenger.chatActions.reportFailed'),
+          ok ? 'info' : 'error'
+        );
         return;
       }
 
       if (action === 'block') {
+        if (!token) {
+          showToast(t('messenger.chatActions.signInRequired'), 'error');
+          return;
+        }
+        if (!chat.username) {
+          showToast(t('messenger.chatActions.blockFailed'), 'error');
+          return;
+        }
+        const okConfirm = await confirm({
+          title: t('messenger.chatActions.blockTitle'),
+          message: t('messenger.chatActions.blockMessage', { name: chat.name }),
+          confirmLabel: t('messenger.chatActions.blockConfirm'),
+          variant: 'danger',
+        });
+        if (!okConfirm) return;
+
+        const ok = await blockUser(token, chat.username);
+        if (!ok) {
+          showToast(t('messenger.chatActions.blockFailed'), 'error');
+          return;
+        }
+        setChats((prev) =>
+          prev.map((c) => (c.id === chat.id ? { ...c, blockedByMe: true } : c))
+        );
+        if (selectedId === chat.id) {
+          setSelectedMeta((prev) => (prev ? { ...prev, blockedByMe: true } : null));
+          clearComposerMode();
+          setNewMessage('');
+        }
         showToast(t('messenger.chatActions.blocked'), 'info');
         return;
       }
@@ -918,15 +996,24 @@ const Messenger: React.FC = () => {
           variant: 'danger',
         });
         if (!ok) return;
-        const hidden = new Set(chatPrefs.hiddenIds);
-        hidden.add(chat.id);
+
+        if (token) {
+          const deleted = await hideConversation(token, chat.id);
+          if (!deleted) {
+            showToast(t('messenger.chatActions.deleteFailed'), 'error');
+            return;
+          }
+        }
+
         persistChatPrefs({
           ...chatPrefs,
-          hiddenIds: Array.from(hidden),
           pinnedIds: chatPrefs.pinnedIds.filter((id) => id !== chat.id),
           markedNewIds: chatPrefs.markedNewIds.filter((id) => id !== chat.id),
+          hiddenIds: chatPrefs.hiddenIds.filter((id) => id !== chat.id),
         });
+        setChats((prev) => prev.filter((c) => c.id !== chat.id));
         if (selectedId === chat.id) closeChat();
+        void refreshUnreads();
         showToast(t('messenger.chatActions.deleted'));
       }
     },
@@ -935,10 +1022,13 @@ const Messenger: React.FC = () => {
       chatPrefs,
       closeChat,
       confirm,
+      clearComposerMode,
       persistChatPrefs,
+      refreshUnreads,
       selectedId,
       showToast,
       t,
+      token,
     ]
   );
 
@@ -1231,6 +1321,33 @@ const Messenger: React.FC = () => {
                   <br />
                   MNOONX will always use verified accounts to communicate with you.
                 </p>
+              </div>
+            </div>
+          ) : isChatBlocked ? (
+            <div className="shrink-0 border-t border-neutral-200 bg-neutral-50 p-4 pb-[env(safe-area-inset-bottom,0px)]">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <div className="flex items-center gap-2 text-neutral-600">
+                  <Ban className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="text-sm font-medium">
+                    {selectedMeta.blockedByMe
+                      ? t('messenger.blockedByMeTitle')
+                      : t('messenger.blockedByThemTitle')}
+                  </span>
+                </div>
+                <p className="max-w-sm text-xs leading-relaxed text-neutral-500">
+                  {selectedMeta.blockedByMe
+                    ? t('messenger.blockedByMeHint')
+                    : t('messenger.blockedByThemHint')}
+                </p>
+                {selectedMeta.blockedByMe && selectedMeta.username ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleUnblockPeer()}
+                    className="rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-800 transition-colors hover:bg-neutral-100"
+                  >
+                    {t('messenger.unblock')}
+                  </button>
+                ) : null}
               </div>
             </div>
           ) : (
