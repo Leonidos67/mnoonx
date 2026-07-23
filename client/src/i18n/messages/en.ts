@@ -1283,6 +1283,8 @@ export const en = {
       shareText: 'Check out @{name} on MNOONX',
       shareFallback: 'Link copied — share it anywhere',
       shareFailed: 'Could not share',
+      scanAria: 'Enlarge QR',
+      enlarge: 'Enlarge QR',
     },
     editPostTitle: 'Edit post',
     editPostDescription: 'Update your post text. Media attachments are not changed here.',

@@ -1283,6 +1283,8 @@ export const ru = {
       shareText: 'Профиль @{name} в MNOONX',
       shareFallback: 'Ссылка скопирована — можете отправить её',
       shareFailed: 'Не удалось поделиться',
+      scanAria: 'Увеличить QR',
+      enlarge: 'Увеличить QR',
     },
     editPostTitle: 'Редактировать пост',
     editPostDescription: 'Измените текст поста. Медиа здесь не меняются.',

@@ -1,16 +1,48 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { Download, QrCode, Share2, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { QrCode, X } from 'lucide-react';
+import type { IconHandle } from '@animateicons/react/lucide';
+import { DownloadIcon, ScanIcon, ShareIcon } from './animateQrIcons';
 import ResponsiveDialogShell from '../Common/ResponsiveDialogShell';
 import { GradientScan, QRCode, type QRCodeHandle } from '../shared-assets/qr-code';
 import { profilePath } from '../../constants/paths';
 import { useTranslation } from '../../i18n/useTranslation';
 import { useToast } from '../../context/ToastContext';
+import { useAnimateOnParentHover } from '../../hooks/useAnimateOnParentHover';
 
 function profileAbsoluteUrl(username: string): string {
   const path = profilePath(username);
   if (typeof window === 'undefined') return path;
   return `${window.location.origin}${path}`;
 }
+
+const AnimatedActionIcon: React.FC<{
+  kind: 'share' | 'download' | 'scan';
+  size?: number;
+  color?: string;
+}> = ({ kind, size = 16, color = 'currentColor' }) => {
+  const iconRef = useRef<IconHandle>(null);
+  const nodeRef = useRef<HTMLSpanElement>(null);
+  useAnimateOnParentHover(iconRef, nodeRef);
+
+  const Icon = kind === 'share' ? ShareIcon : kind === 'download' ? DownloadIcon : ScanIcon;
+
+  return (
+    <span
+      ref={nodeRef}
+      className="inline-flex shrink-0 items-center justify-center overflow-hidden"
+      style={{ width: size, height: size }}
+    >
+      <Icon
+        ref={iconRef}
+        size={size}
+        duration={1}
+        color={color}
+        isAnimated={false}
+        className="!h-full !w-full !min-h-0 !min-w-0"
+      />
+    </span>
+  );
+};
 
 interface ProfileQrCodeModalProps {
   open: boolean;
@@ -29,9 +61,14 @@ export const ProfileQrCodeModal: React.FC<ProfileQrCodeModalProps> = ({
   const { showToast } = useToast();
   const qrRef = useRef<QRCodeHandle>(null);
   const [busy, setBusy] = useState<'share' | 'save' | null>(null);
+  const [scanFocus, setScanFocus] = useState(false);
   const url = useMemo(() => profileAbsoluteUrl(username), [username]);
   const displayName = fullName || username;
   const fileBase = `mnoonx-${username.replace(/[^a-zA-Z0-9_-]/g, '') || 'profile'}-qr`;
+
+  useEffect(() => {
+    if (!open) setScanFocus(false);
+  }, [open]);
 
   const copyLink = async () => {
     try {
@@ -93,62 +130,128 @@ export const ProfileQrCodeModal: React.FC<ProfileQrCodeModalProps> = ({
   return (
     <ResponsiveDialogShell
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (scanFocus) {
+          setScanFocus(false);
+          return;
+        }
+        onClose();
+      }}
       title={t('userProfile.qr.title')}
       sheetPadded
-      panelClassName="relative w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl"
+      panelClassName={`relative w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-xl transition-[padding] duration-500 ${
+        scanFocus ? 'p-4 sm:p-6' : 'p-6'
+      }`}
     >
-      <button
-        type="button"
-        onClick={onClose}
-        className="absolute right-4 top-4 hidden h-9 w-9 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 lg:flex"
-        aria-label={t('common.close')}
-      >
-        <X className="h-5 w-5" strokeWidth={2} aria-hidden />
-      </button>
-
-      <div className="flex flex-col items-center text-center">
-        <h2 className="text-lg font-bold text-neutral-900">{t('userProfile.qr.title')}</h2>
-        <p className="mt-1 text-sm text-neutral-500">
-          {displayName}
-          <span className="text-neutral-400"> · @{username}</span>
-        </p>
-
-        <div className="relative mt-5 flex aspect-square w-full max-w-[15rem] items-center justify-center">
-          {open ? <QRCode ref={qrRef} value={url} size="xl" /> : null}
-          <GradientScan />
-        </div>
-
-        <p className="mt-4 max-w-xs break-all text-xs text-neutral-400">{url}</p>
-
-        <div className="mt-5 grid w-full grid-cols-2 gap-2">
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={() => void shareProfile()}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#315efb] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#2547c4] disabled:opacity-50"
-          >
-            <Share2 className="h-4 w-4 shrink-0" aria-hidden />
-            {busy === 'share' ? t('userProfile.qr.sharing') : t('userProfile.qr.share')}
-          </button>
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={() => void saveAsPhoto()}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-50 disabled:opacity-50"
-          >
-            <Download className="h-4 w-4 shrink-0" aria-hidden />
-            {busy === 'save' ? t('userProfile.qr.saving') : t('userProfile.qr.savePhoto')}
-          </button>
-        </div>
-
+      <div className="absolute right-3 top-3 z-20 hidden items-center gap-0.5 lg:right-4 lg:top-4 lg:flex">
         <button
           type="button"
-          onClick={() => void copyLink()}
-          className="mt-2 w-full rounded-2xl px-4 py-2.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-50"
+          onClick={() => setScanFocus((v) => !v)}
+          className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+            scanFocus
+              ? 'bg-[#eef2ff] text-[#315efb]'
+              : 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600'
+          }`}
+          aria-label={t('userProfile.qr.scanAria')}
+          aria-pressed={scanFocus}
+          title={t('userProfile.qr.scanAria')}
         >
-          {t('userProfile.menu.copyLink')}
+          <AnimatedActionIcon kind="scan" size={20} color="currentColor" />
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            if (scanFocus) setScanFocus(false);
+            else onClose();
+          }}
+          className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
+          aria-label={t('common.close')}
+        >
+          <X className="h-5 w-5" strokeWidth={2} aria-hidden />
+        </button>
+      </div>
+
+      <div
+        className={`relative flex min-h-[20rem] flex-col items-center transition-colors duration-500 ${
+          scanFocus ? 'justify-center bg-white' : 'text-center'
+        }`}
+      >
+        <div
+          className={`w-full overflow-hidden transition-all duration-500 ease-out ${
+            scanFocus
+              ? 'pointer-events-none max-h-0 -translate-y-2 opacity-0'
+              : 'max-h-40 translate-y-0 opacity-100'
+          }`}
+        >
+          <h2 className="pr-0 text-lg font-bold text-neutral-900 lg:pr-20">
+            {t('userProfile.qr.title')}
+          </h2>
+          <button
+            type="button"
+            onClick={() => setScanFocus(true)}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-full px-1 py-0.5 text-sm font-medium text-[#315efb] transition-colors hover:bg-[#eef2ff]"
+            aria-label={t('userProfile.qr.enlarge')}
+          >
+            <span>{t('userProfile.qr.enlarge')}</span>
+            <AnimatedActionIcon kind="scan" size={16} color="#315efb" />
+          </button>
+        </div>
+
+        <div
+          className={`relative flex aspect-square items-center justify-center transition-all duration-500 ease-out ${
+            scanFocus
+              ? 'mt-0 w-full max-w-[18rem] scale-110 sm:max-w-[20rem] sm:scale-125'
+              : 'mt-5 w-full max-w-[15rem] scale-100'
+          }`}
+        >
+          {open ? <QRCode ref={qrRef} value={url} size="xl" /> : null}
+          <div
+            className={`pointer-events-none absolute inset-0 transition-opacity duration-500 ${
+              scanFocus ? 'opacity-0' : 'opacity-100'
+            }`}
+          >
+            <GradientScan className="absolute bottom-0 left-0 right-0" />
+          </div>
+        </div>
+
+        <div
+          className={`w-full overflow-hidden transition-all duration-500 ease-out ${
+            scanFocus
+              ? 'pointer-events-none max-h-0 translate-y-2 opacity-0'
+              : 'max-h-60 translate-y-0 opacity-100'
+          }`}
+        >
+          <p className="mt-4 max-w-xs break-all text-xs text-neutral-400 mx-auto">{url}</p>
+
+          <div className="mt-5 grid w-full grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void shareProfile()}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#315efb] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#2547c4] disabled:opacity-50"
+            >
+              <AnimatedActionIcon kind="share" size={16} color="#ffffff" />
+              {busy === 'share' ? t('userProfile.qr.sharing') : t('userProfile.qr.share')}
+            </button>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void saveAsPhoto()}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-900 transition-colors hover:bg-neutral-50 disabled:opacity-50"
+            >
+              <AnimatedActionIcon kind="download" size={16} color="currentColor" />
+              {busy === 'save' ? t('userProfile.qr.saving') : t('userProfile.qr.savePhoto')}
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => void copyLink()}
+            className="mt-2 w-full rounded-2xl px-4 py-2.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-50"
+          >
+            {t('userProfile.menu.copyLink')}
+          </button>
+        </div>
       </div>
     </ResponsiveDialogShell>
   );
