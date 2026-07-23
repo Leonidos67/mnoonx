@@ -92,6 +92,20 @@ const SearchBar: React.FC<SearchBarProps> = ({
     setQrScannerOpen(true);
   }, []);
 
+  const closeSearchUi = useCallback(() => {
+    setQrScannerOpen(false);
+    setDropdownOpen(false);
+    onDismiss?.();
+  }, [onDismiss]);
+
+  const handleQrGoToPage = useCallback(
+    (path: string) => {
+      closeSearchUi();
+      navigate(path);
+    },
+    [closeSearchUi, navigate]
+  );
+
   const categories = useMemo(
     () => [
       { id: 'all' as const, label: t('search.all'), icon: LayoutGrid },
@@ -562,7 +576,11 @@ const SearchBar: React.FC<SearchBarProps> = ({
   );
 
   const scanner = (
-    <QrScannerModal open={qrScannerOpen} onClose={() => setQrScannerOpen(false)} />
+    <QrScannerModal
+      open={qrScannerOpen}
+      onClose={() => setQrScannerOpen(false)}
+      onGoToPage={handleQrGoToPage}
+    />
   );
 
   if (isModal) {

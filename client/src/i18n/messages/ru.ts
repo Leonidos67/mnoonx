@@ -1295,6 +1295,8 @@ export const ru = {
       shareFailed: 'Не удалось поделиться',
       scanAria: 'Увеличить QR',
       enlarge: 'Увеличить QR',
+      backFromScan: 'Назад',
+      scanHint: 'Наведите другой телефон на этот код',
     },
     editPostTitle: 'Редактировать пост',
     editPostDescription: 'Измените текст поста. Медиа здесь не меняются.',

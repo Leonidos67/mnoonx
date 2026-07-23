@@ -14,6 +14,8 @@ export interface ResponsiveDialogShellProps {
   sheetPadded?: boolean;
   /** Desktop dialog panel classes */
   panelClassName?: string;
+  /** Extra classes on the mobile Vaul drawer surface */
+  sheetContentClassName?: string;
   zIndexClass?: string;
   role?: 'dialog' | 'alertdialog';
   closeOnBackdrop?: boolean;
@@ -29,6 +31,7 @@ const ResponsiveDialogShell: React.FC<ResponsiveDialogShellProps> = ({
   children,
   sheetPadded = false,
   panelClassName = 'w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl',
+  sheetContentClassName = '',
   zIndexClass = 'z-[120]',
   role = 'dialog',
   closeOnBackdrop = true,
@@ -66,6 +69,8 @@ const ResponsiveDialogShell: React.FC<ResponsiveDialogShellProps> = ({
         title={title}
         padded={sheetPadded}
         dismissible={!disableClose}
+        contentClassName={sheetContentClassName}
+        zIndexClass={zIndexClass}
       >
         {children}
       </MobileBottomSheet>

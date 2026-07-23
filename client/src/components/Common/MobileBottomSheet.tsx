@@ -52,7 +52,7 @@ const MobileBottomSheet: React.FC<MobileBottomSheetProps> = ({
           <Drawer.Title className="sr-only">{title}</Drawer.Title>
           <Drawer.Handle className="mx-auto mt-3 h-1.5 w-12 shrink-0 rounded-full bg-neutral-300" />
           {padded ? (
-            <div className="overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-6">
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-6">
               {children}
             </div>
           ) : (

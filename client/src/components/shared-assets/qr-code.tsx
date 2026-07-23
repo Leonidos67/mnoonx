@@ -31,7 +31,9 @@ export const GradientScan = ({ className, ...props }: HTMLAttributes<HTMLDivElem
 const styles = {
   md: { root: 'p-2', qr: { width: 96, height: 96 } },
   lg: { root: 'p-3', qr: { width: 128, height: 128 } },
-  xl: { root: 'p-4', qr: { width: 200, height: 200 } },
+  xl: { root: 'p-4', qr: { width: 240, height: 240 } },
+  '2xl': { root: 'p-5', qr: { width: 320, height: 320 } },
+  '3xl': { root: 'p-4', qr: { width: 360, height: 360 } },
 } as const;
 
 export type QRCodeHandle = {

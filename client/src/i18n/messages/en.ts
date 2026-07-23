@@ -1295,6 +1295,8 @@ export const en = {
       shareFailed: 'Could not share',
       scanAria: 'Enlarge QR',
       enlarge: 'Enlarge QR',
+      backFromScan: 'Back',
+      scanHint: 'Hold another phone over this code to scan',
     },
     editPostTitle: 'Edit post',
     editPostDescription: 'Update your post text. Media attachments are not changed here.',
