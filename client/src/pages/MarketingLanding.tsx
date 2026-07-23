@@ -48,12 +48,15 @@ const MarketingLanding: React.FC = () => {
       const topFrac = (pr.top - hr.top) / hr.height;
       setBeamY(0.5 - topFrac);
       // UV scale in LaserFlow ≈ 204.8; R_V = 150. Size so tip reaches viewport top.
-      const uvToTop = topFrac * 204.8;
+      const uvToTop = Math.max(0.15, topFrac) * 204.8;
       setBeamLen(Math.max(2.4, (uvToTop / 150) * 1.35));
     };
 
     syncBeam();
-    const raf = requestAnimationFrame(syncBeam);
+    const raf = requestAnimationFrame(() => {
+      syncBeam();
+      requestAnimationFrame(syncBeam);
+    });
     const ro = new ResizeObserver(syncBeam);
     ro.observe(hero);
     ro.observe(panel);
@@ -63,7 +66,7 @@ const MarketingLanding: React.FC = () => {
       ro.disconnect();
       window.removeEventListener('resize', syncBeam);
     };
-  }, []);
+  }, [t]);
 
   const revealTextStyle = {
     position: 'absolute',
@@ -72,7 +75,8 @@ const MarketingLanding: React.FC = () => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: '28%',
+    // Keep wordmark in the free space above the auto-height panel
+    paddingBottom: 'min(40%, 280px)',
     pointerEvents: 'none',
     userSelect: 'none',
     fontFamily: '"Archivo Black", sans-serif',
@@ -142,11 +146,11 @@ const MarketingLanding: React.FC = () => {
         ref={panelRef}
         style={{
           position: 'absolute',
-          top: '75%',
-          left: '50%',
-          transform: 'translateX(-50%)',
+          left: 0,
+          right: 0,
+          bottom: 0,
           width: '100%',
-          height: '25%',
+          height: 'auto',
           zIndex: 6,
           borderRadius: '22px 22px 0 0',
           border: 'none',
@@ -162,12 +166,11 @@ const MarketingLanding: React.FC = () => {
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: 'flex-start',
           color: 'white',
-          padding: '2rem 1.5rem',
+          padding: '2rem 1.5rem calc(2rem + env(safe-area-inset-bottom, 0px))',
           boxSizing: 'border-box',
           textAlign: 'center',
-          overflow: 'hidden',
         }}
       >
         <div
