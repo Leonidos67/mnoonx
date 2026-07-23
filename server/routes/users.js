@@ -13,6 +13,13 @@ const {
   profilePayload,
 } = require('../services/socialLinks');
 const { loadBlockedSets } = require('../services/userBlocks');
+const CollaborationRequest = require('../models/CollaborationRequest');
+const {
+  PRIVACY_MODES,
+  normalizePrivacy,
+  getInviteStatusForViewer,
+  createCollaborationCommunity,
+} = require('../services/collaboration');
 
 async function serializePostWithAuthor(post, viewerUserId) {
   return serializeFeedPost(post, viewerUserId);
@@ -23,6 +30,7 @@ router.get('/list', auth, async (req, res) => {
   try {
     const q = (req.query.q || '').toString().trim().toLowerCase();
     const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    const sortBy = (req.query.sort || '').toString().trim().toLowerCase();
     const filter = {};
     if (q) {
       filter.$or = [
@@ -30,9 +38,14 @@ router.get('/list', auth, async (req, res) => {
         { fullName: new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
       ];
     }
+    const sort =
+      sortBy === 'followers' || sortBy === 'popular'
+        ? { followersCount: -1, createdAt: -1 }
+        : { username: 1 };
+    const viewerId = req.userId ? req.userId.toString() : null;
     const users = await User.find(filter)
-      .select('username fullName avatar followersCount createdAt')
-      .sort({ username: 1 })
+      .select('username fullName avatar bio followersCount createdAt')
+      .sort(sort)
       .limit(limit)
       .lean();
     res.json(
@@ -41,8 +54,9 @@ router.get('/list', auth, async (req, res) => {
         username: u.username,
         fullName: u.fullName || u.username,
         avatar: u.avatar || '',
+        bio: (u.bio || '').toString().slice(0, 160),
         followersCount: u.followersCount || 0,
-        isSelf: u._id.toString() === req.userId.toString(),
+        isSelf: Boolean(viewerId && u._id.toString() === viewerId),
       }))
     );
   } catch (error) {
@@ -103,6 +117,142 @@ const DEFAULT_NOTIF_PREFS = {
   waitlistAccepted: true,
   pushEnabled: false,
 };
+
+// PATCH /api/users/me/collaboration-privacy
+router.patch('/me/collaboration-privacy', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const mode = normalizePrivacy(req.body?.collaborationPrivacy ?? req.body?.mode);
+    if (!PRIVACY_MODES.includes(mode)) {
+      return res.status(400).json({ message: 'Invalid collaboration privacy mode' });
+    }
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { $set: { collaborationPrivacy: mode } },
+      { new: true }
+    ).select('collaborationPrivacy username');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({ collaborationPrivacy: normalizePrivacy(user.collaborationPrivacy) });
+  } catch (error) {
+    console.error('Patch collaboration privacy error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/users/me/collaboration-privacy
+router.get('/me/collaboration-privacy', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const user = await User.findById(req.userId).select('collaborationPrivacy');
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({ collaborationPrivacy: normalizePrivacy(user.collaborationPrivacy) });
+  } catch (error) {
+    console.error('Get collaboration privacy error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// GET /api/users/me/collaboration-requests
+router.get('/me/collaboration-requests', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const tab = String(req.query.tab || 'incoming').toLowerCase();
+    const filter =
+      tab === 'outgoing'
+        ? { fromUser: req.userId, status: 'pending' }
+        : { toUser: req.userId, status: 'pending' };
+
+    const rows = await CollaborationRequest.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .populate('fromUser', 'username fullName avatar')
+      .populate('toUser', 'username fullName avatar')
+      .lean();
+
+    res.json({
+      requests: rows.map((r) => ({
+        id: r._id.toString(),
+        name: r.name,
+        description: r.description || '',
+        status: r.status,
+        createdAt: r.createdAt,
+        fromUser: r.fromUser
+          ? {
+              id: r.fromUser._id.toString(),
+              username: r.fromUser.username,
+              fullName: r.fromUser.fullName || r.fromUser.username,
+              avatar: r.fromUser.avatar || '',
+            }
+          : null,
+        toUser: r.toUser
+          ? {
+              id: r.toUser._id.toString(),
+              username: r.toUser.username,
+              fullName: r.toUser.fullName || r.toUser.username,
+              avatar: r.toUser.avatar || '',
+            }
+          : null,
+      })),
+    });
+  } catch (error) {
+    console.error('List collaboration requests error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/users/me/collaboration-requests/:id/accept
+router.post('/me/collaboration-requests/:id/accept', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const request = await CollaborationRequest.findById(req.params.id);
+    if (!request || request.status !== 'pending') {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+    if (String(request.toUser) !== String(req.userId)) {
+      return res.status(403).json({ message: 'Only the recipient can accept this request' });
+    }
+
+    const community = await createCollaborationCommunity({
+      ownerId: request.fromUser,
+      coOwnerId: request.toUser,
+      name: request.name,
+      description: request.description,
+    });
+
+    request.status = 'accepted';
+    request.community = community._id;
+    await request.save();
+
+    res.json({
+      type: 'collaboration',
+      requestId: request._id.toString(),
+      community,
+    });
+  } catch (error) {
+    console.error('Accept collaboration request error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/users/me/collaboration-requests/:id/decline
+router.post('/me/collaboration-requests/:id/decline', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const request = await CollaborationRequest.findById(req.params.id);
+    if (!request || request.status !== 'pending') {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+    if (String(request.toUser) !== String(req.userId)) {
+      return res.status(403).json({ message: 'Only the recipient can decline this request' });
+    }
+    request.status = 'declined';
+    await request.save();
+    res.json({ ok: true, requestId: request._id.toString(), status: 'declined' });
+  } catch (error) {
+    console.error('Decline collaboration request error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
 
 // GET /api/users/me/preferences
 router.get('/me/preferences', auth, async (req, res) => {
@@ -443,6 +593,7 @@ router.get('/:username', auth, async (req, res) => {
     // Проверяем подписку и блокировку
     let isFollowing = false;
     let isBlockedByMe = false;
+    let collaborationInvite = null;
     if (req.userId) {
       const currentUserId = req.userId.toString();
       const profileUserId = user._id.toString();
@@ -466,6 +617,9 @@ router.get('/:username', auth, async (req, res) => {
 
       const { myBlocked } = await loadBlockedSets(req.userId, user._id);
       isBlockedByMe = myBlocked.has(profileUserId);
+      collaborationInvite = await getInviteStatusForViewer(req.userId, user);
+    } else {
+      collaborationInvite = await getInviteStatusForViewer(null, user);
     }
 
     console.log('FINAL isFollowing:', isFollowing);
@@ -481,9 +635,11 @@ router.get('/:username', auth, async (req, res) => {
     const json = user.toJSON();
     res.json({
       ...json,
+      collaborationPrivacy: undefined,
       socialLinks: serializeSocialLinks(user.socialLinks),
       isFollowing,
       isBlockedByMe,
+      collaborationInvite,
       posts: postsWithAuthor,
     });
     

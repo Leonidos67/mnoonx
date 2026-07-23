@@ -107,6 +107,13 @@ interface Community {
   admins?: CommunityAdminEntry[];
   canViewFull?: boolean;
   canPost?: boolean;
+  kind?: 'community' | 'collaboration';
+  coOwner?: {
+    _id: string;
+    username: string;
+    fullName: string;
+    avatar: string;
+  } | null;
 }
 
 interface CommunityAdminEntry {
@@ -1794,6 +1801,14 @@ const CommunityPage: React.FC = () => {
                       )}
                     </span>
                     <span>•</span>
+                    {community.kind === 'collaboration' ? (
+                      <>
+                        <span className="inline-flex items-center rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-xs font-semibold text-[#315efb]">
+                          {t('discover.collaborationBadge')}
+                        </span>
+                        <span>•</span>
+                      </>
+                    ) : null}
                     <span
                       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         community.isPublic !== false
@@ -1814,11 +1829,25 @@ const CommunityPage: React.FC = () => {
                       )}
                     </span>
                     <span>•</span>
-                    <div className="flex items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
                       <span>{t('community.createdBy')}</span>
-                      <Link to={`/@${community.owner?.username}`} className="font-semibold text-black hover:underline">
+                      <Link
+                        to={`/@${community.owner?.username}`}
+                        className="font-semibold text-black hover:underline"
+                      >
                         {community.owner?.fullName || community.owner?.username}
                       </Link>
+                      {community.kind === 'collaboration' && community.coOwner?.username ? (
+                        <>
+                          <span className="text-[#888]">&</span>
+                          <Link
+                            to={`/@${community.coOwner.username}`}
+                            className="font-semibold text-black hover:underline"
+                          >
+                            {community.coOwner.fullName || community.coOwner.username}
+                          </Link>
+                        </>
+                      ) : null}
                     </div>
                   </div>
 

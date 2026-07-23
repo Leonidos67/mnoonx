@@ -11,6 +11,7 @@ import {
   UsersRoundIcon,
   type IconHandle,
 } from '@animateicons/react/lucide';
+import { Swords } from 'lucide-react';
 import { useAnimateOnParentHover } from '../../hooks/useAnimateOnParentHover';
 
 export type SettingsNavIconKind =
@@ -22,9 +23,10 @@ export type SettingsNavIconKind =
   | 'orders'
   | 'notifications'
   | 'payments'
-  | 'resolution';
+  | 'resolution'
+  | 'collaborations';
 
-const ICONS = {
+const ANIMATED_ICONS = {
   account: UserRoundIcon,
   editProfile: UserRoundPenIcon,
   invites: UsersRoundIcon,
@@ -53,14 +55,28 @@ export const AnimatedSettingsNavIcon: React.FC<AnimatedSettingsNavIconProps> = (
   const iconRef = useRef<IconHandle>(null);
   const nodeRef = useRef<HTMLSpanElement>(null);
   useAnimateOnParentHover(iconRef, nodeRef);
-  const Icon = ICONS[kind];
+
+  const wrapperClass = `inline-flex shrink-0 items-center justify-center overflow-hidden ${className || ''}`;
+  const wrapperStyle = { width: size, height: size };
+
+  if (kind === 'collaborations') {
+    return (
+      <span ref={nodeRef} className={wrapperClass} style={wrapperStyle}>
+        <Swords
+          size={size}
+          color={color}
+          strokeWidth={2}
+          className="!h-full !w-full !min-h-0 !min-w-0"
+          aria-hidden
+        />
+      </span>
+    );
+  }
+
+  const Icon = ANIMATED_ICONS[kind];
 
   return (
-    <span
-      ref={nodeRef}
-      className={`inline-flex shrink-0 items-center justify-center overflow-hidden ${className || ''}`}
-      style={{ width: size, height: size }}
-    >
+    <span ref={nodeRef} className={wrapperClass} style={wrapperStyle}>
       <Icon
         ref={iconRef}
         size={size}

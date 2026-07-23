@@ -31,6 +31,22 @@ const CommunitySchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  /**
+   * `community` — обычное сообщество.
+   * `collaboration` — совместный проект двух авторов (owner + coOwner), без «полного» community-first флоу.
+   */
+  kind: {
+    type: String,
+    enum: ['community', 'collaboration'],
+    default: 'community',
+    index: true,
+  },
+  /** Второй автор коллаборации (равноправный доступ как у owner) */
+  coOwner: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null,
+  },
   members: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',

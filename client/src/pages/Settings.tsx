@@ -24,10 +24,12 @@ import {
 } from '../components/Settings/AnimatedSettingsNavIcon';
 import SettingsAccountPanel from '../components/Settings/SettingsAccountPanel';
 import SettingsNotificationsPanel from '../components/Settings/SettingsNotificationsPanel';
+import SettingsCollaborationsPanel from '../components/Settings/SettingsCollaborationsPanel';
 import SettingsSecurityPanel from '../components/Settings/SettingsSecurityPanel';
 import SettingsOrdersPanel from '../components/Settings/SettingsOrdersPanel';
 import SettingsPaymentsPanel from '../components/Settings/SettingsPaymentsPanel';
 import SettingsResolutionPanel from '../components/Settings/SettingsResolutionPanel';
+import { ProfileQrCodeModal, ProfileQrTrigger } from '../components/Profile/ProfileQrCodeModal';
 
 type SettingsSectionId =
   | 'account'
@@ -36,6 +38,7 @@ type SettingsSectionId =
   | 'security'
   | 'orders'
   | 'notifications'
+  | 'collaborations'
   | 'payments'
   | 'resolution';
 
@@ -74,6 +77,7 @@ const Settings: React.FC = () => {
     website: '',
   });
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({ ...EMPTY_SOCIAL_LINKS });
+  const [qrModalOpen, setQrModalOpen] = useState(false);
 
   const menuGroups: MenuGroup[] = useMemo(
     () => [
@@ -117,6 +121,12 @@ const Settings: React.FC = () => {
             icon: 'notifications',
             description: t('settings.notificationsNavHint'),
           },
+          {
+            id: 'collaborations',
+            label: t('settings.collaborations'),
+            icon: 'collaborations',
+            description: t('settings.collaborationsNavHint'),
+          },
         ],
       },
       {
@@ -155,6 +165,7 @@ const Settings: React.FC = () => {
       'connected',
       'security',
       'notifications',
+      'collaborations',
       'orders',
       'payments',
       'resolution',
@@ -352,14 +363,24 @@ const Settings: React.FC = () => {
 
             <div className="mb-6">
               <label className="mb-2 block text-sm font-medium text-neutral-700">{t('settings.username')}</label>
-              <input
-                type="text"
-                value={formData.username}
-                onChange={(e) => handleInputChange('username', e.target.value)}
-                maxLength={42}
-                className="w-full rounded-xl border border-neutral-200 px-4 py-3 transition-all focus:outline-none focus:ring-2 focus:ring-black/10"
-                placeholder={t('settings.usernamePlaceholder')}
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.username}
+                  onChange={(e) => handleInputChange('username', e.target.value)}
+                  maxLength={42}
+                  className="w-full rounded-xl border border-neutral-200 py-3 pl-4 pr-11 transition-all focus:outline-none focus:ring-2 focus:ring-black/10"
+                  placeholder={t('settings.usernamePlaceholder')}
+                />
+                <div className="absolute inset-y-0 right-2 flex items-center">
+                  <ProfileQrTrigger
+                    onClick={() => {
+                      if (!formData.username.trim()) return;
+                      setQrModalOpen(true);
+                    }}
+                  />
+                </div>
+              </div>
               <p className="mt-1 text-sm text-neutral-400">{formData.username.length}/42</p>
             </div>
 
@@ -495,6 +516,9 @@ const Settings: React.FC = () => {
       case 'notifications':
         return <SettingsNotificationsPanel userId={user?.id} />;
 
+      case 'collaborations':
+        return <SettingsCollaborationsPanel />;
+
       case 'security':
         return <SettingsSecurityPanel />;
 
@@ -590,6 +614,15 @@ const Settings: React.FC = () => {
 
         <div className="flex-1 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:p-8">{renderContent()}</div>
       </main>
+
+      {formData.username.trim() ? (
+        <ProfileQrCodeModal
+          open={qrModalOpen}
+          onClose={() => setQrModalOpen(false)}
+          username={formData.username.trim()}
+          fullName={formData.name.trim() || formData.username.trim()}
+        />
+      ) : null}
     </div>
   );
 };

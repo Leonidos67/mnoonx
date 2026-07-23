@@ -28,6 +28,11 @@ const Post = require('../models/Post');
 const auth = require('../middleware/auth');
 const communityAdmin = require('../utils/communityAdmin');
 const {
+  evaluateCollaborationInvite,
+  createCollaborationCommunity,
+} = require('../services/collaboration');
+const CollaborationRequest = require('../models/CollaborationRequest');
+const {
   generateCommunityAiText,
   buildSystemPrompt,
   serializeConfig,
@@ -197,9 +202,15 @@ function isCommunityMember(community, userId) {
 
 function isCommunityOwner(community, userId) {
   if (!userId || !community) return false;
+  const uid = userId.toString();
   const ownerId = ownerIdString(community);
-  if (!ownerId) return false;
-  return ownerId === userId.toString();
+  if (ownerId && ownerId === uid) return true;
+  const co = community.coOwner;
+  if (co) {
+    const coId = (co._id || co).toString();
+    if (coId === uid) return true;
+  }
+  return false;
 }
 
 function canViewCommunity(community, userId) {
@@ -326,6 +337,7 @@ function filterInstancesForViewer(community, userId) {
 async function loadCommunityWithAdmins(handle) {
   return Community.findOne({ handle: handle.toLowerCase() })
     .populate('owner', 'username fullName avatar')
+    .populate('coOwner', 'username fullName avatar')
     .populate('admins.user', 'username fullName avatar');
 }
 
@@ -813,10 +825,109 @@ async function enrichChatMessagesWithReadReceipts(messages, community, instanceI
 // @access  Private
 router.post('/', auth, async (req, res) => {
   try {
-    const { name, handle, description, avatar, banner, category, isPublic, isPaid, price } = req.body;
+    if (!req.userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
 
-    // Проверяем, свободен ли handle
-    const existingCommunity = await Community.findOne({ handle: handle.toLowerCase() });
+    const {
+      name,
+      handle,
+      description,
+      avatar,
+      banner,
+      category,
+      isPublic,
+      isPaid,
+      price,
+      kind,
+      partnerUsername,
+    } = req.body;
+
+    const isCollab = String(kind || '').toLowerCase() === 'collaboration';
+
+    if (isCollab) {
+      if (!String(name || '').trim()) {
+        return res.status(400).json({ message: 'Collaboration name is required' });
+      }
+      const partner = String(partnerUsername || '')
+        .trim()
+        .replace(/^@/, '')
+        .toLowerCase();
+      if (!partner) {
+        return res.status(400).json({ message: 'Partner username is required for a collaboration' });
+      }
+      const partnerUser = await User.findOne({ username: partner }).select(
+        '_id username collaborationPrivacy'
+      );
+      if (!partnerUser) {
+        return res.status(404).json({ message: 'Partner user not found' });
+      }
+
+      const verdict = await evaluateCollaborationInvite(req.userId, partnerUser);
+      if (!verdict.ok) {
+        return res.status(403).json({
+          message: verdict.message || 'Cannot invite this user',
+          code: verdict.code || 'deny',
+        });
+      }
+
+      if (verdict.action === 'request') {
+        const existing = await CollaborationRequest.findOne({
+          fromUser: req.userId,
+          toUser: partnerUser._id,
+          status: 'pending',
+        });
+        if (existing) {
+          return res.status(400).json({
+            message: 'You already have a pending collaboration request with this user',
+            code: 'pending',
+            requestId: existing._id.toString(),
+          });
+        }
+        const request = await CollaborationRequest.create({
+          fromUser: req.userId,
+          toUser: partnerUser._id,
+          name: String(name).trim(),
+          description: String(description || '').trim(),
+          status: 'pending',
+        });
+        return res.status(201).json({
+          type: 'request',
+          request: {
+            id: request._id.toString(),
+            name: request.name,
+            description: request.description,
+            status: request.status,
+            toUsername: partnerUser.username,
+          },
+        });
+      }
+
+      const populated = await createCollaborationCommunity({
+        ownerId: req.userId,
+        coOwnerId: partnerUser._id,
+        name: String(name).trim(),
+        description: String(description || '').trim(),
+        category: category || 'Other',
+        isPublic: isPublic !== undefined ? isPublic : true,
+      });
+      return res.status(201).json({ type: 'collaboration', ...populated.toObject() });
+    }
+
+    let finalHandle = String(handle || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-');
+    if (!finalHandle) {
+      const base = String(name || 'c')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 24);
+      finalHandle = `c-${base || 'space'}-${Date.now().toString(36).slice(-4)}`;
+    }
+
+    const existingCommunity = await Community.findOne({ handle: finalHandle });
     if (existingCommunity) {
       return res.status(400).json({ message: 'Community handle already taken' });
     }
@@ -824,13 +935,15 @@ router.post('/', auth, async (req, res) => {
     const createdAt = new Date();
     const newCommunity = new Community({
       name,
-      handle: handle.toLowerCase(),
+      handle: finalHandle,
       description,
       avatar,
       banner,
       owner: req.userId,
+      kind: 'community',
       members: [req.userId],
       memberJoins: [{ userId: req.userId, joinedAt: createdAt }],
+      memberCount: 1,
       category: category || 'Other',
       isPublic: isPublic !== undefined ? isPublic : true,
       isPaid: isPaid || false,
@@ -840,9 +953,8 @@ router.post('/', auth, async (req, res) => {
 
     await newCommunity.save();
 
-    // Добавляем сообщество в список созданных у пользователя
     await User.findByIdAndUpdate(req.userId, {
-      $push: { ownedCommunities: newCommunity._id, joinedCommunities: newCommunity._id }
+      $push: { ownedCommunities: newCommunity._id, joinedCommunities: newCommunity._id },
     });
 
     res.status(201).json(newCommunity);
@@ -853,7 +965,7 @@ router.post('/', auth, async (req, res) => {
 });
 
 // @route   GET /api/communities/mine
-// @desc    Сообщества, созданные текущим пользователем (владелец)
+// @desc    Communities owned or co-owned by the current user (sidebar)
 // @access  Private
 router.get('/mine', auth, async (req, res) => {
   try {
@@ -861,9 +973,11 @@ router.get('/mine', auth, async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const communities = await Community.find({ owner: req.userId })
+    const communities = await Community.find({
+      $or: [{ owner: req.userId }, { coOwner: req.userId }],
+    })
       .sort({ createdAt: -1 })
-      .select('name handle avatar memberCount category createdAt');
+      .select('name handle avatar memberCount category createdAt kind');
 
     res.json(communities);
   } catch (err) {
@@ -879,13 +993,99 @@ router.get('/list', async (req, res) => {
   try {
     const communities = await Community.find()
       .sort({ memberCount: -1 })
-      .populate('owner', 'username fullName avatar');
+      .populate('owner', 'username fullName avatar')
+      .populate('coOwner', 'username fullName avatar');
     
     console.log(`Found ${communities.length} communities`);
     res.json(communities);
   } catch (err) {
     console.error('Error fetching communities:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// @route   GET /api/communities/discover-courses
+// @desc    Public catalog of courses from public communities (Discover → Courses)
+// @access  Public
+router.get('/discover-courses', auth, async (req, res) => {
+  try {
+    const q = (req.query.q || '').toString().trim().toLowerCase();
+    const limit = Math.min(parseInt(req.query.limit, 10) || 48, 80);
+
+    const publicCommunities = await Community.find({ isPublic: { $ne: false } })
+      .select('name handle avatar memberCount installedAppInstances')
+      .lean();
+
+    const allowed = new Map();
+    for (const c of publicCommunities) {
+      const instances = (c.installedAppInstances || []).filter(
+        (i) => i.appId === 'courses' && i.visibleToMembers !== false
+      );
+      if (!instances.length) continue;
+      allowed.set(c._id.toString(), {
+        community: c,
+        instanceIds: new Set(instances.map((i) => String(i.id))),
+      });
+    }
+
+    if (allowed.size === 0) {
+      return res.json([]);
+    }
+
+    const communityObjectIds = [...allowed.keys()].map((id) => new mongoose.Types.ObjectId(id));
+    const filter = {
+      community: { $in: communityObjectIds },
+      isHidden: { $ne: true },
+    };
+    if (q) {
+      const safe = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.$or = [
+        { name: new RegExp(safe, 'i') },
+        { description: new RegExp(safe, 'i') },
+        { tags: new RegExp(safe, 'i') },
+      ];
+    }
+
+    const rows = await CommunityCourse.find(filter)
+      .sort({ updatedAt: -1 })
+      .limit(limit * 2)
+      .select('name description coverUrl tags community appInstanceId updatedAt createdAt chapters')
+      .lean();
+
+    const out = [];
+    for (const row of rows) {
+      const meta = allowed.get(row.community.toString());
+      if (!meta) continue;
+      if (!meta.instanceIds.has(String(row.appInstanceId))) continue;
+      const lessonCount = (row.chapters || []).reduce(
+        (n, ch) => n + ((ch.lessons && ch.lessons.length) || 0),
+        0
+      );
+      const c = meta.community;
+      out.push({
+        id: row._id.toString(),
+        name: row.name,
+        description: row.description || '',
+        coverUrl: row.coverUrl || '',
+        tags: row.tags || [],
+        lessonCount,
+        updatedAt: row.updatedAt,
+        appInstanceId: row.appInstanceId,
+        community: {
+          id: c._id.toString(),
+          name: c.name,
+          handle: c.handle,
+          avatar: c.avatar || '',
+          memberCount: c.memberCount || 0,
+        },
+      });
+      if (out.length >= limit) break;
+    }
+
+    res.json(out);
+  } catch (err) {
+    console.error('discover-courses error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

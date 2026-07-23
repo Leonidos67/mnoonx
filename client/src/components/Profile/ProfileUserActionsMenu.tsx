@@ -5,12 +5,13 @@ import {
   LockIcon,
   type IconHandle,
 } from '@animateicons/react/lucide';
+import { QrCode } from 'lucide-react';
 import FloatingMenu, { type FloatingMenuAnchor } from '../Common/FloatingMenu';
 import ResponsiveDialogShell from '../Common/ResponsiveDialogShell';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useAnimateOnParentHover } from '../../hooks/useAnimateOnParentHover';
 
-export type ProfileUserActionId = 'copyLink' | 'report' | 'block';
+export type ProfileUserActionId = 'copyLink' | 'qrCode' | 'report' | 'block';
 
 interface ProfileUserActionsMenuProps {
   open: boolean;
@@ -20,10 +21,13 @@ interface ProfileUserActionsMenuProps {
   title: string;
   labels: {
     copyLink: string;
+    qrCode: string;
     report: string;
     block: string;
   };
   isBlocked?: boolean;
+  /** When true, hide report/block (own profile). */
+  isOwnProfile?: boolean;
   onAction: (action: ProfileUserActionId) => void;
 }
 
@@ -31,7 +35,7 @@ const menuBtnClass =
   'flex w-full items-center gap-2 rounded-md p-2 text-left text-sm text-black transition-colors hover:bg-neutral-50';
 
 const MenuAnimatedIcon: React.FC<{
-  kind: 'copy' | 'headset' | 'lock';
+  kind: 'copy' | 'qr' | 'headset' | 'lock';
   color?: string;
 }> = ({ kind, color = '#000000' }) => {
   const iconRef = useRef<IconHandle>(null);
@@ -55,6 +59,8 @@ const MenuAnimatedIcon: React.FC<{
     >
       {kind === 'copy' ? (
         <CopyIcon {...shared} />
+      ) : kind === 'qr' ? (
+        <QrCode size={size} color={color} strokeWidth={2} aria-hidden />
       ) : kind === 'headset' ? (
         <HeadsetIcon {...shared} />
       ) : (
@@ -72,6 +78,7 @@ const ProfileUserActionsMenu: React.FC<ProfileUserActionsMenuProps> = ({
   title,
   labels,
   isBlocked = false,
+  isOwnProfile = false,
   onAction,
 }) => {
   const isDesktop = useMediaQuery('(min-width: 1024px)');
@@ -88,18 +95,27 @@ const ProfileUserActionsMenu: React.FC<ProfileUserActionsMenuProps> = ({
       icon: <MenuAnimatedIcon kind="copy" />,
     },
     {
-      id: 'report',
-      label: labels.report,
-      icon: <MenuAnimatedIcon kind="headset" />,
+      id: 'qrCode',
+      label: labels.qrCode,
+      icon: <MenuAnimatedIcon kind="qr" />,
     },
-    {
-      id: 'block',
-      label: labels.block,
-      icon: (
-        <MenuAnimatedIcon kind="lock" color={isBlocked ? '#525252' : '#000000'} />
-      ),
-      destructive: !isBlocked,
-    },
+    ...(isOwnProfile
+      ? []
+      : [
+          {
+            id: 'report' as const,
+            label: labels.report,
+            icon: <MenuAnimatedIcon kind="headset" />,
+          },
+          {
+            id: 'block' as const,
+            label: labels.block,
+            icon: (
+              <MenuAnimatedIcon kind="lock" color={isBlocked ? '#525252' : '#000000'} />
+            ),
+            destructive: !isBlocked,
+          },
+        ]),
   ];
 
   const handlePick = (id: ProfileUserActionId) => {

@@ -18,9 +18,9 @@ import MarketingLanding from './pages/MarketingLanding';
 
 import LoginModal from './components/Auth/LoginModal';
 import RegisterModal from './components/Auth/RegisterModal';
+import WelcomeOnboarding from './components/Auth/WelcomeOnboarding';
 
 import NewPage from './components/Community/New';
-import NewPersonal from './components/Community/NewPersonal';
 import NewBusiness from './components/Community/NewBusiness';
 import Messenger from './pages/Messenger';
 import Notifications from './pages/Notifications';
@@ -30,6 +30,7 @@ import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 import PostPage from './pages/PostPage';
 import CreateCommunity from './pages/CreateCommunity';
+import CreateCollaboration from './pages/CreateCollaboration';
 import CommunitySettings from './pages/CommunitySettings';
 import CommunityStore from './pages/CommunityStore';
 import CommunityDashboardLayout from './components/Community/Dashboard/CommunityDashboardLayout';
@@ -102,7 +103,7 @@ function App() {
               </AppLayout>
             }
           />
-          <Route path="/ai" element={<Navigate to="/discover?tab=market" replace />} />
+          <Route path="/ai" element={<Navigate to="/discover" replace />} />
           <Route
             path={`/community/:handle/${COMMUNITY_SETTINGS_SEGMENT}`}
             element={
@@ -149,8 +150,16 @@ function App() {
             <Route path="invites" element={<CommunityDashboardInvites />} />
           </Route>
           <Route path="/create-community" element={<CreateCommunity />} />
+          <Route
+            path="/create-collaboration"
+            element={
+              <AppLayout>
+                <CreateCollaboration />
+              </AppLayout>
+            }
+          />
           <Route path="/new" element={<AppLayout><NewPage /></AppLayout>} />
-          <Route path="/new/personal" element={<AppLayout><NewPersonal /></AppLayout>} />
+          <Route path="/new/personal" element={<Navigate to="/new" replace />} />
           <Route path="/new/business" element={<AppLayout><NewBusiness /></AppLayout>} />
           <Route path="/messenger" element={<AppLayout><Messenger /></AppLayout>} />
           <Route path="/notifications" element={<AppLayout><Notifications /></AppLayout>} />
@@ -222,6 +231,8 @@ function App() {
             setIsLoginOpen(true);
           }} 
         />
+
+        <WelcomeOnboarding />
 
       </InAppBrowserProvider>
       </Router>

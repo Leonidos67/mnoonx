@@ -33,6 +33,7 @@ function userPayload(user) {
     postsCount: user.postsCount,
     createdAt: user.createdAt,
     twoFactorEnabled: Boolean(user.twoFactorEnabled),
+    welcomeOnboardingCompleted: user.welcomeOnboardingCompleted !== false,
   };
 }
 
@@ -74,6 +75,7 @@ router.post('/register', async (req, res) => {
       email: String(email).trim().toLowerCase(),
       password,
       fullName: fullName || username,
+      welcomeOnboardingCompleted: false,
     });
 
     await user.save();
@@ -179,6 +181,65 @@ router.get('/me', auth, async (req, res) => {
     res.json({ user: userPayload(user) });
   } catch (error) {
     console.error('Auth me error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+const WELCOME_SOURCES = new Set([
+  'friend',
+  'social',
+  'search',
+  'youtube',
+  'telegram',
+  'discord',
+  'podcast',
+  'article',
+  'event',
+  'other',
+]);
+const WELCOME_GOALS = new Set([
+  'build_community',
+  'find_communities',
+  'create_courses',
+  'collaborate',
+  'explore',
+]);
+
+// PATCH /api/auth/welcome-onboarding — finish post-signup welcome wizard
+router.patch('/welcome-onboarding', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+
+    const sourceRaw = String(req.body?.source || '').trim().toLowerCase();
+    const source = WELCOME_SOURCES.has(sourceRaw) ? sourceRaw : 'other';
+    const goalsIn = Array.isArray(req.body?.goals) ? req.body.goals : [];
+    const goals = [
+      ...new Set(
+        goalsIn
+          .map((g) => String(g || '').trim().toLowerCase())
+          .filter((g) => WELCOME_GOALS.has(g))
+      ),
+    ];
+
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      {
+        $set: {
+          welcomeOnboardingCompleted: true,
+          welcomeOnboarding: {
+            source,
+            goals,
+            completedAt: new Date(),
+          },
+        },
+      },
+      { new: true }
+    ).select('-password');
+
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({ user: userPayload(user) });
+  } catch (error) {
+    console.error('Welcome onboarding error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

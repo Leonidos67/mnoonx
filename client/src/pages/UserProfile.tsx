@@ -15,6 +15,7 @@ import {
   Lock,
   Repeat2,
   Pencil,
+  Users2,
 } from 'lucide-react';
 import { MessageCircleIcon, type IconHandle } from '@animateicons/react/lucide';
 import { AnimatedPostMenuIcon } from '../components/Posts/PostMenuAnimatedIcons';
@@ -33,6 +34,7 @@ import {
 import ProfilePremiumStyleModal, {
   type ProfileCustomizationDraft,
 } from '../components/Profile/ProfilePremiumStyleModal';
+import { ProfileQrCodeModal, ProfileQrTrigger } from '../components/Profile/ProfileQrCodeModal';
 import ProfileUserActionsMenu, {
   type ProfileUserActionId,
 } from '../components/Profile/ProfileUserActionsMenu';
@@ -109,6 +111,14 @@ type ProfileReply = {
   post: FeedPost;
 };
 
+interface CollaborationInvite {
+  status: string;
+  privacy?: string;
+  pendingRequestId?: string | null;
+  canInvite?: boolean;
+  message?: string | null;
+}
+
 interface UserProfile {
   _id: string;
   username: string;
@@ -128,6 +138,7 @@ interface UserProfile {
   profileStatusIcon?: string;
   profileNameColor?: string;
   profileBgEmoji?: string;
+  collaborationInvite?: CollaborationInvite | null;
 }
 
 interface FollowerUser {
@@ -176,6 +187,7 @@ const UserProfileComponent: React.FC = () => {
   const [followersSheetOpen, setFollowersSheetOpen] = useState(false);
   const [followingSheetOpen, setFollowingSheetOpen] = useState(false);
   const [premiumModalOpen, setPremiumModalOpen] = useState(false);
+  const [qrModalOpen, setQrModalOpen] = useState(false);
   const [styleSaving, setStyleSaving] = useState(false);
   const [hasProPlan, setHasProPlan] = useState(hasProSubscription);
   const [messagingId, setMessagingId] = useState<string | null>(null); // Добавлено для отслеживания загрузки сообщения
@@ -953,6 +965,25 @@ const UserProfileComponent: React.FC = () => {
     }
   };
 
+  const startCollaborate = () => {
+    if (!profile) return;
+    if (user?.username === profile.username) return;
+    if (!token) {
+      window.dispatchEvent(new CustomEvent('openLogin'));
+      return;
+    }
+    const invite = profile.collaborationInvite;
+    if (invite?.pendingRequestId) {
+      showToast(t('userProfile.collaboratePendingHint'), 'info');
+      return;
+    }
+    if (!invite?.canInvite) {
+      showToast(invite?.message || t('userProfile.collaborateDenied'), 'info');
+      return;
+    }
+    navigate(`/create-collaboration?partner=${encodeURIComponent(profile.username)}`);
+  };
+
   const handleFollow = async () => {
     if (!token) { window.dispatchEvent(new CustomEvent('openLogin')); return; }
     if (!profile) return;
@@ -1255,6 +1286,10 @@ const UserProfileComponent: React.FC = () => {
       if (!profile) return;
       if (action === 'copyLink') {
         void copyProfileLink();
+        return;
+      }
+      if (action === 'qrCode') {
+        setQrModalOpen(true);
         return;
       }
       if (action === 'report') {
@@ -1604,6 +1639,16 @@ const UserProfileComponent: React.FC = () => {
                     <Zap className="h-3.5 w-3.5 text-amber-600" aria-hidden />
                     {t('userProfile.activity')}
                   </button>
+                  <button
+                    type="button"
+                    onClick={openProfileMenu}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-neutral-300 transition-colors hover:bg-neutral-100"
+                    aria-label={t('userProfile.menu.title')}
+                    aria-haspopup="menu"
+                    aria-expanded={profileMenuOpen}
+                  >
+                    <AnimatedPostMenuIcon kind="ellipsis" size={16} />
+                  </button>
                 </>
               ) : (
                 <>
@@ -1626,6 +1671,17 @@ const UserProfileComponent: React.FC = () => {
                   >
                     <ProfileMessengerIcon size={16} color="#ffffff" />
                     {messagingId === profile.username ? t('users.opening') : t('users.message')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={startCollaborate}
+                    disabled={Boolean(profile.collaborationInvite?.pendingRequestId)}
+                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#315efb]/40 bg-[#eef2ff] px-3 py-1.5 text-xs font-semibold text-[#315efb] transition-colors hover:bg-[#e0e7ff] disabled:cursor-default disabled:opacity-70"
+                  >
+                    <Users2 className="h-3.5 w-3.5" aria-hidden />
+                    {profile.collaborationInvite?.pendingRequestId
+                      ? t('userProfile.collaboratePending')
+                      : t('userProfile.collaborate')}
                   </button>
                   <button
                     type="button"
@@ -1675,7 +1731,10 @@ const UserProfileComponent: React.FC = () => {
               />
             ) : null}
           </div>
-          <p className="text-neutral-500">@{profile.username}</p>
+          <div className="mt-1 flex items-center gap-1.5 text-neutral-500">
+            <span>@{profile.username}</span>
+            <ProfileQrTrigger onClick={() => setQrModalOpen(true)} />
+          </div>
           <div className="mt-2 flex flex-wrap gap-2">
             {isOwnProfile ? (
               <>
@@ -1694,6 +1753,16 @@ const UserProfileComponent: React.FC = () => {
                   <Zap className="h-4 w-4 text-amber-600" aria-hidden />
                   {t('userProfile.activity')}
                 </button>
+                <button
+                  type="button"
+                  onClick={openProfileMenu}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-300 transition-colors hover:bg-neutral-100"
+                  aria-label={t('userProfile.menu.title')}
+                  aria-haspopup="menu"
+                  aria-expanded={profileMenuOpen}
+                >
+                  <AnimatedPostMenuIcon kind="ellipsis" size={18} />
+                </button>
               </>
             ) : (
               <>
@@ -1709,6 +1778,17 @@ const UserProfileComponent: React.FC = () => {
                 >
                   <ProfileMessengerIcon size={16} color="#ffffff" />
                   {messagingId === profile.username ? t('users.opening') : t('users.message')}
+                </button>
+                <button
+                  type="button"
+                  onClick={startCollaborate}
+                  disabled={Boolean(profile.collaborationInvite?.pendingRequestId)}
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#315efb]/40 bg-[#eef2ff] px-5 py-2 text-sm font-semibold text-[#315efb] transition-colors hover:bg-[#e0e7ff] disabled:cursor-default disabled:opacity-70"
+                >
+                  <Users2 className="h-4 w-4" aria-hidden />
+                  {profile.collaborationInvite?.pendingRequestId
+                    ? t('userProfile.collaboratePending')
+                    : t('userProfile.collaborate')}
                 </button>
                 <button
                   type="button"
@@ -2253,25 +2333,32 @@ const UserProfileComponent: React.FC = () => {
         onSubmit={(value) => void submitEditPost(value)}
       />
 
-      {!isOwnProfile ? (
-        <ProfileUserActionsMenu
-          open={profileMenuOpen}
-          onClose={() => {
-            setProfileMenuOpen(false);
-            setProfileMenuAnchor(null);
-          }}
-          anchor={profileMenuAnchor}
-          username={profile.username}
-          title={t('userProfile.menu.title')}
-          labels={{
-            copyLink: t('userProfile.menu.copyLink'),
-            report: t('userProfile.menu.report'),
-            block: profile.isBlockedByMe ? t('userProfile.menu.unblock') : t('userProfile.menu.block'),
-          }}
-          isBlocked={Boolean(profile.isBlockedByMe)}
-          onAction={handleProfileMenuAction}
-        />
-      ) : null}
+      <ProfileQrCodeModal
+        open={qrModalOpen}
+        onClose={() => setQrModalOpen(false)}
+        username={profile.username}
+        fullName={displayName}
+      />
+
+      <ProfileUserActionsMenu
+        open={profileMenuOpen}
+        onClose={() => {
+          setProfileMenuOpen(false);
+          setProfileMenuAnchor(null);
+        }}
+        anchor={profileMenuAnchor}
+        username={profile.username}
+        title={t('userProfile.menu.title')}
+        labels={{
+          copyLink: t('userProfile.menu.copyLink'),
+          qrCode: t('userProfile.menu.qrCode'),
+          report: t('userProfile.menu.report'),
+          block: profile.isBlockedByMe ? t('userProfile.menu.unblock') : t('userProfile.menu.block'),
+        }}
+        isBlocked={Boolean(profile.isBlockedByMe)}
+        isOwnProfile={isOwnProfile}
+        onAction={handleProfileMenuAction}
+      />
 
       <ProfileFollowersSheet
         open={followersSheetOpen}

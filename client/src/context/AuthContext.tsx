@@ -14,6 +14,7 @@ interface User {
   postsCount: number;
   createdAt: string;
   twoFactorEnabled?: boolean;
+  welcomeOnboardingCompleted?: boolean;
 }
 
 export type LoginResult =
@@ -26,6 +27,7 @@ interface AuthContextType {
   complete2faLogin: (tempToken: string, totpCode: string) => Promise<void>;
   register: (username: string, email: string, password: string, fullName: string) => Promise<void>;
   logout: () => void;
+  setUser: (user: User | null) => void;
   isAuthenticated: boolean;
   loading: boolean;
   token: string | null;
@@ -92,6 +94,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     localStorage.setItem('user', JSON.stringify(nextUser));
   };
 
+  const patchUser = (nextUser: User | null) => {
+    setUser(nextUser);
+    if (nextUser) localStorage.setItem('user', JSON.stringify(nextUser));
+    else localStorage.removeItem('user');
+  };
+
   const login = async (email: string, password: string): Promise<LoginResult> => {
     const res = await fetch(`${API_URL}/login`, {
       method: 'POST',
@@ -151,6 +159,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         complete2faLogin,
         register,
         logout,
+        setUser: patchUser,
         isAuthenticated: !!user,
         loading,
         token,

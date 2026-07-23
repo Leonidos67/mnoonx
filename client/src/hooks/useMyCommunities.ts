@@ -8,6 +8,7 @@ export interface MyCommunity {
   handle: string;
   avatar?: string;
   memberCount?: number;
+  kind?: 'community' | 'collaboration';
 }
 
 export function useMyCommunities(enabled = true) {

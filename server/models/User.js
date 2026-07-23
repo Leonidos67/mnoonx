@@ -119,6 +119,12 @@ const userSchema = new mongoose.Schema({
     default: '',
     maxlength: 32,
   },
+  /** Who can invite this user into a collaboration */
+  collaborationPrivacy: {
+    type: String,
+    enum: ['everyone', 'friends', 'request', 'off'],
+    default: 'everyone',
+  },
   /** In-app / push notification toggles (synced from client) */
   notificationPreferences: {
     type: mongoose.Schema.Types.Mixed,
@@ -131,6 +137,16 @@ const userSchema = new mongoose.Schema({
     claimedRuleIds: { type: [String], default: [] },
     streak: { type: Number, default: 0 },
     lastDailyVisit: { type: String, default: '' },
+  },
+  /** Post-signup welcome wizard (false only for newly registered users) */
+  welcomeOnboardingCompleted: {
+    type: Boolean,
+    default: true,
+  },
+  welcomeOnboarding: {
+    source: { type: String, default: '' },
+    goals: { type: [String], default: [] },
+    completedAt: { type: Date, default: null },
   },
   twoFactorEnabled: {
     type: Boolean,

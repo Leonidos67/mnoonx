@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Briefcase, ArrowRight } from 'lucide-react';
+import { Briefcase, Users2, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from '../../i18n/useTranslation';
 
@@ -44,58 +44,24 @@ const NewPage: React.FC = () => {
     <>
       <style>{`
         @keyframes fadeCenter {
-          from {
-            opacity: 0;
-            transform: scale(0.5);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
+          from { opacity: 0; transform: scale(0.5); }
+          to { opacity: 1; transform: scale(1); }
         }
-
         @keyframes fadeCenterLeft {
-          from {
-            opacity: 0;
-            transform: translateX(40px) scale(0.7);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0) scale(1);
-          }
+          from { opacity: 0; transform: translateX(40px) scale(0.7); }
+          to { opacity: 1; transform: translateX(0) scale(1); }
         }
-
         @keyframes fadeCenterRight {
-          from {
-            opacity: 0;
-            transform: translateX(-40px) scale(0.7);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0) scale(1);
-          }
+          from { opacity: 0; transform: translateX(-40px) scale(0.7); }
+          to { opacity: 1; transform: translateX(0) scale(1); }
         }
-
         @keyframes fadeLeft {
-          from {
-            opacity: 0;
-            transform: translateX(80px) scale(0.7);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0) scale(1);
-          }
+          from { opacity: 0; transform: translateX(80px) scale(0.7); }
+          to { opacity: 1; transform: translateX(0) scale(1); }
         }
-
         @keyframes fadeRight {
-          from {
-            opacity: 0;
-            transform: translateX(-80px) scale(0.7);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0) scale(1);
-          }
+          from { opacity: 0; transform: translateX(-80px) scale(0.7); }
+          to { opacity: 1; transform: translateX(0) scale(1); }
         }
       `}</style>
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white">
@@ -108,15 +74,7 @@ const NewPage: React.FC = () => {
                     key={index}
                     src={src}
                     alt=""
-                    className="
-                      rounded-full
-                      border-4
-                      border-white
-                      object-cover
-                      shadow-md
-                      transition-all
-                      duration-300
-                    "
+                    className="rounded-full border-4 border-white object-cover shadow-md transition-all duration-300"
                     style={{
                       width: `${sizes[index]}px`,
                       height: `${sizes[index]}px`,
@@ -132,28 +90,6 @@ const NewPage: React.FC = () => {
 
               <div className="flex flex-col gap-6">
                 <Link
-                  to="/new/personal"
-                  className="group rounded-[32px] border border-[#e5e5e5] bg-white p-7 transition-all duration-200 hover:border-[#d4d4d4] hover:shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-5">
-                      <div className="flex h-[64px] w-[64px] items-center justify-center rounded-2xl bg-[#f3f3f3] text-black">
-                        <User size={28} strokeWidth={2.2} />
-                      </div>
-                      <div>
-                        <h2 className="text-[30px] font-semibold tracking-[-0.03em] text-black">
-                          {t('newPage.personalTitle')}
-                        </h2>
-                        <p className="mt-1 text-[15px] text-[#666]">{t('newPage.personalDesc')}</p>
-                      </div>
-                    </div>
-                    <div className="text-[#999] transition group-hover:text-black">
-                      <ArrowRight size={28} />
-                    </div>
-                  </div>
-                </Link>
-
-                <Link
                   to="/new/business"
                   className="group rounded-[32px] border border-[#e5e5e5] bg-white p-7 transition-all duration-200 hover:border-[#d4d4d4] hover:shadow-sm"
                 >
@@ -167,6 +103,28 @@ const NewPage: React.FC = () => {
                           {t('newPage.businessTitle')}
                         </h2>
                         <p className="mt-1 text-[15px] text-[#666]">{t('newPage.businessDesc')}</p>
+                      </div>
+                    </div>
+                    <div className="text-[#999] transition group-hover:text-black">
+                      <ArrowRight size={28} />
+                    </div>
+                  </div>
+                </Link>
+
+                <Link
+                  to="/create-collaboration"
+                  className="group rounded-[32px] border border-[#e5e5e5] bg-white p-7 transition-all duration-200 hover:border-[#d4d4d4] hover:shadow-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-5">
+                      <div className="flex h-[64px] w-[64px] items-center justify-center rounded-2xl bg-[#eef2ff] text-[#315efb]">
+                        <Users2 size={28} strokeWidth={2.2} />
+                      </div>
+                      <div>
+                        <h2 className="text-[30px] font-semibold tracking-[-0.03em] text-black">
+                          {t('newPage.collabTitle')}
+                        </h2>
+                        <p className="mt-1 text-[15px] text-[#666]">{t('newPage.collabDesc')}</p>
                       </div>
                     </div>
                     <div className="text-[#999] transition group-hover:text-black">

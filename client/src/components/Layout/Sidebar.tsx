@@ -30,6 +30,7 @@ interface MyCommunity {
   handle: string;
   avatar?: string;
   memberCount?: number;
+  kind?: 'community' | 'collaboration';
 }
 
 interface SidebarProps {
@@ -72,7 +73,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
 
   useEffect(() => {
     fetchMine();
-  }, [fetchMine]);
+  }, [fetchMine, location.pathname]);
 
   useEffect(() => {
     const onDocMouseDown = (e: MouseEvent) => {
@@ -173,6 +174,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
             )}
             {myCommunities.map((c) => {
               const active = isCommunityRouteActive(c.handle);
+              const isCollab = c.kind === 'collaboration';
               return (
                 <Link
                   key={c._id}
@@ -197,7 +199,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onToggleCollapse }) => {
                     alt=""
                     className="ml-1 h-8 w-8 flex-shrink-0 rounded-lg object-cover"
                   />
-                  <span className="truncate text-sm font-medium">{c.name}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{c.name}</span>
+                    {isCollab ? (
+                      <span className="mt-0.5 block truncate text-[10px] font-semibold uppercase tracking-wide text-[#315efb]">
+                        {t('discover.collaborationBadge')}
+                      </span>
+                    ) : null}
+                  </span>
                 </Link>
               );
             })}

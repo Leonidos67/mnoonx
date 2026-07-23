@@ -72,7 +72,7 @@ const DiscoverExportBackground: React.FC = () => {
   const [webglOk] = useState(canUseWebGL2);
 
   return (
-    <section className="mb-4 w-full">
+    <section className="w-full">
       <div className="relative isolate h-[260px] w-full overflow-hidden rounded-3xl border border-gray-200 shadow-sm">
         {/* Background: gradient only */}
         <div className="absolute inset-0 z-0">
