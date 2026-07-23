@@ -14,6 +14,7 @@ import { resolveMediaUrl } from '../../utils/mediaUrl';
 import { authInputClass } from '../Auth/authFormStyles';
 import { useTranslation } from '../../i18n/useTranslation';
 import AnimatedSearchIcon from './AnimatedSearchIcon';
+import QrScannerModal, { AnimatedScanQrIcon } from './QrScannerModal';
 
 interface SearchBarProps {
   onSearch?: (query: string, category?: string) => void;
@@ -82,8 +83,14 @@ const SearchBar: React.FC<SearchBarProps> = ({
   const [popularLoading, setPopularLoading] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
 
   const panelOpen = isModal ? isActive : dropdownOpen;
+
+  const openQrScanner = useCallback(() => {
+    setDropdownOpen(false);
+    setQrScannerOpen(true);
+  }, []);
 
   const categories = useMemo(
     () => [
@@ -532,11 +539,30 @@ const SearchBar: React.FC<SearchBarProps> = ({
         placeholder={resolvedPlaceholder}
         className={
           isModal
-            ? `${authInputClass} pl-12 pr-5`
-            : 'w-full rounded-lg border border-neutral-200 bg-white py-2 pl-9 pr-3 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-black/10'
+            ? `${authInputClass} pl-12 pr-12`
+            : 'w-full rounded-lg border border-neutral-200 bg-white py-2 pl-9 pr-10 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-black/10'
         }
       />
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          openQrScanner();
+        }}
+        className={`absolute top-1/2 z-[2] flex -translate-y-1/2 items-center justify-center rounded-lg text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 ${
+          isModal ? 'right-2.5 h-9 w-9' : 'right-1.5 h-7 w-7'
+        }`}
+        aria-label={t('search.qr.openAria')}
+        title={t('search.qr.openAria')}
+      >
+        <AnimatedScanQrIcon size={isModal ? 18 : 16} />
+      </button>
     </div>
+  );
+
+  const scanner = (
+    <QrScannerModal open={qrScannerOpen} onClose={() => setQrScannerOpen(false)} />
   );
 
   if (isModal) {
@@ -548,6 +574,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             {resultsPanel}
           </div>
         )}
+        {scanner}
       </div>
     );
   }
@@ -560,6 +587,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
           {resultsPanel}
         </div>
       )}
+      {scanner}
     </div>
   );
 };

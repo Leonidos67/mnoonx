@@ -143,21 +143,7 @@ export const ProfileQrCodeModal: React.FC<ProfileQrCodeModalProps> = ({
         scanFocus ? 'p-4 sm:p-6' : 'p-6'
       }`}
     >
-      <div className="absolute right-3 top-3 z-20 hidden items-center gap-0.5 lg:right-4 lg:top-4 lg:flex">
-        <button
-          type="button"
-          onClick={() => setScanFocus((v) => !v)}
-          className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
-            scanFocus
-              ? 'bg-[#eef2ff] text-[#315efb]'
-              : 'text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600'
-          }`}
-          aria-label={t('userProfile.qr.scanAria')}
-          aria-pressed={scanFocus}
-          title={t('userProfile.qr.scanAria')}
-        >
-          <AnimatedActionIcon kind="scan" size={20} color="currentColor" />
-        </button>
+      <div className="absolute right-3 top-3 z-20 hidden lg:right-4 lg:top-4 lg:block">
         <button
           type="button"
           onClick={() => {
@@ -183,7 +169,7 @@ export const ProfileQrCodeModal: React.FC<ProfileQrCodeModalProps> = ({
               : 'max-h-40 translate-y-0 opacity-100'
           }`}
         >
-          <h2 className="pr-0 text-lg font-bold text-neutral-900 lg:pr-20">
+          <h2 className="text-center text-lg font-bold text-neutral-900">
             {t('userProfile.qr.title')}
           </h2>
           <button

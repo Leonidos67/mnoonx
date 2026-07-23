@@ -700,6 +700,16 @@ export const en = {
     hashtagCount: '{count} posts',
     noResultsFor: 'No results for "{query}"',
     tryAnother: 'Try another name or handle',
+    qr: {
+      openAria: 'Scan QR code',
+      title: 'Scan QR code',
+      hint: 'Point the camera at a profile or page QR code',
+      found: 'Page found',
+      go: 'Go to page',
+      scanAgain: 'Scan again',
+      cameraError: 'Could not access the camera. Check browser permissions.',
+      page: 'Page',
+    },
   },
   postComposer: {
     whatsOnMind: "What's on your mind?",

@@ -13,4 +13,5 @@ type AnimateIcon = ForwardRefExoticComponent<AnimateIconProps & RefAttributes<Ic
 
 export const DownloadIcon: AnimateIcon;
 export const ScanIcon: AnimateIcon;
+export const ScanQrCodeIcon: AnimateIcon;
 export const ShareIcon: AnimateIcon;

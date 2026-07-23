@@ -5,5 +5,6 @@
 export {
   DownloadIcon,
   ScanIcon,
+  ScanQrCodeIcon,
   ShareIcon,
 } from '@animateicons/react/lucide';
