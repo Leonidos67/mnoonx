@@ -30,6 +30,7 @@ interface Post {
   media: string[];
   linkAttachment?: PostLinkAttachment | null;
   coinAttachment?: PostCoinAttachment | null;
+  poll?: import('../types/postPoll').FeedPostPoll | null;
   createdAt: string;
   isLiked: boolean;
   isReposted: boolean;
@@ -224,6 +225,9 @@ const PostPage: React.FC = () => {
                 content={post.content}
                 linkAttachment={post.linkAttachment}
                 coinAttachment={post.coinAttachment}
+                poll={post.poll}
+                postId={String(post._id)}
+                onPollChange={(poll) => setPost((prev) => (prev ? { ...prev, poll } : prev))}
                 contentClassName="text-neutral-900 leading-relaxed whitespace-pre-wrap break-words text-[15px]"
               />
             </div>

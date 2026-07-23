@@ -39,6 +39,7 @@ export interface FeedPost {
   media: string[];
   linkAttachment?: PostLinkAttachment | null;
   coinAttachment?: PostCoinAttachment | null;
+  poll?: import('./postPoll').FeedPostPoll | null;
   createdAt: string;
   isLiked?: boolean;
   isReposted?: boolean;

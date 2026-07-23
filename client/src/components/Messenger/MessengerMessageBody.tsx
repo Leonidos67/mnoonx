@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import AnimojiPlayer from './AnimojiPlayer';
 import MessengerCoinMessageCard from './MessengerCoinMessageCard';
 import MessengerLinkPreviewCard from './MessengerLinkPreviewCard';
@@ -13,10 +14,11 @@ import {
   splitReplyMessage,
 } from '../../utils/messengerAnimoji';
 
-const URL_RE = /(https?:\/\/[^\s<]+)/g;
+/** Absolute http(s) or in-app absolute paths (/settings, /docs/…). */
+const LINK_RE = /(https?:\/\/[^\s<]+|\/(?:[a-zA-Z0-9@][\w\-./?=&%#@]*))/g;
 
 function extractFirstUrl(text: string): string | null {
-  const match = text.match(URL_RE);
+  const match = text.match(/(https?:\/\/[^\s<]+)/);
   if (!match || match.length === 0) return null;
   return match[0].replace(/[).,!?]+$/, '');
 }
@@ -26,7 +28,7 @@ function renderTextWithLinks(value: string, keyPrefix: string): React.ReactNode[
   const nodes: React.ReactNode[] = [];
   let lastIndex = 0;
   let index = 0;
-  const re = new RegExp(URL_RE.source, 'g');
+  const re = new RegExp(LINK_RE.source, 'g');
   let match: RegExpExecArray | null;
   while ((match = re.exec(value)) !== null) {
     if (match.index > lastIndex) {
@@ -39,16 +41,29 @@ function renderTextWithLinks(value: string, keyPrefix: string): React.ReactNode[
     }
     const rawUrl = match[0].replace(/[).,!?]+$/, '');
     const trailing = match[0].slice(rawUrl.length);
-    nodes.push(
-      <ExternalLink
-        key={`${keyPrefix}-a-${index}`}
-        href={rawUrl}
-        onClick={(e) => e.stopPropagation()}
-        className="underline decoration-current/40 underline-offset-2 hover:opacity-80 break-all"
-      >
-        {rawUrl}
-      </ExternalLink>
-    );
+    if (rawUrl.startsWith('/')) {
+      nodes.push(
+        <Link
+          key={`${keyPrefix}-a-${index}`}
+          to={rawUrl}
+          onClick={(e) => e.stopPropagation()}
+          className="underline decoration-current/40 underline-offset-2 hover:opacity-80 break-all"
+        >
+          {rawUrl}
+        </Link>
+      );
+    } else {
+      nodes.push(
+        <ExternalLink
+          key={`${keyPrefix}-a-${index}`}
+          href={rawUrl}
+          onClick={(e) => e.stopPropagation()}
+          className="underline decoration-current/40 underline-offset-2 hover:opacity-80 break-all"
+        >
+          {rawUrl}
+        </ExternalLink>
+      );
+    }
     index += 1;
     if (trailing) {
       nodes.push(

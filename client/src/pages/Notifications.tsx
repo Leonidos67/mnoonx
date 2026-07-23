@@ -1,70 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronRight, Heart } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useUnreads } from '../context/UnreadsContext';
-
 import { NOTIFICATIONS_API as API_URL } from '../config/api';
 import { useTranslation } from '../i18n/useTranslation';
+import {
+  NotificationFeed,
+  NotificationItem,
+} from '../components/Notifications/NotificationFeed';
 
-interface NotificationActor {
-  username: string;
-  fullName: string;
-  avatar?: string;
-}
-
-interface NotificationItem {
-  _id: string;
-  type: string;
-  title: string;
-  body: string;
-  link: string;
-  read: boolean;
-  createdAt: string;
-  actor?: NotificationActor | null;
-}
-
-type Tab = 'mentions' | 'all';
-
-function startOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function formatTimestamp(iso: string) {
-  const d = new Date(iso);
-  const now = new Date();
-  const today = startOfDay(now);
-  const day = startOfDay(d);
-  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  if (day.getTime() === today.getTime()) {
-    return `Today, ${time}`;
-  }
-  const weekAgo = new Date(today);
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  if (day >= weekAgo) {
-    return d.toLocaleDateString([], { weekday: 'short', hour: '2-digit', minute: '2-digit' });
-  }
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function groupKey(iso: string): 'today' | 'week' | 'earlier' {
-  const d = new Date(iso);
-  const now = new Date();
-  const today = startOfDay(now);
-  const day = startOfDay(d);
-  if (day.getTime() === today.getTime()) return 'today';
-  const weekAgo = new Date(today);
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  if (day >= weekAgo) return 'week';
-  return 'earlier';
-}
+export const NOTIFICATIONS_ENGAGEMENT_PATH = '/notifications/engagement';
 
 const Notifications: React.FC = () => {
   const { token } = useAuth();
-  const { mentionUnread, refreshUnreads } = useUnreads();
+  const { refreshUnreads } = useUnreads();
   const { t } = useTranslation();
-  const [tab, setTab] = useState<Tab>('all');
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -76,7 +27,7 @@ const Notifications: React.FC = () => {
     }
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}?tab=${tab}`, {
+      const res = await fetch(`${API_URL}?tab=all`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -87,7 +38,7 @@ const Notifications: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [token, tab]);
+  }, [token]);
 
   useEffect(() => {
     void load();
@@ -103,27 +54,17 @@ const Notifications: React.FC = () => {
     refreshUnreads();
   };
 
-  const grouped = useMemo(() => {
-    const sectionLabels: Record<'today' | 'week' | 'earlier', string> = {
-      today: t('notifications.sectionToday'),
-      week: t('notifications.sectionWeek'),
-      earlier: t('notifications.sectionEarlier'),
-    };
-    const order: Array<'today' | 'week' | 'earlier'> = ['today', 'week', 'earlier'];
-    const map: Record<string, NotificationItem[]> = { today: [], week: [], earlier: [] };
-    for (const n of items) {
-      map[groupKey(n.createdAt)].push(n);
-    }
-    return order
-      .filter((k) => map[k].length > 0)
-      .map((k) => ({ key: k, label: sectionLabels[k], items: map[k] }));
-  }, [items, t]);
+  const engagementItems = useMemo(
+    () => items.filter((n) => n.type === 'engagement'),
+    [items]
+  );
+  const otherItems = useMemo(
+    () => items.filter((n) => n.type !== 'engagement'),
+    [items]
+  );
 
-  const avatarFor = (n: NotificationItem) => {
-    if (n.actor?.avatar) return n.actor.avatar;
-    const name = n.actor?.fullName || n.title || 'N';
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=000&color=fff&bold=true`;
-  };
+  const latestEngagement = engagementItems[0] || null;
+  const unreadEngagementInList = engagementItems.filter((n) => !n.read).length;
 
   if (!token) {
     return (
@@ -135,108 +76,56 @@ const Notifications: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-full">
-      <h1 className="text-xl pt-4 px-4 font-semibold text-neutral-800">{t('notifications.title')}</h1>
-
-      <div className="mt-6 px-4 flex gap-8 border-b border-neutral-200">
-        <button
-          type="button"
-          onClick={() => setTab('mentions')}
-          className={`relative pb-3 text-[15px] font-medium transition-colors ${
-            tab === 'mentions' ? 'text-neutral-900' : 'text-neutral-500 hover:text-neutral-800'
-          }`}
-        >
-          {t('notifications.mentions')}
-          {mentionUnread > 0 && (
-            <span className="ml-2 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#e5484d] px-1.5 text-[11px] font-bold text-white">
-              {mentionUnread > 99 ? '99+' : mentionUnread}
-            </span>
-          )}
-          {tab === 'mentions' && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900" />
-          )}
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab('all')}
-          className={`relative pb-3 text-[15px] font-medium transition-colors ${
-            tab === 'all' ? 'text-neutral-900' : 'text-neutral-500 hover:text-neutral-800'
-          }`}
-        >
-          {t('notifications.allActivity')}
-          {tab === 'all' && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-neutral-900" />
-          )}
-        </button>
-      </div>
+      <h1 className="px-4 pt-4 text-xl font-semibold text-neutral-800">
+        {t('notifications.title')}
+      </h1>
 
       {loading ? (
         <div className="flex justify-center py-16">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-300 border-t-black" />
         </div>
-      ) : grouped.length === 0 ? (
-        <p className="py-16 text-center text-neutral-500">{t('notifications.empty')}</p>
       ) : (
         <div className="mt-2">
-          {grouped.map((section) => (
-            <div key={section.key} className="mb-6">
-              <div className="my-6 flex items-center gap-4">
-                <div className="h-px flex-1 bg-neutral-200" />
-                <span className="text-[10px] font-semibold tracking-wide text-neutral-400">
-                  {section.label}
-                </span>
-                <div className="h-px flex-1 bg-neutral-200" />
-              </div>
-              <ul className="divide-y divide-neutral-100">
-                {section.items.map((n) => {
-                  const inner = (
-                    <div className="flex items-start gap-3 py-4">
-                      {!n.read && (
-                        <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-neutral-900" />
-                      )}
-                      {n.read && <span className="mt-2 h-2 w-2 shrink-0" />}
-                      <img
-                        src={avatarFor(n)}
-                        alt=""
-                        className="h-11 w-11 shrink-0 rounded-full object-cover"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[15px] leading-snug text-neutral-900">
-                          <span className="font-semibold">{n.title}</span>
-                          {n.body ? (
-                            <span className="font-normal text-neutral-600"> {n.body}</span>
-                          ) : null}
-                        </p>
-                      </div>
-                      <span className="shrink-0 text-xs text-neutral-400 mr-4">
-                        {formatTimestamp(n.createdAt)}
-                      </span>
-                    </div>
-                  );
-                  return (
-                    <li key={n._id}>
-                      {n.link ? (
-                        <Link
-                          to={n.link}
-                          onClick={() => !n.read && void markRead(n._id)}
-                          className="block hover:bg-neutral-50/80"
-                        >
-                          {inner}
-                        </Link>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => !n.read && void markRead(n._id)}
-                          className="block w-full text-left hover:bg-neutral-50/80"
-                        >
-                          {inner}
-                        </button>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+          <Link
+            to={NOTIFICATIONS_ENGAGEMENT_PATH}
+            className="flex w-full items-center gap-3 px-0 py-4 text-left hover:bg-neutral-50/80"
+          >
+            <span
+              className={`w-2 -ml-1 shrink-0 rounded-full transition-all duration-200 ease-out ${
+                unreadEngagementInList > 0 ? 'h-8 bg-black' : 'h-0 bg-transparent'
+              }`}
+              aria-hidden
+            />
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-700">
+              <Heart className="h-5 w-5" strokeWidth={2} aria-hidden />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[15px] font-semibold leading-snug text-neutral-900">
+                <span className="lg:hidden">{t('notifications.engagementBlockTitlePage')}</span>
+                <span className="hidden lg:inline">{t('notifications.engagementBlockTitle')}</span>
+              </p>
+              <p className="mt-0.5 text-sm text-neutral-500">
+                {unreadEngagementInList > 0
+                  ? t('notifications.engagementUnread', { count: unreadEngagementInList })
+                  : latestEngagement?.body || t('notifications.engagementBlockHint')}
+              </p>
             </div>
-          ))}
+            <ChevronRight
+              className="mr-4 h-5 w-5 shrink-0 text-neutral-400"
+              aria-hidden
+            />
+          </Link>
+
+          {otherItems.length === 0 && engagementItems.length === 0 ? (
+            <p className="py-16 text-center text-neutral-500">{t('notifications.empty')}</p>
+          ) : otherItems.length > 0 ? (
+            <NotificationFeed
+              items={otherItems}
+              emptyLabel={t('notifications.empty')}
+              onMarkRead={(id) => void markRead(id)}
+              t={t}
+            />
+          ) : null}
         </div>
       )}
     </div>

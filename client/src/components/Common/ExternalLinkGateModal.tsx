@@ -42,7 +42,7 @@ const ExternalLinkGateModal: React.FC<ExternalLinkGateModalProps> = ({
       sheetPadded
       role="alertdialog"
       zIndexClass="z-[140]"
-      panelClassName="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+      panelClassName="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
     >
       <div className="mb-5 flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
@@ -84,7 +84,7 @@ const ExternalLinkGateModal: React.FC<ExternalLinkGateModalProps> = ({
         <button
           type="button"
           onClick={onOpenNewTab}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-neutral-200 py-3 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+          className="inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-neutral-200 px-3 py-3 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
         >
           <AnimatedExternalLinkIcon size={16} />
           {t('inAppBrowser.openNewTab')}
@@ -92,7 +92,7 @@ const ExternalLinkGateModal: React.FC<ExternalLinkGateModalProps> = ({
         <button
           type="button"
           onClick={onOpenHere}
-          className="flex-1 rounded-xl bg-black py-3 text-sm font-medium text-white transition-colors hover:bg-neutral-800"
+          className="flex-1 whitespace-nowrap rounded-xl bg-black px-3 py-3 text-sm font-medium text-white transition-colors hover:bg-neutral-800"
         >
           {t('inAppBrowser.openHere')}
         </button>

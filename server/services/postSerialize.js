@@ -1,6 +1,40 @@
 const Community = require('../models/Community');
 const User = require('../models/User');
 
+function serializePollForFeed(poll, viewerUserId) {
+  const options = Array.isArray(poll?.options) ? poll.options : [];
+  if (options.length < 2) return null;
+
+  const uid = viewerUserId ? String(viewerUserId) : null;
+  let totalVotes = 0;
+  let viewerVotedOptionId = null;
+
+  const mapped = options.map((opt) => {
+    const votes = Array.isArray(opt.votes) ? opt.votes.map(String) : [];
+    const votesCount =
+      typeof opt.votesCount === 'number' ? opt.votesCount : votes.length;
+    totalVotes += votesCount;
+    if (uid && votes.some((id) => id === uid)) {
+      viewerVotedOptionId = String(opt.id);
+    }
+    return {
+      id: String(opt.id),
+      text: String(opt.text || '').trim(),
+      votesCount,
+    };
+  });
+
+  return {
+    options: mapped.map((opt) => ({
+      ...opt,
+      percent:
+        totalVotes > 0 ? Math.round((opt.votesCount / totalVotes) * 1000) / 10 : 0,
+    })),
+    totalVotes,
+    viewerVotedOptionId,
+  };
+}
+
 async function serializeCommunityInfo(communityId) {
   if (!communityId) return null;
   const community = await Community.findById(communityId).select('name handle avatar');
@@ -63,6 +97,7 @@ async function serializeFeedPost(post, viewerUserId) {
             symbol: String(post.coinAttachment.symbol).trim().toLowerCase(),
           }
         : null,
+    poll: serializePollForFeed(post.poll, uid),
     likesCount: post.likesCount || 0,
     commentsCount: post.commentsCount || 0,
     repostsCount: post.repostsCount || 0,
@@ -101,4 +136,5 @@ module.exports = {
   serializePostAuthor,
   serializeFeedPost,
   attachQuotedPost,
+  serializePollForFeed,
 };

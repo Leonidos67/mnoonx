@@ -22,66 +22,18 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
+import { useTranslation } from '../../i18n/useTranslation';
 
 import { COMMUNITIES_API as API } from '../../config/api';
 
-const WIZARD_TEMPLATES = [
-  {
-    id: 'trading',
-    title: 'Trading calls & signals',
-    desc: 'Entries, exits, stop losses, and urgent market updates.',
-  },
-  {
-    id: 'sports',
-    title: 'Sports picks & alerts',
-    desc: 'Picks, unit sizes, locks, line movement, and game alerts.',
-  },
-  {
-    id: 'clipping',
-    title: 'Clipping campaigns',
-    desc: 'New campaigns, budget refills, payout changes, and deadlines.',
-  },
-  {
-    id: 'course',
-    title: 'Course & coaching updates',
-    desc: 'New lessons, live sessions, homework, and launch notices.',
-  },
-  {
-    id: 'general',
-    title: 'General community updates',
-    desc: 'Rules, events, milestones, and anything members should see first.',
-  },
-];
+const WIZARD_TEMPLATE_IDS = ['trading', 'sports', 'clipping', 'course', 'general'] as const;
+type WizardTemplateId = (typeof WIZARD_TEMPLATE_IDS)[number];
 
-const AUDIENCE_OPTIONS = [
-  { id: 'under100', title: 'Under 100', desc: 'Small group, simple setup.' },
-  { id: '100-500', title: '100–500', desc: 'Growing community with regular updates.' },
-  { id: '500-2000', title: '500–2,000', desc: 'Larger audience with launches, drops, or repeat updates.' },
-  { id: '2000plus', title: '2,000+', desc: 'Big community where important posts need a tighter system.' },
-];
+const AUDIENCE_OPTION_IDS = ['under100', '100-500', '500-2000', '2000plus'] as const;
 
-const TEMPLATE_DEFAULT_POST: Record<string, { title: string; body: string }> = {
-  trading: {
-    title: 'Important market update',
-    body: 'Quick heads-up for everyone on the desk: watch risk, size down if needed, and check the pinned levels before the next session.',
-  },
-  sports: {
-    title: 'Pick alert',
-    body: 'New card is up — read the write-up for units, limits, and what changed since the morning line.',
-  },
-  clipping: {
-    title: 'Campaign update',
-    body: 'Budget, pacing, and deadlines moved — here is what you need to do today so nothing slips.',
-  },
-  course: {
-    title: 'Lesson drop',
-    body: 'New module is live. Skim the outline, do the short exercise, and bring questions to the live Q&A.',
-  },
-  general: {
-    title: 'Important Update',
-    body: 'Hey everyone, here is what is new…',
-  },
-};
+function resolveTemplateKey(key: string): WizardTemplateId {
+  return WIZARD_TEMPLATE_IDS.includes(key as WizardTemplateId) ? (key as WizardTemplateId) : 'general';
+}
 
 interface Author {
   _id?: string;
@@ -125,16 +77,31 @@ interface CommunityAnnouncementsPanelProps {
   onBackToCommunity: () => void;
 }
 
-function formatRelativeTime(iso: string): string {
+function formatRelativeTime(
+  iso: string,
+  translate: (key: string, vars?: Record<string, string | number>) => string
+): string {
   const d = new Date(iso);
   const diff = Date.now() - d.getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return 'less than a minute ago';
-  if (m < 60) return `${m} minute${m === 1 ? '' : 's'} ago`;
+  if (m < 1) return translate('community.announcementsPanel.lessThanMinute');
+  if (m < 60) {
+    return translate(m === 1 ? 'community.announcementsPanel.minutesAgo' : 'community.announcementsPanel.minutesAgoMany', {
+      count: m,
+    });
+  }
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} hour${h === 1 ? '' : 's'} ago`;
+  if (h < 24) {
+    return translate(h === 1 ? 'community.announcementsPanel.hoursAgo' : 'community.announcementsPanel.hoursAgoMany', {
+      count: h,
+    });
+  }
   const days = Math.floor(h / 24);
-  if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`;
+  if (days < 7) {
+    return translate(days === 1 ? 'community.announcementsPanel.daysAgo' : 'community.announcementsPanel.daysAgoMany', {
+      count: days,
+    });
+  }
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
@@ -155,6 +122,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
   const { user, token } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [meta, setMeta] = useState<MetaState | null>(null);
@@ -163,8 +131,8 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('');
   const [selectedAudience, setSelectedAudience] = useState<string>('');
-  const [draftTitle, setDraftTitle] = useState('Important Update');
-  const [draftBody, setDraftBody] = useState("Hey everyone, here's what's new…");
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftBody, setDraftBody] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<AnnouncementDetail | null>(null);
   const [editorTitle, setEditorTitle] = useState('');
@@ -175,7 +143,18 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
   const [commentText, setCommentText] = useState('');
   const [openMenuForId, setOpenMenuForId] = useState<string | null>(null);
 
-  const headerTitle = instanceTitle?.trim() || 'Announcements';
+  const headerTitle = instanceTitle?.trim() || t('community.announcementsPanel.titleFallback');
+
+  const defaultPostForTemplate = useCallback(
+    (templateKey: string) => {
+      const key = resolveTemplateKey(templateKey);
+      return {
+        title: t(`community.announcementsPanel.defaultPost.${key}.title`),
+        body: t(`community.announcementsPanel.defaultPost.${key}.body`),
+      };
+    },
+    [t]
+  );
 
   const loadMeta = useCallback(async () => {
     if (!token || !handle || !instanceId) return null;
@@ -184,7 +163,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error((data as { message?: string }).message || 'Meta failed');
+    if (!res.ok) throw new Error((data as { message?: string }).message || t('community.announcementsPanel.metaFailed'));
     const m: MetaState = {
       wizardComplete: Boolean((data as MetaState).wizardComplete),
       templateKey: String((data as MetaState).templateKey || ''),
@@ -192,7 +171,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
     };
     setMeta(m);
     return m;
-  }, [token, handle, instanceId]);
+  }, [token, handle, instanceId, t]);
 
   const loadList = useCallback(async () => {
     if (!token || !handle || !instanceId) return [];
@@ -201,11 +180,11 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error((data as { message?: string }).message || 'List failed');
+    if (!res.ok) throw new Error((data as { message?: string }).message || t('community.announcementsPanel.listFailed'));
     const arr = Array.isArray(data) ? (data as AnnouncementListItem[]) : [];
     setList(arr);
     return arr;
-  }, [token, handle, instanceId]);
+  }, [token, handle, instanceId, t]);
 
   const refreshAll = useCallback(async () => {
     if (!token || !handle || !instanceId) {
@@ -223,7 +202,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
           setWizardStep(3);
           setSelectedTemplate(m.templateKey || 'general');
           setSelectedAudience(m.audienceSize);
-          const d = TEMPLATE_DEFAULT_POST[m.templateKey || 'general'] || TEMPLATE_DEFAULT_POST.general;
+          const d = defaultPostForTemplate(m.templateKey || 'general');
           setDraftTitle(d.title);
           setDraftBody(d.body);
         } else if (m.templateKey) {
@@ -240,11 +219,11 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
         setMode('feed');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Network error');
+      setError(e instanceof Error ? e.message : t('community.announcementsPanel.networkError'));
     } finally {
       setLoading(false);
     }
-  }, [token, handle, instanceId, isOwner, loadMeta, loadList]);
+  }, [token, handle, instanceId, isOwner, loadMeta, loadList, defaultPostForTemplate, t]);
 
   useEffect(() => {
     setLoading(true);
@@ -256,8 +235,8 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
   useEffect(() => {
     if (!openMenuForId) return;
     const onDoc = (e: MouseEvent) => {
-      const t = e.target as HTMLElement | null;
-      if (t?.closest?.('[data-announcement-menu-root]')) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.('[data-announcement-menu-root]')) return;
       setOpenMenuForId(null);
     };
     document.addEventListener('mousedown', onDoc);
@@ -280,7 +259,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
       body: JSON.stringify({ instanceId, ...body }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error((data as { message?: string }).message || 'Save failed');
+    if (!res.ok) throw new Error((data as { message?: string }).message || t('community.announcementsPanel.saveFailed'));
     setMeta({
       wizardComplete: Boolean((data as MetaState).wizardComplete),
       templateKey: String((data as MetaState).templateKey || ''),
@@ -297,7 +276,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
   const goWizardNextFromStep2 = async () => {
     if (!selectedAudience) return;
     await patchMeta({ audienceSize: selectedAudience });
-    const d = TEMPLATE_DEFAULT_POST[selectedTemplate] || TEMPLATE_DEFAULT_POST.general;
+    const d = defaultPostForTemplate(selectedTemplate);
     setDraftTitle(d.title);
     setDraftBody(d.body);
     setWizardStep(3);
@@ -321,13 +300,13 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((data as { message?: string }).message || 'Publish failed');
+      if (!res.ok) throw new Error((data as { message?: string }).message || t('community.announcementsPanel.publishFailed'));
       await loadMeta();
       await loadList();
       setMode('feed');
       setWizardStep(1);
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Error', 'error');
+      showToast(e instanceof Error ? e.message : t('community.announcementsPanel.error'), 'error');
     } finally {
       setPublishing(false);
     }
@@ -339,7 +318,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
       await loadList();
       setMode('feed');
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Error', 'error');
+      showToast(e instanceof Error ? e.message : t('community.announcementsPanel.error'), 'error');
     }
   };
 
@@ -399,7 +378,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
           }
         );
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error((data as { message?: string }).message || 'Save failed');
+        if (!res.ok) throw new Error((data as { message?: string }).message || t('community.announcementsPanel.saveFailed'));
         await loadList();
         const idAfter = editorEditingId;
         const returnToDetail = selectedId === idAfter;
@@ -427,13 +406,13 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
           }),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error((data as { message?: string }).message || 'Publish failed');
+        if (!res.ok) throw new Error((data as { message?: string }).message || t('community.announcementsPanel.publishFailed'));
         await loadList();
         setEditorEditingId(null);
         setMode('feed');
       }
     } catch (e) {
-      showToast(e instanceof Error ? e.message : 'Error', 'error');
+      showToast(e instanceof Error ? e.message : t('community.announcementsPanel.error'), 'error');
     } finally {
       setPublishing(false);
     }
@@ -463,23 +442,23 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        showToast((data as { message?: string }).message || 'Could not post comment', 'error');
+        showToast((data as { message?: string }).message || t('community.announcementsPanel.commentFailed'), 'error');
         return;
       }
       setCommentText('');
       await openDetail(selectedId);
       await loadList();
     } catch {
-      showToast('Network error', 'error');
+      showToast(t('community.announcementsPanel.networkError'), 'error');
     }
   };
 
   const deleteAnnouncement = async (id: string) => {
     if (!token) return;
     const confirmed = await confirm({
-      title: 'Delete announcement?',
-      message: 'This announcement and its comments will be permanently removed.',
-      confirmLabel: 'Delete',
+      title: t('community.announcementsPanel.deleteTitle'),
+      message: t('community.announcementsPanel.deleteMessage'),
+      confirmLabel: t('community.announcementsPanel.deleteConfirm'),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -491,7 +470,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
       );
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        showToast((data as { message?: string }).message || 'Delete failed', 'error');
+        showToast((data as { message?: string }).message || t('community.announcementsPanel.deleteFailed'), 'error');
         return;
       }
       setOpenMenuForId(null);
@@ -500,7 +479,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
       setDetail(null);
       await loadList();
     } catch {
-      showToast('Network error', 'error');
+      showToast(t('community.announcementsPanel.networkError'), 'error');
     }
   };
 
@@ -521,7 +500,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
             }
           }}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100"
-          aria-label="Back"
+          aria-label={t('community.announcementsPanel.back')}
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
@@ -539,17 +518,17 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
             className="inline-flex items-center gap-1.5 rounded-xl bg-[#315efb] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2547c4] disabled:opacity-40"
           >
             <Send className="h-4 w-4" />
-            {editorEditingId ? 'Save' : 'Publish'}
+            {editorEditingId ? t('community.announcementsPanel.save') : t('community.announcementsPanel.publish')}
           </button>
         ) : (
           <>
-            <button type="button" onClick={copyLink} className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title="Copy link">
+            <button type="button" onClick={copyLink} className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title={t('community.announcementsPanel.copyLink')}>
               <Link2 className="h-5 w-5" />
             </button>
-            <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title="Members">
+            <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title={t('community.announcementsPanel.members')}>
               <Users className="h-5 w-5" />
             </button>
-            <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title="Notifications">
+            <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title={t('community.announcementsPanel.notifications')}>
               <Bell className="h-5 w-5" />
             </button>
           </>
@@ -561,7 +540,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
   if (!token) {
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center rounded-xl border border-[#e7e7e7] bg-white p-10 text-center text-neutral-600">
-        Sign in to view announcements.
+        <p className="text-[17px]">{t('community.announcementsPanel.signIn')}</p>
       </div>
     );
   }
@@ -585,9 +564,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
   const wizardProgress = (step: number) => (
     <div className="mb-6">
       <div className="mb-2 flex items-center justify-between text-sm text-neutral-600">
-        <span>
-          Step {step} of 3
-        </span>
+        <span>{t('community.announcementsPanel.wizardStep', { step })}</span>
       </div>
       <div className="h-1.5 overflow-hidden rounded-full bg-neutral-200">
         <div
@@ -604,28 +581,28 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
         <>
           {wizardProgress(1)}
           <div className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-6">
-            <p className="text-sm font-semibold text-[#315efb]">Welcome to Announcements</p>
-            <h2 className="mt-2 text-2xl font-bold tracking-tight text-neutral-900">Let&apos;s get your first post seen.</h2>
+            <p className="text-sm font-semibold text-[#315efb]">{t('community.announcementsPanel.wizardWelcome')}</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-neutral-900">{t('community.announcementsPanel.wizardHeadline')}</h2>
             <p className="mt-2 text-sm leading-relaxed text-neutral-600">
-              Tell us what your members usually need fast. We&apos;ll set up your first announcement around that.
+              {t('community.announcementsPanel.wizardIntro')}
             </p>
           </div>
-          <h3 className="mt-8 text-lg font-semibold text-neutral-900">What do members need to see fast?</h3>
-          <p className="mt-1 text-sm text-neutral-500">Pick the closest fit. You can edit the post before it goes live.</p>
+          <h3 className="mt-8 text-lg font-semibold text-neutral-900">{t('community.announcementsPanel.wizardQuestion')}</h3>
+          <p className="mt-1 text-sm text-neutral-500">{t('community.announcementsPanel.wizardQuestionHint')}</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {WIZARD_TEMPLATES.map((t) => (
+            {WIZARD_TEMPLATE_IDS.map((templateId) => (
               <button
-                key={t.id}
+                key={templateId}
                 type="button"
-                onClick={() => setSelectedTemplate(t.id)}
+                onClick={() => setSelectedTemplate(templateId)}
                 className={`rounded-2xl border p-4 text-left transition-colors ${
-                  selectedTemplate === t.id
+                  selectedTemplate === templateId
                     ? 'border-[#315efb] bg-[#eef2ff]'
                     : 'border-neutral-200 bg-white hover:border-neutral-300'
                 }`}
               >
-                <p className="font-semibold text-neutral-900">{t.title}</p>
-                <p className="mt-1 text-sm text-neutral-600">{t.desc}</p>
+                <p className="font-semibold text-neutral-900">{t(`community.announcementsPanel.templates.${templateId}.title`)}</p>
+                <p className="mt-1 text-sm text-neutral-600">{t(`community.announcementsPanel.templates.${templateId}.desc`)}</p>
               </button>
             ))}
           </div>
@@ -636,7 +613,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
               onClick={() => void goWizardNextFromStep1()}
               className="rounded-xl bg-[#315efb] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#2547c4] disabled:opacity-40"
             >
-              Continue
+              {t('community.announcementsPanel.continue')}
             </button>
           </div>
         </>
@@ -649,28 +626,28 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
             onClick={() => setWizardStep(1)}
             className="mb-4 rounded-xl border border-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
           >
-            ← Back
+            {t('community.announcementsPanel.wizardBack')}
           </button>
-          <p className="text-sm font-semibold text-[#315efb]">Quick question</p>
-          <h2 className="mt-1 text-2xl font-bold text-neutral-900">How big is your community?</h2>
+          <p className="text-sm font-semibold text-[#315efb]">{t('community.announcementsPanel.wizardQuickQuestion')}</p>
+          <h2 className="mt-1 text-2xl font-bold text-neutral-900">{t('community.announcementsPanel.wizardAudienceTitle')}</h2>
           <p className="mt-2 text-sm text-neutral-600">
-            This helps us tailor the setup so your first announcement feels made for your audience.
+            {t('community.announcementsPanel.wizardAudienceHint')}
           </p>
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
-            {AUDIENCE_OPTIONS.map((o) => (
+            {AUDIENCE_OPTION_IDS.map((audienceId) => (
               <button
-                key={o.id}
+                key={audienceId}
                 type="button"
-                onClick={() => setSelectedAudience(o.id)}
+                onClick={() => setSelectedAudience(audienceId)}
                 className={`flex items-center justify-between gap-3 rounded-2xl border p-4 text-left ${
-                  selectedAudience === o.id
+                  selectedAudience === audienceId
                     ? 'border-[#315efb] bg-[#eef2ff]'
                     : 'border-neutral-200 bg-white hover:border-neutral-300'
                 }`}
               >
                 <div>
-                  <p className="font-semibold text-neutral-900">{o.title}</p>
-                  <p className="mt-1 text-sm text-neutral-600">{o.desc}</p>
+                  <p className="font-semibold text-neutral-900">{t(`community.announcementsPanel.audience.${audienceId}.title`)}</p>
+                  <p className="mt-1 text-sm text-neutral-600">{t(`community.announcementsPanel.audience.${audienceId}.desc`)}</p>
                 </div>
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
                   <ChevronRight className="h-4 w-4" />
@@ -678,7 +655,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
               </button>
             ))}
           </div>
-          <p className="mt-6 text-center text-xs text-neutral-400">You can change this later.</p>
+          <p className="mt-6 text-center text-xs text-neutral-400">{t('community.announcementsPanel.wizardAudienceNote')}</p>
           <div className="mt-4 flex justify-end">
             <button
               type="button"
@@ -686,7 +663,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
               onClick={() => void goWizardNextFromStep2()}
               className="rounded-xl bg-[#315efb] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#2547c4] disabled:opacity-40"
             >
-              Continue
+              {t('community.announcementsPanel.continue')}
             </button>
           </div>
         </>
@@ -699,15 +676,15 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
             onClick={() => setWizardStep(2)}
             className="mb-4 rounded-xl border border-neutral-200 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
           >
-            ← Back
+            {t('community.announcementsPanel.wizardBack')}
           </button>
-          <h2 className="text-2xl font-bold text-neutral-900">Write your first announcement.</h2>
+          <h2 className="text-2xl font-bold text-neutral-900">{t('community.announcementsPanel.wizardWriteTitle')}</h2>
           <p className="mt-2 text-sm text-neutral-600">
-            This template matches your community posts. Edit it or write your own.
+            {t('community.announcementsPanel.wizardWriteHint')}
           </p>
           <div className="mt-6 space-y-4 rounded-2xl border border-neutral-200 bg-white p-5">
             <div>
-              <label className="text-xs font-medium text-neutral-500">Title</label>
+              <label className="text-xs font-medium text-neutral-500">{t('community.announcementsPanel.titleLabel')}</label>
               <input
                 value={draftTitle}
                 onChange={(e) => setDraftTitle(e.target.value)}
@@ -715,7 +692,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-neutral-500">Body</label>
+              <label className="text-xs font-medium text-neutral-500">{t('community.announcementsPanel.bodyLabel')}</label>
               <textarea
                 value={draftBody}
                 onChange={(e) => setDraftBody(e.target.value)}
@@ -726,7 +703,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
           </div>
           <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
             <button type="button" onClick={() => void skipWizard()} className="text-sm font-semibold text-[#315efb] hover:underline">
-              Skip, I&apos;ll do this later
+              {t('community.announcementsPanel.skipLater')}
             </button>
             <button
               type="button"
@@ -735,7 +712,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
               className="inline-flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-2 text-sm font-semibold text-neutral-900 hover:bg-neutral-50 disabled:opacity-40"
             >
               <Send className="h-4 w-4 text-[#315efb]" />
-              Publish now
+              {t('community.announcementsPanel.publishNow')}
             </button>
           </div>
         </>
@@ -751,21 +728,21 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
             <Plus className="h-5 w-5" strokeWidth={2.5} />
           </div>
           <div>
-            <p className="font-semibold text-neutral-900">Your last post reached 62%</p>
-            <p className="text-xs text-neutral-500">Suggested for you · just now</p>
+            <p className="font-semibold text-neutral-900">{t('community.announcementsPanel.growthReach')}</p>
+            <p className="text-xs text-neutral-500">{t('community.announcementsPanel.growthSuggested')}</p>
           </div>
         </div>
-        <button type="button" className="rounded-full p-1 text-neutral-400 hover:bg-neutral-100" aria-label="Close">
+        <button type="button" className="rounded-full p-1 text-neutral-400 hover:bg-neutral-100" aria-label={t('community.announcementsPanel.growthClose')}>
           <X className="h-4 w-4" />
         </button>
       </div>
-      <h3 className="mt-4 text-base font-semibold text-neutral-900">Help more members see the next post.</h3>
+      <h3 className="mt-4 text-base font-semibold text-neutral-900">{t('community.announcementsPanel.growthTitle')}</h3>
       <p className="mt-2 text-sm text-neutral-600">
-        Small nudges after high-signal posts can lift repeat opens without spamming your whole list.
+        {t('community.announcementsPanel.growthBody')}
       </p>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-neutral-100 px-3 py-2 text-xs text-neutral-600">
-        <span>Growth tools · from $19/mo</span>
-        <span className="text-neutral-400">Built for member retention</span>
+        <span>{t('community.announcementsPanel.growthTools')}</span>
+        <span className="text-neutral-400">{t('community.announcementsPanel.growthRetention')}</span>
       </div>
     </div>
   );
@@ -773,7 +750,9 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
   const feedToolbar = (
     <div className="sticky top-0 z-[1] flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 bg-white px-4 py-3">
       <p className="text-sm text-neutral-600">
-        {list.length} announcement{list.length === 1 ? '' : 's'}
+        {list.length === 1
+          ? t('community.announcementsPanel.announcementOne')
+          : t('community.announcementsPanel.announcementMany', { count: list.length })}
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <button
@@ -781,9 +760,9 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
           className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
         >
           <LayoutGrid className="h-3.5 w-3.5" />
-          Growth Apps
+          {t('community.announcementsPanel.growthApps')}
         </button>
-        <button type="button" className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100" title="Notifications">
+        <button type="button" className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100" title={t('community.announcementsPanel.notifications')}>
           <Bell className="h-4 w-4" />
         </button>
         {isOwner && (
@@ -793,7 +772,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
             className="inline-flex items-center gap-2 rounded-xl bg-[#315efb] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2547c4]"
           >
             <Plus className="h-4 w-4" />
-            Add
+            {t('community.announcementsPanel.add')}
           </button>
         )}
       </div>
@@ -810,7 +789,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
           <div className="min-w-0">
             <p className="truncate font-semibold text-neutral-900">{a.author?.fullName || a.author?.username}</p>
             <p className="truncate text-sm text-neutral-500">
-              @{a.author?.username} · {formatRelativeTime(a.createdAt)}
+              @{a.author?.username} · {formatRelativeTime(a.createdAt, t)}
             </p>
           </div>
         </div>
@@ -820,7 +799,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
               type="button"
               onClick={() => setOpenMenuForId((v) => (v === a._id ? null : a._id))}
               className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
-              aria-label="Menu"
+              aria-label={t('community.announcementsPanel.menu')}
             >
               <MoreVertical className="h-5 w-5" />
             </button>
@@ -832,7 +811,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-neutral-800 hover:bg-neutral-50"
                 >
                   <Pencil className="h-4 w-4" />
-                  Edit
+                  {t('community.announcementsPanel.edit')}
                 </button>
                 <button
                   type="button"
@@ -840,7 +819,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
                   className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
                 >
                   <Trash2 className="h-4 w-4" />
-                  Delete
+                  {t('community.announcementsPanel.delete')}
                 </button>
               </div>
             )}
@@ -858,7 +837,9 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1">
             <MessageCircle className="h-4 w-4" />
-            {a.commentsCount} comments
+            {a.commentsCount === 1
+              ? t('community.announcementsPanel.commentOne')
+              : t('community.announcementsPanel.commentsMany', { count: a.commentsCount })}
           </span>
           <span className="inline-flex items-center gap-1">
             <BarChart2 className="h-4 w-4" />
@@ -875,7 +856,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
         </div>
         <input
           readOnly
-          placeholder="Write a comment…"
+          placeholder={t('community.announcementsPanel.writeComment')}
           className="flex-1 cursor-pointer rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm text-neutral-500"
           onClick={() => void openDetail(a._id)}
         />
@@ -884,23 +865,23 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
   );
 
   const editorFormatChips = [
-    'Undo',
-    'Redo',
-    'Paragraph ▾',
-    'No list ▾',
-    '❝',
-    '</>',
-    '😀',
-    'B',
-    'I',
-    'S',
-    '</>',
-    '⌫',
-    '🔗',
-    '≡',
-    '⫴',
-    '🖼',
-    '🎬',
+    t('community.announcementsPanel.toolbarUndo'),
+    t('community.announcementsPanel.toolbarRedo'),
+    t('community.announcementsPanel.toolbarParagraph'),
+    t('community.announcementsPanel.toolbarNoList'),
+    t('community.announcementsPanel.toolbarQuote'),
+    t('community.announcementsPanel.toolbarCode'),
+    t('community.announcementsPanel.toolbarEmoji'),
+    t('community.announcementsPanel.toolbarBold'),
+    t('community.announcementsPanel.toolbarItalic'),
+    t('community.announcementsPanel.toolbarStrike'),
+    t('community.announcementsPanel.toolbarCodeBlock'),
+    t('community.announcementsPanel.toolbarClear'),
+    t('community.announcementsPanel.toolbarLink'),
+    t('community.announcementsPanel.toolbarAlign'),
+    t('community.announcementsPanel.toolbarIndent'),
+    t('community.announcementsPanel.toolbarImage'),
+    t('community.announcementsPanel.toolbarVideo'),
   ];
 
   const editorView = (
@@ -910,16 +891,16 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
           type="button"
           onClick={leaveEditor}
           className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100"
-          aria-label="Back"
+          aria-label={t('community.announcementsPanel.back')}
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex min-w-0 flex-1 items-center justify-center gap-2 px-2 text-neutral-400">
           <FileText className="h-4 w-4 shrink-0" aria-hidden />
-          <span className="truncate text-sm">{editorTitle.trim() || 'Untitled'}</span>
+          <span className="truncate text-sm">{editorTitle.trim() || t('community.announcementsPanel.untitled')}</span>
         </div>
         <div className="flex items-center gap-1">
-          <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title="Schedule">
+          <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title={t('community.announcementsPanel.schedule')}>
             <Calendar className="h-5 w-5" />
           </button>
           <button
@@ -927,7 +908,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
             disabled={publishing || !editorTitle.trim()}
             onClick={() => void saveEditor()}
             className="rounded-full p-2 text-[#315efb] hover:bg-[#eef2ff] disabled:opacity-40"
-            title={editorEditingId ? 'Save' : 'Publish'}
+            title={editorEditingId ? t('community.announcementsPanel.save') : t('community.announcementsPanel.publish')}
           >
             <Send className="h-5 w-5" />
           </button>
@@ -950,13 +931,13 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
           <input
             value={editorTitle}
             onChange={(e) => setEditorTitle(e.target.value)}
-            placeholder="Title"
+            placeholder={t('community.announcementsPanel.titlePh')}
             className="w-full border-0 bg-transparent text-lg font-semibold text-neutral-900 outline-none placeholder:text-neutral-400"
           />
           <textarea
             value={editorBody}
             onChange={(e) => setEditorBody(e.target.value)}
-            placeholder="Write your announcement…"
+            placeholder={t('community.announcementsPanel.bodyPh')}
             className="min-h-[min(50vh,420px)] w-full resize-y border-0 bg-transparent text-sm leading-relaxed text-neutral-800 outline-none placeholder:italic placeholder:text-neutral-400"
           />
         </div>
@@ -976,7 +957,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
               <div>
                 <p className="font-semibold text-neutral-900">{detail.author?.fullName || detail.author?.username}</p>
                 <p className="text-sm text-neutral-500">
-                  @{detail.author?.username} · {formatRelativeTime(detail.createdAt)}
+                  @{detail.author?.username} · {formatRelativeTime(detail.createdAt, t)}
                 </p>
               </div>
             </div>
@@ -986,7 +967,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
                   type="button"
                   onClick={() => openEditorForEdit(detail._id, detail.title, detail.body)}
                   className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
-                  title="Edit"
+                  title={t('community.announcementsPanel.edit')}
                 >
                   <Pencil className="h-4 w-4" />
                 </button>
@@ -994,7 +975,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
                   type="button"
                   onClick={() => void deleteAnnouncement(detail._id)}
                   className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
-                  title="Delete"
+                  title={t('community.announcementsPanel.delete')}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -1012,11 +993,11 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
           </div>
           <div className="mt-6 border-t border-neutral-100 pt-4">
             <div className="mb-3 flex items-center justify-between">
-              <span className="text-sm font-semibold text-neutral-900">Comments</span>
-              <span className="text-xs text-neutral-500">Newest</span>
+              <span className="text-sm font-semibold text-neutral-900">{t('community.announcementsPanel.comments')}</span>
+              <span className="text-xs text-neutral-500">{t('community.announcementsPanel.newest')}</span>
             </div>
             {(!detail.comments || detail.comments.length === 0) && (
-              <p className="py-6 text-center text-sm text-neutral-500">No comments yet. Be the first to comment!</p>
+              <p className="py-6 text-center text-sm text-neutral-500">{t('community.announcementsPanel.noComments')}</p>
             )}
             <ul className="space-y-3">
               {(detail.comments || []).map((c) => (
@@ -1027,7 +1008,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
                   <div>
                     <p className="font-medium text-neutral-900">{c.user?.fullName || c.user?.username}</p>
                     <p className="text-neutral-700">{c.content}</p>
-                    <p className="mt-0.5 text-xs text-neutral-400">{formatRelativeTime(c.createdAt)}</p>
+                    <p className="mt-0.5 text-xs text-neutral-400">{formatRelativeTime(c.createdAt, t)}</p>
                   </div>
                 </li>
               ))}
@@ -1048,7 +1029,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
                     void postComment();
                   }
                 }}
-                placeholder="Write a comment…"
+                placeholder={t('community.announcementsPanel.writeComment')}
                 className="min-w-0 flex-1 rounded-full border border-neutral-200 bg-neutral-50 px-4 py-2 text-sm outline-none focus:border-[#315efb]"
               />
               <button
@@ -1071,7 +1052,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
       {mode === 'wizard' && isOwner && <div className="min-h-0 flex-1 overflow-y-auto bg-white">{wizardBody}</div>}
       {mode === 'wizard' && !isOwner && (
         <div className="flex flex-1 flex-col items-center justify-center p-10 text-center text-neutral-600">
-          <p>The community owner is setting up announcements.</p>
+          <p>{t('community.announcementsPanel.ownerSettingUp')}</p>
         </div>
       )}
       {mode === 'feed' && (
@@ -1080,12 +1061,12 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
           <div className="mx-auto max-w-2xl space-y-4 p-4">
               {!isOwner && meta && !meta.wizardComplete && list.length === 0 && (
                 <div className="rounded-2xl border border-neutral-200 bg-white p-8 text-center text-sm text-neutral-600">
-                  The community owner is setting up announcements. Check back soon.
+                  {t('community.announcementsPanel.ownerSettingUpSoon')}
                 </div>
               )}
               {meta && !meta.wizardComplete && list.length === 0 && isOwner && (
                 <div className="rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
-                  Finish setup to unlock the full feed, or skip from the wizard.
+                  {t('community.announcementsPanel.finishSetup')}
                   <button
                     type="button"
                     className="ml-2 font-semibold text-[#315efb] underline"
@@ -1094,13 +1075,13 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
                       setWizardStep(1);
                     }}
                   >
-                    Continue setup
+                    {t('community.announcementsPanel.continueSetup')}
                   </button>
                 </div>
               )}
               {list.length === 0 && meta?.wizardComplete && (
                 <div className="rounded-2xl border border-dashed border-neutral-300 bg-white p-10 text-center text-neutral-500">
-                  <p>No announcements yet.</p>
+                  <p>{t('community.announcementsPanel.noAnnouncements')}</p>
                   {isOwner && (
                     <button
                       type="button"
@@ -1108,7 +1089,7 @@ const CommunityAnnouncementsPanel: React.FC<CommunityAnnouncementsPanelProps> = 
                       className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#315efb] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2547c4]"
                     >
                       <Plus className="h-4 w-4" />
-                      Add
+                      {t('community.announcementsPanel.add')}
                     </button>
                   )}
                 </div>

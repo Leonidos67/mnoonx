@@ -149,8 +149,18 @@ const Settings: React.FC = () => {
 
   useEffect(() => {
     const section = searchParams.get('section');
-    if (section === 'connected' || section === 'security') {
-      setActiveSection(section);
+    const valid: SettingsSectionId[] = [
+      'account',
+      'edit-profile',
+      'connected',
+      'security',
+      'notifications',
+      'orders',
+      'payments',
+      'resolution',
+    ];
+    if (section && valid.includes(section as SettingsSectionId)) {
+      setActiveSection(section as SettingsSectionId);
       if (!isDesktop) setMobileView('content');
     }
   }, [searchParams, isDesktop]);

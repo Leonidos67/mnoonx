@@ -52,6 +52,7 @@ export interface PostFeedCardProps {
     rect: DOMRect,
     isOpen: boolean,
   ) => void;
+  onPollChange?: (poll: import('../../types/postPoll').FeedPostPoll) => void;
 }
 
 const PostFeedCard: React.FC<PostFeedCardProps> = ({
@@ -87,6 +88,7 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
   isCommentOwner,
   openCommentMenu,
   onCommentMenuToggle,
+  onPollChange,
 }) => {
   const { t } = useTranslation();
   const postId = String(post._id);
@@ -213,6 +215,9 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
               content={post.content}
               linkAttachment={post.linkAttachment}
               coinAttachment={post.coinAttachment}
+              poll={post.poll}
+              postId={postId}
+              onPollChange={onPollChange}
               contentClassName="whitespace-pre-wrap break-words text-[15px] leading-relaxed text-neutral-900"
             />
           </div>

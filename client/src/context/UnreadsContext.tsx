@@ -8,6 +8,7 @@ interface UnreadsContextType {
   messageUnread: number;
   notificationUnread: number;
   mentionUnread: number;
+  engagementUnread: number;
   refreshUnreads: () => void;
 }
 
@@ -19,12 +20,14 @@ export const UnreadsProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [messageUnread, setMessageUnread] = useState(0);
   const [notificationUnread, setNotificationUnread] = useState(0);
   const [mentionUnread, setMentionUnread] = useState(0);
+  const [engagementUnread, setEngagementUnread] = useState(0);
 
   const refreshUnreads = useCallback(async () => {
     if (!token) {
       setMessageUnread(0);
       setNotificationUnread(0);
       setMentionUnread(0);
+      setEngagementUnread(0);
       return;
     }
     const headers = { Authorization: `Bearer ${token}` };
@@ -42,6 +45,7 @@ export const UnreadsProvider: React.FC<{ children: ReactNode }> = ({ children })
         const data = await notifRes.json();
         setNotificationUnread(typeof data.all === 'number' ? data.all : 0);
         setMentionUnread(typeof data.mentions === 'number' ? data.mentions : 0);
+        setEngagementUnread(typeof data.engagement === 'number' ? data.engagement : 0);
       }
     } catch {
       /* ignore */
@@ -57,7 +61,13 @@ export const UnreadsProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   return (
     <UnreadsContext.Provider
-      value={{ messageUnread, notificationUnread, mentionUnread, refreshUnreads }}
+      value={{
+        messageUnread,
+        notificationUnread,
+        mentionUnread,
+        engagementUnread,
+        refreshUnreads,
+      }}
     >
       {children}
     </UnreadsContext.Provider>

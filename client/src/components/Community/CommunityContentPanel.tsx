@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Bell, Link2, Users, Quote, Pencil, Lock } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from '../../i18n/useTranslation';
 
 import { COMMUNITIES_API as API } from '../../config/api';
 
@@ -20,7 +21,8 @@ const CommunityContentPanel: React.FC<CommunityContentPanelProps> = ({
   onBackToCommunity,
 }) => {
   const { token } = useAuth();
-  const [title, setTitle] = useState('Unnamed document');
+  const { t } = useTranslation();
+  const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,20 +44,24 @@ const CommunityContentPanel: React.FC<CommunityContentPanelProps> = ({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { message?: string }).message || 'Could not load document');
+        setError((data as { message?: string }).message || t('community.contentPanel.loadFailed'));
         return;
       }
-      const t = typeof (data as { title?: string }).title === 'string' ? (data as { title: string }).title : 'Unnamed document';
+      const docTitle =
+        typeof (data as { title?: string }).title === 'string'
+          ? (data as { title: string }).title
+          : t('community.contentPanel.unnamed');
       const b = typeof (data as { body?: string }).body === 'string' ? (data as { body: string }).body : '';
-      setTitle(t.trim() || 'Unnamed document');
+      const normalizedTitle = docTitle.trim() || t('community.contentPanel.unnamed');
+      setTitle(normalizedTitle);
       setBody(b);
-      lastSentRef.current = { title: t.trim() || 'Unnamed document', body: b };
+      lastSentRef.current = { title: normalizedTitle, body: b };
     } catch {
-      setError('Network error');
+      setError(t('community.contentPanel.networkError'));
     } finally {
       setLoading(false);
     }
-  }, [token, handle, instanceId]);
+  }, [token, handle, instanceId, t]);
 
   useEffect(() => {
     setLoading(true);
@@ -70,7 +76,7 @@ const CommunityContentPanel: React.FC<CommunityContentPanelProps> = ({
     }
     if (!token || !handle || !instanceId || !isOwner) return;
     const prev = lastSentRef.current;
-    const nextTitle = title.trim() || 'Unnamed document';
+    const nextTitle = title.trim() || t('community.contentPanel.unnamed');
     const nextBody = body;
     if (prev && prev.title === nextTitle && prev.body === nextBody) return;
     setSaveState('saving');
@@ -88,15 +94,17 @@ const CommunityContentPanel: React.FC<CommunityContentPanelProps> = ({
         setSaveState('error');
         return;
       }
-      const t = typeof (data as { title?: string }).title === 'string' ? (data as { title: string }).title : nextTitle;
-      const b = typeof (data as { body?: string }).body === 'string' ? (data as { body: string }).body : nextBody;
-      lastSentRef.current = { title: t, body: b };
+      const savedTitle =
+        typeof (data as { title?: string }).title === 'string' ? (data as { title: string }).title : nextTitle;
+      const savedBody =
+        typeof (data as { body?: string }).body === 'string' ? (data as { body: string }).body : nextBody;
+      lastSentRef.current = { title: savedTitle, body: savedBody };
       setSaveState('saved');
       window.setTimeout(() => setSaveState((s) => (s === 'saved' ? 'idle' : s)), 1500);
     } catch {
       setSaveState('error');
     }
-  }, [token, handle, instanceId, isOwner, title, body]);
+  }, [token, handle, instanceId, isOwner, title, body, t]);
 
   const scheduleSave = useCallback(() => {
     if (!isOwner || !editing) return;
@@ -123,13 +131,13 @@ const CommunityContentPanel: React.FC<CommunityContentPanelProps> = ({
     });
   };
 
-  const headerTitle = instanceTitle?.trim() || 'Content';
+  const headerTitle = instanceTitle?.trim() || t('community.contentPanel.titleFallback');
 
   if (!token) {
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center rounded-xl border border-[#e7e7e7] bg-white p-10 text-center text-[#666]">
         <Lock className="mx-auto mb-3 h-10 w-10 text-[#999]" />
-        <p className="text-[17px]">Sign in to view this document.</p>
+        <p className="text-[17px]">{t('community.contentPanel.signIn')}</p>
       </div>
     );
   }
@@ -146,7 +154,7 @@ const CommunityContentPanel: React.FC<CommunityContentPanelProps> = ({
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center rounded-xl border border-[#e7e7e7] bg-white p-8 text-center">
         <p className="mb-2 text-[#e5484d]">{error}</p>
-        <p className="text-sm text-[#888]">You may need to join this community or the app may be hidden.</p>
+        <p className="text-sm text-[#888]">{t('community.contentPanel.accessHint')}</p>
       </div>
     );
   }
@@ -165,7 +173,7 @@ const CommunityContentPanel: React.FC<CommunityContentPanelProps> = ({
               })();
             }}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100"
-            aria-label="Back to community"
+            aria-label={t('community.contentPanel.backToCommunity')}
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -175,13 +183,13 @@ const CommunityContentPanel: React.FC<CommunityContentPanelProps> = ({
           <h1 className="min-w-0 truncate text-lg font-semibold text-neutral-900">{headerTitle}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          <button type="button" onClick={copyPageLink} className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title="Copy link">
+          <button type="button" onClick={copyPageLink} className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title={t('community.contentPanel.copyLink')}>
             <Link2 className="h-5 w-5" />
           </button>
-          <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title="Members">
+          <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title={t('community.contentPanel.members')}>
             <Users className="h-5 w-5" />
           </button>
-          <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title="Notifications">
+          <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title={t('community.contentPanel.notifications')}>
             <Bell className="h-5 w-5" />
           </button>
           {isOwner && (
@@ -196,7 +204,7 @@ const CommunityContentPanel: React.FC<CommunityContentPanelProps> = ({
               className="ml-1 flex items-center gap-1.5 rounded-xl bg-[#315efb] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#2547c4]"
             >
               <Pencil className="h-4 w-4" strokeWidth={2} />
-              {editing ? 'Done' : 'Edit'}
+              {editing ? t('community.contentPanel.done') : t('community.contentPanel.edit')}
             </button>
           )}
         </div>
@@ -206,9 +214,9 @@ const CommunityContentPanel: React.FC<CommunityContentPanelProps> = ({
         <div className="mx-auto max-w-3xl">
           {editing && isOwner && (
             <p className="mb-4 text-right text-xs text-neutral-400">
-              {saveState === 'saving' && 'Saving…'}
-              {saveState === 'saved' && 'Saved'}
-              {saveState === 'error' && 'Save failed'}
+              {saveState === 'saving' && t('community.contentPanel.saving')}
+              {saveState === 'saved' && t('community.contentPanel.saved')}
+              {saveState === 'error' && t('community.contentPanel.saveFailed')}
               {saveState === 'idle' && '\u00a0'}
             </p>
           )}
@@ -219,21 +227,21 @@ const CommunityContentPanel: React.FC<CommunityContentPanelProps> = ({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 className="mb-6 w-full border-0 border-b border-transparent bg-transparent text-3xl font-bold tracking-tight text-neutral-900 outline-none ring-0 placeholder:text-neutral-300 focus:border-neutral-200"
-                placeholder="Unnamed document"
+                placeholder={t('community.contentPanel.unnamed')}
                 maxLength={500}
               />
               <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 className="min-h-[min(60vh,520px)] w-full resize-y border-0 bg-transparent text-[17px] leading-relaxed text-neutral-800 outline-none ring-0 placeholder:text-neutral-300"
-                placeholder="Start writing…"
+                placeholder={t('community.contentPanel.bodyPlaceholder')}
               />
             </>
           ) : (
             <>
-              <h2 className="mb-6 text-3xl font-bold tracking-tight text-neutral-900">{title || 'Unnamed document'}</h2>
+              <h2 className="mb-6 text-3xl font-bold tracking-tight text-neutral-900">{title || t('community.contentPanel.unnamed')}</h2>
               <div className="whitespace-pre-wrap text-[17px] leading-relaxed text-neutral-800">
-                {body.trim() ? body : <span className="text-neutral-300">Empty document</span>}
+                {body.trim() ? body : <span className="text-neutral-300">{t('community.contentPanel.emptyDocument')}</span>}
               </div>
             </>
           )}

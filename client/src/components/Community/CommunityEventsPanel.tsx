@@ -21,6 +21,7 @@ import { useToast } from '../../context/ToastContext';
 import ResponsiveDialogShell from '../Common/ResponsiveDialogShell';
 import { useConfirm } from '../../context/ConfirmContext';
 import { communityPath } from '../../constants/communityRoutes';
+import { useTranslation } from '../../i18n/useTranslation';
 
 import { COMMUNITIES_API as API } from '../../config/api';
 
@@ -70,15 +71,6 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
-function dayHeading(iso: string): string {
-  const d = new Date(iso);
-  const today = new Date();
-  const sameDay =
-    d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
-  const md = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  return sameDay ? `${md} / Today` : md;
-}
-
 function toInputLocal(iso: string): string {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -97,6 +89,8 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
   const { user, token } = useAuth();
   const { showToast } = useToast();
   const { confirm } = useConfirm();
+  const { t } = useTranslation();
+  const googleMeetDefault = t('community.eventsPanel.googleMeetDefault');
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<CommunityEventItem[]>([]);
   const [editMode, setEditMode] = useState(false);
@@ -111,7 +105,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
   const [formTimezone] = useState('Europe/Moscow');
   const [formRepeat, setFormRepeat] = useState('none');
   const [formLocType, setFormLocType] = useState<'place' | 'online'>('online');
-  const [formLocLabel, setFormLocLabel] = useState('Google Meet (Online)');
+  const [formLocLabel, setFormLocLabel] = useState('');
   const [formLocAddr, setFormLocAddr] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formRsvp, setFormRsvp] = useState(false);
@@ -157,12 +151,21 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
       list.push(ev);
       map.set(key, list);
     }
-    return Array.from(map.entries()).map(([k, list]) => ({
-      key: k,
-      label: dayHeading(list[0].startsAt),
-      items: list,
-    }));
-  }, [upcoming]);
+    return Array.from(map.entries()).map(([k, list]) => {
+      const d = new Date(list[0].startsAt);
+      const today = new Date();
+      const sameDay =
+        d.getFullYear() === today.getFullYear() &&
+        d.getMonth() === today.getMonth() &&
+        d.getDate() === today.getDate();
+      const md = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      return {
+        key: k,
+        label: sameDay ? `${md} / ${t('community.eventsPanel.today')}` : md,
+        items: list,
+      };
+    });
+  }, [upcoming, t]);
 
   const openCreate = () => {
     setEditingId(null);
@@ -174,7 +177,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
     setFormEnds(toInputLocal(end.toISOString()));
     setFormRepeat('none');
     setFormLocType('online');
-    setFormLocLabel('Google Meet (Online)');
+    setFormLocLabel(googleMeetDefault);
     setFormLocAddr('');
     setFormDesc('');
     setFormRsvp(false);
@@ -189,7 +192,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
     setFormEnds(toInputLocal(ev.endsAt));
     setFormRepeat(ev.repeatRule || 'none');
     setFormLocType(ev.locationType === 'place' ? 'place' : 'online');
-    setFormLocLabel(ev.locationLabel || 'Google Meet (Online)');
+    setFormLocLabel(ev.locationLabel || googleMeetDefault);
     setFormLocAddr(ev.locationAddress || '');
     setFormDesc(ev.description || '');
     setFormRsvp(ev.allowRsvp);
@@ -226,10 +229,10 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          showToast((err as { message?: string }).message || 'Failed to save', 'error');
+          showToast((err as { message?: string }).message || t('community.eventsPanel.saveFailed'), 'error');
           return;
         }
-        showToast('Event updated');
+        showToast(t('community.eventsPanel.updatedToast'));
       } else {
         const res = await fetch(`${API}/${encodeURIComponent(handle)}/events`, {
           method: 'POST',
@@ -241,15 +244,15 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          showToast((err as { message?: string }).message || 'Failed to create', 'error');
+          showToast((err as { message?: string }).message || t('community.eventsPanel.createFailed'), 'error');
           return;
         }
-        showToast('Event created');
+        showToast(t('community.eventsPanel.createdToast'));
       }
       setModalOpen(false);
       await load();
     } catch {
-      showToast('Network error', 'error');
+      showToast(t('community.eventsPanel.networkError'), 'error');
     } finally {
       setSaving(false);
     }
@@ -258,9 +261,9 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
   const deleteEvent = async (id: string) => {
     if (!token) return;
     const confirmed = await confirm({
-      title: 'Delete event?',
-      message: 'This event will be permanently removed.',
-      confirmLabel: 'Delete',
+      title: t('community.eventsPanel.deleteTitle'),
+      message: t('community.eventsPanel.deleteMessage'),
+      confirmLabel: t('community.eventsPanel.deleteConfirm'),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -271,25 +274,25 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        showToast((err as { message?: string }).message || 'Failed to delete', 'error');
+        showToast((err as { message?: string }).message || t('community.eventsPanel.deleteFailed'), 'error');
         return;
       }
       await load();
-      showToast('Event deleted');
+      showToast(t('community.eventsPanel.deletedToast'));
     } catch {
-      showToast('Network error', 'error');
+      showToast(t('community.eventsPanel.networkError'), 'error');
     }
   };
 
   const shareEvent = (ev: CommunityEventItem) => {
     const link = `${window.location.origin}${communityPath(handle)}`;
     void navigator.clipboard.writeText(link).then(
-      () => showToast(`Link copied — share “${ev.title}”`),
-      () => showToast('Could not copy link', 'error')
+      () => showToast(t('community.eventsPanel.linkCopied', { title: ev.title })),
+      () => showToast(t('community.eventsPanel.copyFailed'), 'error')
     );
   };
 
-  const title = instanceTitle || 'Events';
+  const title = instanceTitle || t('community.eventsPanel.titleFallback');
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[#e7e7e7] bg-white">
@@ -299,7 +302,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
             type="button"
             onClick={onBackToCommunity}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-neutral-600 transition-colors hover:bg-neutral-100"
-            aria-label="Back"
+            aria-label={t('community.eventsPanel.back')}
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -308,7 +311,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
           </span>
           <div className="min-w-0">
             <h1 className="truncate text-lg font-semibold text-neutral-900">
-              {isOwner && editMode ? 'Editing Events' : title}
+              {isOwner && editMode ? t('community.eventsPanel.editingTitle') : title}
             </h1>
           </div>
         </div>
@@ -316,7 +319,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
           <button
             type="button"
             className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
-            title="Copy link"
+            title={t('community.eventsPanel.copyLink')}
             onClick={() =>
               void navigator.clipboard
                 .writeText(`${window.location.origin}${communityPath(handle)}`)
@@ -328,14 +331,14 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
           <button
             type="button"
             className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
-            title="People"
+            title={t('community.eventsPanel.people')}
           >
             <Users className="h-4 w-4" />
           </button>
           <button
             type="button"
             className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:bg-neutral-100"
-            title="Notifications"
+            title={t('community.eventsPanel.notifications')}
           >
             <Bell className="h-4 w-4" />
           </button>
@@ -346,11 +349,11 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
               className="ml-1 flex items-center gap-1.5 rounded-xl bg-[#315efb] px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-[#2547c4]"
             >
               <Pencil className="h-4 w-4" />
-              {editMode ? 'Done' : 'Edit'}
+              {editMode ? t('community.eventsPanel.done') : t('community.eventsPanel.edit')}
             </button>
           )}
           {isOwner && editMode && (
-            <span className="ml-1 flex h-9 w-9 items-center justify-center text-neutral-400" title="Owner">
+            <span className="ml-1 flex h-9 w-9 items-center justify-center text-neutral-400" title={t('community.eventsPanel.owner')}>
               <Lock className="h-4 w-4" />
             </span>
           )}
@@ -362,7 +365,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
           type="button"
           className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
         >
-          Upcoming Events
+          {t('community.eventsPanel.upcomingEvents')}
           <ChevronDown className="h-4 w-4 text-neutral-500" />
         </button>
         {isOwner && editMode && (
@@ -372,7 +375,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
             className="flex items-center gap-1.5 rounded-xl bg-[#315efb] px-3 py-2 text-sm font-semibold text-white hover:bg-[#2547c4]"
           >
             <Plus className="h-4 w-4" />
-            Create Event
+            {t('community.eventsPanel.createEvent')}
           </button>
         )}
       </div>
@@ -385,36 +388,38 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
         ) : upcoming.length === 0 ? (
           <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
             <Calendar className="mb-4 h-20 w-20 text-neutral-200" strokeWidth={1.1} />
-            <p className="text-lg font-semibold text-neutral-900">No upcoming events</p>
+            <p className="text-lg font-semibold text-neutral-900">{t('community.eventsPanel.noUpcoming')}</p>
             {isOwner && editMode ? (
               <>
-                <p className="mt-2 max-w-sm text-sm text-neutral-500">Create an event to get started</p>
+                <p className="mt-2 max-w-sm text-sm text-neutral-500">{t('community.eventsPanel.emptyOwnerHint')}</p>
                 <button
                   type="button"
                   onClick={openCreate}
                   className="mt-8 w-full max-w-sm rounded-2xl bg-[#315efb] py-3.5 text-base font-semibold text-white transition-colors hover:bg-[#2547c4]"
                 >
-                  Create Event
+                  {t('community.eventsPanel.createEvent')}
                 </button>
               </>
             ) : (
               <>
                 <p className="mt-2 max-w-sm text-sm text-neutral-500">
-                  Creator has not created any events yet.
+                  {t('community.eventsPanel.emptyMemberHint')}
                 </p>
                 {isOwner && !editMode && (
-                  <p className="mt-3 text-sm text-neutral-600">Tap <span className="font-semibold">Edit</span> in the header to add events.</p>
+                  <p className="mt-3 text-sm text-neutral-600">
+                    {t('community.eventsPanel.emptyOwnerEditHint', { edit: t('community.eventsPanel.edit') })}
+                  </p>
                 )}
                 {!isOwner && isMember && ownerUsername ? (
                   <Link
                     to={`/@${ownerUsername}`}
                     className="mt-8 flex w-full max-w-sm items-center justify-center rounded-2xl bg-[#315efb] py-3.5 text-base font-semibold text-white transition-colors hover:bg-[#2547c4]"
                   >
-                    DM the creator for an event
+                    {t('community.eventsPanel.dmCreator')}
                   </Link>
                 ) : null}
                 {!isOwner && !isMember && (
-                  <p className="mt-6 text-sm text-neutral-400">Join the community to contact the creator.</p>
+                  <p className="mt-6 text-sm text-neutral-400">{t('community.eventsPanel.joinToContact')}</p>
                 )}
               </>
             )}
@@ -438,7 +443,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
                             {ev.host ? initials(ev.host.fullName || ev.host.username) : '??'}
                           </span>
                           <span className="font-medium text-neutral-700">
-                            {ev.host?.username || 'host'}
+                            {ev.host?.username || t('community.eventsPanel.hostFallback')}
                           </span>
                         </div>
                         <p className="mt-1 text-lg font-bold text-neutral-900">{ev.title}</p>
@@ -462,14 +467,14 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
                               onClick={() => openEdit(ev)}
                               className="text-sm font-medium text-[#315efb] hover:underline"
                             >
-                              Edit
+                              {t('community.eventsPanel.edit')}
                             </button>
                             <button
                               type="button"
                               onClick={() => void deleteEvent(ev._id)}
                               className="text-sm font-medium text-red-600 hover:underline"
                             >
-                              Delete
+                              {t('community.eventsPanel.delete')}
                             </button>
                           </div>
                         )}
@@ -480,7 +485,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
                         className="flex shrink-0 items-center gap-1 self-start text-sm font-semibold text-[#315efb] hover:underline"
                       >
                         <Share2 className="h-4 w-4" />
-                        Share
+                        {t('community.eventsPanel.share')}
                       </button>
                     </div>
                   ))}
@@ -494,7 +499,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
       <ResponsiveDialogShell
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editingId ? 'Edit Event' : 'Create Event'}
+        title={editingId ? t('community.eventsPanel.editEvent') : t('community.eventsPanel.createEvent')}
         disableClose={saving}
         zIndexClass="z-[200]"
         panelClassName="flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-xl"
@@ -505,40 +510,40 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
                 type="button"
                 onClick={() => setModalOpen(false)}
                 className="flex h-9 w-9 items-center justify-center rounded-lg border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
-                aria-label="Close"
+                aria-label={t('community.eventsPanel.close')}
               >
                 <X className="h-4 w-4" />
               </button>
               <h2 className="text-base font-semibold text-neutral-900">
-                {editingId ? 'Edit Event' : 'Create Event'}
+                {editingId ? t('community.eventsPanel.editEvent') : t('community.eventsPanel.createEvent')}
               </h2>
               <span className="w-9" />
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
               <div className="mb-5 overflow-hidden rounded-xl bg-gradient-to-br from-lime-300 to-violet-400">
                 <div className="flex min-h-[120px] flex-col items-center justify-center gap-2 p-5">
-                  <p className="text-sm font-medium text-white drop-shadow">Cover image URL</p>
+                  <p className="text-sm font-medium text-white drop-shadow">{t('community.eventsPanel.coverImageUrl')}</p>
                   <input
                     type="url"
                     value={formImageUrl}
                     onChange={(e) => setFormImageUrl(e.target.value)}
-                    placeholder="https://…"
+                    placeholder={t('community.eventsPanel.coverImagePh')}
                     className="w-full max-w-sm rounded-lg border border-white/60 bg-white/95 px-3 py-2 text-sm text-neutral-800 placeholder:text-neutral-500"
                   />
                 </div>
               </div>
 
-              <label className="block text-xs font-medium text-neutral-500">Event Name</label>
+              <label className="block text-xs font-medium text-neutral-500">{t('community.eventsPanel.eventName')}</label>
               <input
                 type="text"
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
-                placeholder="Mary's Run Club"
+                placeholder={t('community.eventsPanel.eventNamePh')}
                 className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm outline-none focus:border-[#315efb]"
               />
 
               <p className="mt-4 text-xs font-medium text-neutral-500">
-                Date & Time (Timezone: {formTimezone})
+                {t('community.eventsPanel.dateTimeLabel', { timezone: formTimezone })}
               </p>
               <div className="mt-2 space-y-2 rounded-xl border border-neutral-200 bg-neutral-50 p-3">
                 <div className="flex gap-3">
@@ -549,7 +554,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
                   </div>
                   <div className="min-w-0 flex-1 space-y-2">
                     <div>
-                      <p className="text-xs text-neutral-500">Start</p>
+                      <p className="text-xs text-neutral-500">{t('community.eventsPanel.start')}</p>
                       <input
                         type="datetime-local"
                         value={formStarts}
@@ -558,7 +563,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
                       />
                     </div>
                     <div>
-                      <p className="text-xs text-neutral-500">End</p>
+                      <p className="text-xs text-neutral-500">{t('community.eventsPanel.end')}</p>
                       <input
                         type="datetime-local"
                         value={formEnds}
@@ -570,55 +575,55 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
                 </div>
               </div>
 
-              <label className="mt-4 block text-xs font-medium text-neutral-500">Repeat</label>
+              <label className="mt-4 block text-xs font-medium text-neutral-500">{t('community.eventsPanel.repeat')}</label>
               <select
                 value={formRepeat}
                 onChange={(e) => setFormRepeat(e.target.value)}
                 className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm"
               >
-                <option value="none">Does not repeat</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
+                <option value="none">{t('community.eventsPanel.repeatNone')}</option>
+                <option value="daily">{t('community.eventsPanel.repeatDaily')}</option>
+                <option value="weekly">{t('community.eventsPanel.repeatWeekly')}</option>
               </select>
 
-              <label className="mt-4 block text-xs font-medium text-neutral-500">Location</label>
+              <label className="mt-4 block text-xs font-medium text-neutral-500">{t('community.eventsPanel.location')}</label>
               <select
                 value={formLocType}
                 onChange={(e) => setFormLocType(e.target.value === 'place' ? 'place' : 'online')}
                 className="mt-1 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm"
               >
-                <option value="online">Online</option>
-                <option value="place">Place</option>
+                <option value="online">{t('community.eventsPanel.locationOnline')}</option>
+                <option value="place">{t('community.eventsPanel.locationPlace')}</option>
               </select>
               <input
                 type="text"
                 value={formLocLabel}
                 onChange={(e) => setFormLocLabel(e.target.value)}
-                placeholder="Google Meet (Online)"
+                placeholder={googleMeetDefault}
                 className="mt-2 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm"
               />
               <input
                 type="text"
                 value={formLocAddr}
                 onChange={(e) => setFormLocAddr(e.target.value)}
-                placeholder="300 Kent Ave"
+                placeholder={t('community.eventsPanel.addressPh')}
                 className="mt-2 w-full rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm"
               />
 
-              <label className="mt-4 block text-xs font-medium text-neutral-500">Description</label>
+              <label className="mt-4 block text-xs font-medium text-neutral-500">{t('community.eventsPanel.description')}</label>
               <textarea
                 value={formDesc}
                 onChange={(e) => setFormDesc(e.target.value)}
                 rows={4}
-                placeholder="Join Mary's run club for weekly running sessions."
+                placeholder={t('community.eventsPanel.descriptionPh')}
                 className="mt-1 w-full resize-y rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 text-sm"
               />
 
               <div className="mt-4 flex items-center justify-between rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-3">
                 <div>
-                  <p className="text-sm font-medium text-neutral-900">Allow RSVP</p>
+                  <p className="text-sm font-medium text-neutral-900">{t('community.eventsPanel.allowRsvp')}</p>
                   <p className="text-xs text-neutral-500">
-                    Leaving this off will automatically notify all app users about the event.
+                    {t('community.eventsPanel.allowRsvpHint')}
                   </p>
                 </div>
                 <button
@@ -640,7 +645,7 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
                 onClick={() => setModalOpen(false)}
                 className="flex-1 rounded-xl border border-neutral-200 py-3 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
               >
-                Cancel
+                {t('community.eventsPanel.cancel')}
               </button>
               <button
                 type="button"
@@ -648,7 +653,11 @@ const CommunityEventsPanel: React.FC<CommunityEventsPanelProps> = ({
                 onClick={() => void submitModal()}
                 className="flex-1 rounded-xl bg-[#315efb] py-3 text-sm font-semibold text-white hover:bg-[#2547c4] disabled:opacity-50"
               >
-                {saving ? 'Saving…' : editingId ? 'Save' : 'Create'}
+                {saving
+                  ? t('community.eventsPanel.saving')
+                  : editingId
+                    ? t('community.eventsPanel.save')
+                    : t('community.eventsPanel.create')}
               </button>
             </div>
           </div>

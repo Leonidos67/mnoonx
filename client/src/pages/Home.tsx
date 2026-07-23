@@ -15,6 +15,7 @@ import QuoteComposerModal from '../components/Posts/QuoteComposerModal';
 import { PostCommentsSection } from '../components/Posts/PostCommentsSection';
 import type { PostCoinAttachment } from '../types/postCoin';
 import type { PostLinkAttachment } from '../types/postLink';
+import { isValidPollDraft, type PostPollDraft } from '../types/postPoll';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
 import HomeSidebarPromoCarousel from '../components/Home/HomeSidebarPromoCarousel';
 import HomeRecommendedCommunities from '../components/Home/HomeRecommendedCommunities';
@@ -71,6 +72,7 @@ interface Post {
   media: string[];
   linkAttachment?: import('../types/postLink').PostLinkAttachment | null;
   coinAttachment?: PostCoinAttachment | null;
+  poll?: import('../types/postPoll').FeedPostPoll | null;
   createdAt: string;
   isLiked?: boolean;
   isReposted?: boolean;
@@ -127,6 +129,7 @@ const Home: React.FC = () => {
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
   const [newPostLink, setNewPostLink] = useState<PostLinkAttachment | null>(null);
   const [newPostCoin, setNewPostCoin] = useState<PostCoinAttachment | null>(null);
+  const [newPostPoll, setNewPostPoll] = useState<PostPollDraft | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [suggestedUsers, setSuggestedUsers] = useState<SuggestedUser[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -250,6 +253,7 @@ const Home: React.FC = () => {
     setNewPostMedia([]);
     setNewPostLink(null);
     setNewPostCoin(null);
+    setNewPostPoll(null);
   }, []);
 
   const getPostFromState = (postId: string): Post | undefined => {
@@ -640,7 +644,13 @@ const Home: React.FC = () => {
     const hasCoin = Boolean(
       newPostCoin?.coinId?.trim() && newPostCoin?.name?.trim() && newPostCoin?.symbol?.trim()
     );
-    if ((!newPostContent.trim() && newPostMedia.length === 0 && !hasLink && !hasCoin) || !token || isPosting) return;
+    const hasPoll = isValidPollDraft(newPostPoll);
+    if (
+      (!newPostContent.trim() && newPostMedia.length === 0 && !hasLink && !hasCoin && !hasPoll) ||
+      !token ||
+      isPosting
+    )
+      return;
     try {
       setIsPosting(true);
       const res = await fetch(API_URL, {
@@ -654,6 +664,7 @@ const Home: React.FC = () => {
           media: newPostMedia,
           linkAttachment: hasLink ? newPostLink : undefined,
           coinAttachment: hasCoin ? newPostCoin : undefined,
+          poll: hasPoll ? newPostPoll : undefined,
         })
       });
       if (res.status === 401) {
@@ -673,6 +684,7 @@ const Home: React.FC = () => {
       setNewPostMedia([]);
       setNewPostLink(null);
       setNewPostCoin(null);
+      setNewPostPoll(null);
       setIsCreateOpen(false);
       showToast(t('common.postPublished'));
     } catch (err: unknown) {
@@ -816,6 +828,16 @@ const Home: React.FC = () => {
               content={post.content}
               linkAttachment={post.linkAttachment}
               coinAttachment={post.coinAttachment}
+              poll={post.poll}
+              postId={String(post._id)}
+              onPollChange={(poll) => {
+                setPosts((prev) =>
+                  prev.map((p) => (String(p._id) === String(post._id) ? { ...p, poll } : p))
+                );
+                setSelectedPost((prev) =>
+                  prev && String(prev._id) === String(post._id) ? { ...prev, poll } : prev
+                );
+              }}
             />
 
             {post.media && post.media.length > 0 && (
@@ -905,6 +927,8 @@ const Home: React.FC = () => {
             onLinkAttachmentChange={setNewPostLink}
             coinAttachment={newPostCoin}
             onCoinAttachmentChange={setNewPostCoin}
+            pollAttachment={newPostPoll}
+            onPollAttachmentChange={setNewPostPoll}
             onCancel={closeComposer}
             onSubmit={() => void handleCreatePost()}
             isPosting={isPosting}
@@ -1048,6 +1072,15 @@ const Home: React.FC = () => {
                         content={post.content}
                         linkAttachment={post.linkAttachment}
                         coinAttachment={post.coinAttachment}
+                        poll={post.poll}
+                        postId={String(post._id)}
+                        onPollChange={(poll) => {
+                          setPosts((prev) =>
+                            prev.map((p) =>
+                              String(p._id) === String(post._id) ? { ...p, poll } : p
+                            )
+                          );
+                        }}
                         contentClassName="text-neutral-900 leading-relaxed whitespace-pre-wrap break-words text-[15px]"
                       />
                     </div>

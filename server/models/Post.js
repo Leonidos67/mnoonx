@@ -24,6 +24,17 @@ const postSchema = new mongoose.Schema({
     name: { type: String, default: '', maxlength: 80 },
     symbol: { type: String, default: '', maxlength: 16 },
   },
+  /** Optional poll: 2–4 options; voters stored as string user IDs */
+  poll: {
+    options: [
+      {
+        id: { type: String, required: true },
+        text: { type: String, required: true, maxlength: 80 },
+        votes: [{ type: String }],
+        votesCount: { type: Number, default: 0 },
+      },
+    ],
+  },
   likes: [{
     type: String // ID пользователей которые лайкнули
   }],

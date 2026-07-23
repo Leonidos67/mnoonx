@@ -19,8 +19,15 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useTranslation } from '../../i18n/useTranslation';
+import {
+  FileUpload,
+  getReadableFileSize,
+  type UploadedFileItem,
+} from '../Common/FileUpload/fileUploadBase';
 
 import { COMMUNITIES_API as API } from '../../config/api';
+
+const MAX_COMMUNITY_FILE_BYTES = 50 * 1024 * 1024;
 
 export interface CommunityFileRow {
   _id: string;
@@ -44,25 +51,49 @@ function fileExtLabel(name: string): string {
   return name.slice(i + 1, i + 5).toUpperCase();
 }
 
-function formatBytes(n: number): string {
-  if (!n || n < 0) return '0 B';
-  const u = ['B', 'KB', 'MB', 'GB'];
-  let i = 0;
-  let v = n;
-  while (v >= 1024 && i < u.length - 1) {
-    v /= 1024;
-    i += 1;
-  }
-  return `${v < 10 && i > 0 ? v.toFixed(1) : Math.round(v)} ${u[i]}`;
-}
-
 function formatFileMeta(f: CommunityFileRow): string {
   const ext = fileExtLabel(f.originalName);
   const when = new Date(f.createdAt).toLocaleString(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
   });
-  return `${ext} • ${when}`;
+  return `${ext} • ${when} • ${getReadableFileSize(f.size)}`;
+}
+
+function newUploadId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `up_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function uploadCommunityFile(
+  url: string,
+  token: string,
+  formData: FormData,
+  onProgress: (progress: number) => void
+): Promise<{ ok: boolean; status: number; body: unknown }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      const pct = Math.max(0, Math.min(99, Math.round((event.loaded / event.total) * 100)));
+      onProgress(pct);
+    };
+    xhr.onload = () => {
+      let body: unknown = {};
+      try {
+        body = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+      } catch {
+        body = {};
+      }
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, body });
+    };
+    xhr.onerror = () => reject(new Error('Network error'));
+    xhr.send(formData);
+  });
 }
 
 const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
@@ -85,15 +116,16 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
   const [sortKey, setSortKey] = useState<'nameAsc' | 'nameDesc' | 'dateDesc'>('nameAsc');
   const [view, setView] = useState<'list' | 'grid'>('list');
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploadQueue, setUploadQueue] = useState<UploadedFileItem[]>([]);
+  const fileRetryMap = useRef<Map<string, File>>(new Map());
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const headerName = instanceTitle?.trim() || 'Files';
+  const headerName = instanceTitle?.trim() || t('community.filesPanel.titleFallback');
+  const uploading = uploadQueue.some((f) => !f.failed && f.progress < 100);
 
   useEffect(() => {
-    const t = window.setTimeout(() => setDebouncedSearch(search), 320);
-    return () => window.clearTimeout(t);
+    const timer = window.setTimeout(() => setDebouncedSearch(search), 320);
+    return () => window.clearTimeout(timer);
   }, [search]);
 
   const load = useCallback(async () => {
@@ -111,13 +143,13 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { message?: string }).message || 'Could not load files');
+        setError((data as { message?: string }).message || t('community.filesPanel.loadFailed'));
         setFiles([]);
         return;
       }
       setFiles(Array.isArray(data) ? data : []);
     } catch {
-      setError('Network error');
+      setError(t('community.filesPanel.networkError'));
       setFiles([]);
     } finally {
       setLoading(false);
@@ -169,9 +201,9 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
   const deleteFile = async (id: string) => {
     if (!token || !handle || !instanceId) return;
     const confirmed = await confirm({
-      title: 'Delete file?',
-      message: 'This file will be permanently removed from the community.',
-      confirmLabel: 'Delete',
+      title: t('community.filesPanel.deleteTitle'),
+      message: t('community.filesPanel.deleteMessage'),
+      confirmLabel: t('community.filesPanel.deleteConfirm'),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -183,57 +215,113 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
       );
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        showToast((data as { message?: string }).message || 'Could not delete', 'error');
+        showToast((data as { message?: string }).message || t('community.filesPanel.deleteFailed'), 'error');
         return;
       }
       setMenuOpenId(null);
       void load();
-      showToast('File deleted');
+      showToast(t('community.filesPanel.deletedToast'));
     } catch {
-      showToast('Network error', 'error');
+      showToast(t('community.filesPanel.networkError'), 'error');
     }
   };
 
-  const onPickFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const list = e.target.files;
-    if (!list?.length || !token || !handle || !instanceId) return;
-    setUploading(true);
-    try {
-      for (let i = 0; i < list.length; i += 1) {
-        const file = list[i];
-        const fd = new FormData();
-        fd.append('instanceId', instanceId);
-        fd.append('file', file);
-        const res = await fetch(`${API}/${encodeURIComponent(handle)}/files`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: fd,
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          showToast((data as { message?: string }).message || 'Upload failed', 'error');
-          break;
+  const runUpload = useCallback(
+    async (id: string, file: File) => {
+      if (!token || !handle || !instanceId) return;
+      fileRetryMap.current.set(id, file);
+      const fd = new FormData();
+      fd.append('instanceId', instanceId);
+      fd.append('file', file);
+      try {
+        const result = await uploadCommunityFile(
+          `${API}/${encodeURIComponent(handle)}/files`,
+          token,
+          fd,
+          (progress) => {
+            setUploadQueue((prev) =>
+              prev.map((item) => (item.id === id ? { ...item, progress, failed: false } : item))
+            );
+          }
+        );
+        if (!result.ok) {
+          const message =
+            (result.body as { message?: string })?.message || t('community.filesPanel.uploadFailed');
+          setUploadQueue((prev) =>
+            prev.map((item) =>
+              item.id === id ? { ...item, failed: true, progress: 0 } : item
+            )
+          );
+          showToast(message, 'error');
+          return;
         }
+        setUploadQueue((prev) =>
+          prev.map((item) => (item.id === id ? { ...item, progress: 100, failed: false } : item))
+        );
+        window.setTimeout(() => {
+          setUploadQueue((prev) => prev.filter((item) => item.id !== id));
+          fileRetryMap.current.delete(id);
+        }, 800);
+        void load();
+      } catch {
+        setUploadQueue((prev) =>
+          prev.map((item) => (item.id === id ? { ...item, failed: true, progress: 0 } : item))
+        );
+        showToast(t('community.filesPanel.networkError'), 'error');
       }
-      void load();
-      showToast('Upload complete');
-    } catch {
-      showToast('Network error', 'error');
-    } finally {
-      setUploading(false);
-      e.target.value = '';
-    }
+    },
+    [token, handle, instanceId, load, showToast]
+  );
+
+  const handleDropFiles = (fileList: FileList) => {
+    if (!token || !isOwner) return;
+    const incoming = Array.from(fileList).map((file) => {
+      const id = newUploadId();
+      fileRetryMap.current.set(id, file);
+      return {
+        id,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        progress: 0,
+        fileObject: file,
+      } satisfies UploadedFileItem;
+    });
+    setUploadQueue((prev) => [...incoming, ...prev]);
+    setEditing(true);
+    incoming.forEach((item) => {
+      if (item.fileObject) void runUpload(item.id, item.fileObject);
+    });
+  };
+
+  const handleDeleteUpload = (id: string) => {
+    setUploadQueue((prev) => prev.filter((file) => file.id !== id));
+    fileRetryMap.current.delete(id);
+  };
+
+  const handleRetryUpload = (id: string) => {
+    const file = fileRetryMap.current.get(id);
+    if (!file) return;
+    setUploadQueue((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, failed: false, progress: 0 } : item))
+    );
+    void runUpload(id, file);
   };
 
   const filteredLocal = files;
-  const emptyAll = !loading && !error && filteredLocal.length === 0 && !debouncedSearch.trim();
+  const emptyAll =
+    !loading &&
+    !error &&
+    filteredLocal.length === 0 &&
+    !debouncedSearch.trim() &&
+    uploadQueue.length === 0;
   const emptySearch = !loading && !error && filteredLocal.length === 0 && debouncedSearch.trim();
 
   if (!token) {
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center rounded-xl border border-[#e7e7e7] bg-white p-10 text-center text-[#666]">
         <Lock className="mx-auto mb-3 h-10 w-10 text-[#999]" />
-        <p className="text-[17px]">Sign in to browse community files.</p>
+        <p className="text-[17px]">{t('community.filesPanel.signIn')}</p>
       </div>
     );
   }
@@ -250,10 +338,45 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center rounded-xl border border-[#e7e7e7] bg-white p-8 text-center">
         <p className="mb-2 text-[#e5484d]">{error}</p>
-        <p className="text-sm text-[#888]">Join this community or check app visibility.</p>
+        <p className="text-sm text-[#888]">{t('community.filesPanel.accessHint')}</p>
       </div>
     );
   }
+
+  const uploadSection =
+    isOwner && editing ? (
+      <div className="shrink-0 border-b border-neutral-200 bg-white px-4 py-4">
+        <FileUpload.Root>
+          <FileUpload.DropZone
+            isDisabled={false}
+            allowsMultiple
+            maxSize={MAX_COMMUNITY_FILE_BYTES}
+            hint={t('community.fileUpload.hintCommunity')}
+            onDropFiles={handleDropFiles}
+            onSizeLimitExceed={() =>
+              showToast(t('community.filesPanel.tooLarge'), 'error')
+            }
+            onDropUnacceptedFiles={() => showToast(t('community.filesPanel.typeRejected'), 'error')}
+          />
+          {uploadQueue.length > 0 ? (
+            <FileUpload.List>
+              {uploadQueue.map((file) => (
+                <FileUpload.ListItemProgressFill
+                  key={file.id}
+                  name={file.name}
+                  size={file.size}
+                  progress={file.progress}
+                  failed={file.failed}
+                  type={file.type}
+                  onDelete={() => handleDeleteUpload(file.id)}
+                  onRetry={() => handleRetryUpload(file.id)}
+                />
+              ))}
+            </FileUpload.List>
+          ) : null}
+        </FileUpload.Root>
+      </div>
+    ) : null;
 
   const controlsRow = (
     <div className="shrink-0 space-y-3 border-b border-neutral-200 bg-white px-4 py-3">
@@ -264,38 +387,31 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search files"
+            placeholder={t('community.filesPanel.searchPlaceholder')}
             className="w-full rounded-xl border border-neutral-200 bg-neutral-50 py-2.5 pl-10 pr-3 text-sm text-neutral-900 outline-none ring-0 placeholder:text-neutral-400 focus:border-sky-300 focus:bg-white"
           />
         </div>
-        {editing && isOwner && (
-          <button
-            type="button"
-            disabled={uploading}
-            onClick={() => fileInputRef.current?.click()}
-            className="shrink-0 rounded-xl bg-[#315efb] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#2547c4] disabled:opacity-50"
-          >
-            {uploading ? 'Uploading…' : 'Add File'}
-          </button>
-        )}
+        {editing && isOwner && uploading ? (
+          <span className="shrink-0 text-sm font-medium text-neutral-500">{t('community.filesPanel.uploading')}</span>
+        ) : null}
       </div>
       <div className="flex items-center justify-between gap-2">
         <label className="inline-flex items-center gap-1 text-sm text-neutral-700">
-          <span className="sr-only">Sort</span>
+          <span className="sr-only">{t('community.filesPanel.sortAria')}</span>
           <select
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as typeof sortKey)}
             className="cursor-pointer rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-sm font-medium text-neutral-800 outline-none focus:border-sky-300"
           >
-            <option value="nameAsc">Name (A-Z)</option>
-            <option value="nameDesc">Name (Z-A)</option>
-            <option value="dateDesc">Newest first</option>
+            <option value="nameAsc">{t('community.filesPanel.sortNameAsc')}</option>
+            <option value="nameDesc">{t('community.filesPanel.sortNameDesc')}</option>
+            <option value="dateDesc">{t('community.filesPanel.sortNewest')}</option>
           </select>
         </label>
         <div className="flex rounded-lg border border-neutral-200 p-0.5">
           <button
             type="button"
-            title="List view"
+            title={t('community.filesPanel.listView')}
             onClick={() => setView('list')}
             className={`rounded-md p-1.5 ${view === 'list' ? 'bg-neutral-100 text-neutral-900' : 'text-neutral-400 hover:text-neutral-700'}`}
           >
@@ -303,7 +419,7 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
           </button>
           <button
             type="button"
-            title="Grid view"
+            title={t('community.filesPanel.gridView')}
             onClick={() => setView('grid')}
             className={`rounded-md p-1.5 ${view === 'grid' ? 'bg-neutral-100 text-neutral-900' : 'text-neutral-400 hover:text-neutral-700'}`}
           >
@@ -327,7 +443,6 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold text-neutral-900">{f.originalName}</p>
           <p className="mt-0.5 text-xs text-neutral-500">{formatFileMeta(f)}</p>
-          {compact && <p className="mt-1 text-[11px] text-neutral-400">{formatBytes(f.size)}</p>}
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-1 self-end sm:self-center">
@@ -335,7 +450,7 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
           <div className="relative" ref={menuOpenId === f._id ? menuRef : undefined}>
             <button
               type="button"
-              aria-label="File actions"
+              aria-label={t('community.filesPanel.fileActions')}
               onClick={() => setMenuOpenId((v) => (v === f._id ? null : f._id))}
               className="rounded-full p-2 hover:bg-neutral-100"
             >
@@ -349,7 +464,7 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
                   onClick={() => void deleteFile(f._id)}
                 >
                   <Trash2 className="h-4 w-4 shrink-0" />
-                  Delete
+                  {t('community.filesPanel.delete')}
                 </button>
               </div>
             )}
@@ -357,7 +472,7 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
         ) : (
           <button
             type="button"
-            title="Download"
+            title={t('community.filesPanel.download')}
             onClick={() => void downloadFile(f)}
             className="rounded-full p-2 hover:bg-neutral-100"
           >
@@ -370,7 +485,6 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-[#e7e7e7] bg-white">
-      <input ref={fileInputRef} type="file" className="hidden" multiple onChange={onPickFiles} />
       {editing && isOwner ? (
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-neutral-200 bg-white px-4">
           <div className="flex min-w-0 items-center gap-2">
@@ -378,12 +492,15 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
               type="button"
               onClick={() => setEditing(false)}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100"
-              aria-label="Back"
+              aria-label={t('community.filesPanel.back')}
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
-            <h1 className="truncate text-lg font-semibold text-neutral-900">Editing Files</h1>
-            <span className="text-neutral-400" title="Members see files you publish here. Only you can add or remove files.">
+            <h1 className="truncate text-lg font-semibold text-neutral-900">{t('community.filesPanel.editingTitle')}</h1>
+            <span
+              className="text-neutral-400"
+              title={t('community.filesPanel.editingHint')}
+            >
               <Info className="h-4 w-4" />
             </span>
           </div>
@@ -393,9 +510,9 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
               onClick={() => setEditing(false)}
               className="rounded-xl bg-[#315efb] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2547c4]"
             >
-              Done
+              {t('community.filesPanel.done')}
             </button>
-            <span className="text-neutral-400" title="Only the community owner can manage files">
+            <span className="text-neutral-400" title={t('community.filesPanel.ownerOnlyHint')}>
               <Lock className="h-5 w-5" />
             </span>
           </div>
@@ -407,7 +524,7 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
               type="button"
               onClick={onBackToCommunity}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100"
-              aria-label="Back to community"
+              aria-label={t('community.filesPanel.backToCommunity')}
             >
               <ArrowLeft className="h-5 w-5" />
             </button>
@@ -417,13 +534,26 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
             <h1 className="min-w-0 truncate text-lg font-semibold text-neutral-900">{headerName}</h1>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <button type="button" onClick={copyPageLink} className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title="Copy link">
+            <button
+              type="button"
+              onClick={copyPageLink}
+              className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
+              title={t('community.filesPanel.copyLink')}
+            >
               <Link2 className="h-5 w-5" />
             </button>
-            <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title="Members">
+            <button
+              type="button"
+              className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
+              title={t('community.filesPanel.members')}
+            >
               <Users className="h-5 w-5" />
             </button>
-            <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title="Notifications">
+            <button
+              type="button"
+              className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100"
+              title={t('community.filesPanel.notifications')}
+            >
               <Bell className="h-5 w-5" />
             </button>
             {isOwner && (
@@ -440,6 +570,7 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
         </div>
       )}
 
+      {uploadSection}
       {controlsRow}
 
       <div className="min-h-0 flex-1 overflow-y-auto bg-white">
@@ -448,40 +579,44 @@ const CommunityFilesPanel: React.FC<CommunityFilesPanelProps> = ({
             <div className="mb-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-6 text-neutral-300">
               <CloudDownload className="h-12 w-12" strokeWidth={1.25} />
             </div>
-            <h2 className="text-lg font-semibold text-neutral-900">No files here</h2>
+            <h2 className="text-lg font-semibold text-neutral-900">{t('community.filesPanel.emptyTitle')}</h2>
             <p className="mt-2 max-w-sm text-sm text-neutral-500">
-              You can upload images, videos, documents, whatever you want!
+              {t('community.filesPanel.emptyHint')}
             </p>
-            {isOwner && (
+            {/* {isOwner && (
               <button
                 type="button"
-                disabled={uploading}
-                onClick={() => {
-                  setEditing(true);
-                  window.setTimeout(() => fileInputRef.current?.click(), 0);
-                }}
-                className="mt-6 rounded-xl bg-[#315efb] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#2547c4] disabled:opacity-50"
+                onClick={() => setEditing(true)}
+                className="mt-6 rounded-xl bg-[#315efb] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#2547c4]"
               >
-                {uploading ? 'Uploading…' : 'Add File'}
+                Add File
               </button>
-            )}
+            )} */}
           </div>
         )}
 
         {emptySearch && (
-          <div className="px-6 py-12 text-center text-sm text-neutral-500">No files match your search.</div>
+          <div className="px-6 py-12 text-center text-sm text-neutral-500">
+            {t('community.filesPanel.emptySearch')}
+          </div>
         )}
 
         {!emptyAll && !emptySearch && view === 'list' && (
-          <div className="divide-y divide-neutral-100">{filteredLocal.map((f) => fileCardInner(f, false))}</div>
+          <div className="divide-y divide-neutral-100">
+            {filteredLocal.map((f) => (
+              <React.Fragment key={f._id}>{fileCardInner(f, false)}</React.Fragment>
+            ))}
+          </div>
         )}
 
         {!emptyAll && !emptySearch && view === 'grid' && (
-          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">{filteredLocal.map((f) => (
-            <div key={f._id} className="rounded-xl border border-neutral-200 bg-neutral-50/50">
-              {fileCardInner(f, true)}
-            </div>
-          ))}</div>
+          <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2">
+            {filteredLocal.map((f) => (
+              <div key={f._id} className="rounded-xl border border-neutral-200 bg-neutral-50/50">
+                {fileCardInner(f, true)}
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>

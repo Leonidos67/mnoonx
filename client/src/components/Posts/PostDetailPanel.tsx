@@ -111,6 +111,8 @@ const PostDetailPanel: React.FC<PostDetailPanelProps> = ({
             content={post.content}
             linkAttachment={post.linkAttachment}
             coinAttachment={post.coinAttachment}
+            poll={post.poll}
+            postId={String(post._id)}
           />
           {post.media && post.media.length > 0 && (
             <div className="mt-3">

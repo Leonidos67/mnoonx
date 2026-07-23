@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, MessageCircle, Lock, Check, CheckCheck } from 'lucide-react';
 import AnimatedSendIcon, { type AnimatedSendIconHandle } from '../Common/AnimatedSendIcon';
 import { useAuth } from '../../context/AuthContext';
+import { useTranslation } from '../../i18n/useTranslation';
 
 import { COMMUNITIES_API as API } from '../../config/api';
 
@@ -37,6 +38,7 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
   onBackToCommunity,
 }) => {
   const { user, token } = useAuth();
+  const { t } = useTranslation();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -82,7 +84,7 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           if (!opts?.silent) {
-            setError((data as { message?: string }).message || 'Could not load chat');
+            setError((data as { message?: string }).message || t('community.chatPanel.loadFailed'));
             setMessages([]);
           }
           return;
@@ -91,7 +93,7 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
         setMessages(Array.isArray(data) ? data : []);
       } catch {
         if (!opts?.silent) {
-          setError('Network error');
+          setError(t('community.chatPanel.networkError'));
           setMessages([]);
         }
       } finally {
@@ -163,7 +165,7 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError((data as { message?: string }).message || 'Failed to send');
+        setError((data as { message?: string }).message || t('community.chatPanel.sendFailed'));
         return;
       }
       setMessages((prev) => [...prev, data as ChatMessage]);
@@ -171,7 +173,7 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
       const mid = (data as ChatMessage)._id;
       if (mid) void tryMarkRead(mid);
     } catch {
-      setError('Network error');
+      setError(t('community.chatPanel.networkError'));
     } finally {
       setSending(false);
     }
@@ -187,20 +189,20 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
     }
     if (read >= total) {
       return (
-        <span className="inline-flex" title="Read by everyone">
+        <span className="inline-flex" title={t('community.chatPanel.readByEveryone')}>
           <CheckCheck className="h-3 w-3 text-sky-200" aria-hidden />
         </span>
       );
     }
     if (read > 0) {
       return (
-        <span className="inline-flex" title="Read by some members">
+        <span className="inline-flex" title={t('community.chatPanel.readBySome')}>
           <CheckCheck className="h-3 w-3 text-white/60" aria-hidden />
         </span>
       );
     }
     return (
-      <span title="Sent">
+      <span title={t('community.chatPanel.sent')}>
         <Check className="h-3 w-3 text-white/60" aria-hidden />
       </span>
     );
@@ -210,7 +212,7 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center rounded-[32px] border border-[#e7e7e7] bg-white p-10 text-center text-[#666]">
         <Lock className="mx-auto mb-3 h-10 w-10 text-[#999]" />
-        <p className="text-[17px]">Sign in to use community chat.</p>
+        <p className="text-[17px]">{t('community.chatPanel.signIn')}</p>
       </div>
     );
   }
@@ -227,7 +229,7 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center rounded-[32px] border border-[#e7e7e7] bg-white p-8 text-center">
         <p className="mb-2 text-[#e5484d]">{error}</p>
-        <p className="text-sm text-[#888]">Join this community to read and post messages.</p>
+        <p className="text-sm text-[#888]">{t('community.chatPanel.joinHint')}</p>
       </div>
     );
   }
@@ -240,26 +242,26 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
             type="button"
             onClick={onBackToCommunity}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100 lg:hidden"
-            aria-label="Back to community"
+            aria-label={t('community.chatPanel.backToCommunity')}
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
         )}
         <MessageCircle className="h-5 w-5 shrink-0 text-[#315efb]" />
         <h2 className="min-w-0 truncate text-lg font-semibold text-neutral-900">
-          {title?.trim() || 'Community chat'}
+          {title?.trim() || t('community.chatPanel.titleFallback')}
         </h2>
       </div>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#fafafa] px-4 py-4">
         {messages.length === 0 && (
-          <p className="py-8 text-center text-sm text-[#999]">No messages yet. Say hello!</p>
+          <p className="py-8 text-center text-sm text-[#999]">{t('community.chatPanel.empty')}</p>
         )}
         {messages.map((m) => {
           const isBot = Boolean(m.isAiBot);
           const mine = !isBot && user?.id === m.author?._id;
           const displayName = isBot
-            ? m.aiBotName || 'Community AI'
+            ? m.aiBotName || t('community.defaultAiTitle')
             : m.author?.fullName || m.author?.username;
           return (
             <div key={m._id} className={`flex gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
@@ -285,7 +287,7 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
                 {!mine && (
                   <p className={`mb-1 text-xs font-semibold ${isBot ? 'text-emerald-700' : 'text-[#315efb]'}`}>
                     {displayName}
-                    {isBot ? ' · AI' : ''}
+                    {isBot ? t('community.chatPanel.aiSuffix') : ''}
                   </p>
                 )}
                 <p className="whitespace-pre-wrap break-words">{m.content}</p>
@@ -315,7 +317,7 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
                 send();
               }
             }}
-            placeholder="Write a message…"
+            placeholder={t('community.chatPanel.placeholder')}
             rows={1}
             className="flex-1 resize-none px-4 py-3 text-[15px] outline-none focus:border-[#315efb] focus:ring-[#315efb]/30"
             maxLength={4000}
@@ -325,7 +327,7 @@ const CommunityChatPanel: React.FC<CommunityChatPanelProps> = ({
             onClick={send}
             disabled={sending || !input.trim()}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl mr-2 bg-[#315efb] text-white transition-colors hover:bg-[#2547c4] disabled:cursor-not-allowed disabled:opacity-40"
-            aria-label="Send"
+            aria-label={t('community.chatPanel.send')}
           >
             <AnimatedSendIcon ref={sendIconRef} size={18} color="#ffffff" />
           </button>

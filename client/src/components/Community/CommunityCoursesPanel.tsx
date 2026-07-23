@@ -201,7 +201,7 @@ function tempCourseId(kind: 'chapter' | 'lesson'): string {
 }
 
 const emptyLesson = (tr: (k: string) => string, defaultDays = 0): Omit<Lesson, '_id'> => ({
-  title: 'New lesson',
+  title: tr('community.coursesPanel.newLesson'),
   lessonType: 'multimedia',
   videoEmbedUrl: '',
   content: '',
@@ -486,13 +486,13 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
     const lessonId = tempCourseId('lesson');
     const newChapter: Chapter = {
       _id: chapterId,
-      title: `Chapter ${order + 1}`,
+      title: t('community.coursesPanel.chapterNumber', { n: order + 1 }),
       order,
       lessons: [
         {
           _id: lessonId,
           ...emptyLesson(t, courseFull.defaultLessonUnlockDays ?? 0),
-          title: 'Lesson 1',
+          title: t('community.coursesPanel.lessonNumber', { n: 1 }),
         },
       ],
     };
@@ -531,14 +531,14 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
     (chapterId: string) => {
       if (!courseFull || !isOwner) return;
       if (courseFull.chapters.length <= 1) {
-        showToast('You must keep at least one chapter in this course.', 'info');
+        showToast(t('community.coursesPanel.keepOneChapter'), 'info');
         return;
       }
       setStructureMenu(null);
       setConfirmDialog({
-        title: 'Delete chapter',
-        message: 'Are you sure you want to delete this chapter? This action cannot be undone.',
-        confirmLabel: 'Delete chapter',
+        title: t('community.coursesPanel.deleteChapterTitle'),
+        message: t('community.coursesPanel.deleteChapterBody'),
+        confirmLabel: t('community.coursesPanel.deleteChapter'),
         destructive: true,
         onConfirm: async () => {
           setConfirmDialog(null);
@@ -556,7 +556,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
         },
       });
     },
-    [courseFull, isOwner, markCourseDirty, activeChapterId, showToast]
+    [courseFull, isOwner, markCourseDirty, activeChapterId, showToast, t]
   );
 
   const requestDeleteLesson = useCallback(
@@ -564,17 +564,14 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
       if (!courseFull || !isOwner) return;
       const ch = courseFull.chapters.find((c) => sameId(c._id, chapterId));
       if (!ch || ch.lessons.length <= 1) {
-        showToast(
-          'Each chapter must have at least one lesson. Add another lesson before deleting this one.',
-          'info'
-        );
+        showToast(t('community.coursesPanel.keepOneLesson'), 'info');
         return;
       }
       setStructureMenu(null);
       setConfirmDialog({
-        title: 'Delete lesson',
-        message: 'Are you sure you want to delete this lesson? This action cannot be undone.',
-        confirmLabel: 'Delete lesson',
+        title: t('community.coursesPanel.deleteLessonTitle'),
+        message: t('community.coursesPanel.deleteLessonBody'),
+        confirmLabel: t('community.coursesPanel.deleteLesson'),
         destructive: true,
         onConfirm: async () => {
           setConfirmDialog(null);
@@ -596,7 +593,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
         },
       });
     },
-    [courseFull, isOwner, markCourseDirty, activeChapterId, activeLessonId, showToast]
+    [courseFull, isOwner, markCourseDirty, activeChapterId, activeLessonId, showToast, t]
   );
 
   const duplicateLesson = useCallback(
@@ -671,8 +668,8 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
   useEffect(() => {
     if (!structureMenu && !confirmDialog) return;
     const close = (ev: MouseEvent) => {
-      const t = ev.target as Node;
-      if (structureMenuRef.current?.contains(t)) return;
+      const target = ev.target as Node;
+      if (structureMenuRef.current?.contains(target)) return;
       setStructureMenu(null);
     };
     document.addEventListener('mousedown', close);
@@ -682,9 +679,9 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
   const deleteCourse = async (courseId: string) => {
     if (!token || !handle || !instanceId || !isOwner) return;
     const confirmed = await confirm({
-      title: 'Delete course?',
-      message: 'All chapters and lessons in this course will be permanently removed.',
-      confirmLabel: 'Delete',
+      title: t('community.coursesPanel.deleteCourseTitle'),
+      message: t('community.coursesPanel.deleteCourseBody'),
+      confirmLabel: t('common.delete'),
       variant: 'danger',
     });
     if (!confirmed) return;
@@ -796,7 +793,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        showToast((d as { message?: string }).message || 'Could not create course', 'error');
+        showToast((d as { message?: string }).message || t('community.coursesPanel.quickCreateFailed'), 'error');
         return;
       }
       const created = (await res.json()) as CourseFull;
@@ -837,7 +834,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
     reader.onload = () => {
       const r = String(reader.result || '');
       if (r.length > 400_000) {
-        showToast('Image is too large. Use a smaller file or paste an image URL instead.', 'info');
+        showToast(t('community.coursesPanel.imageTooLarge'), 'info');
         return;
       }
       updateCourseMeta({ coverUrl: r });
@@ -861,7 +858,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
     reader.onload = () => {
       const r = String(reader.result || '');
       if (r.length > 400_000) {
-        showToast('Image is too large. Use a smaller file or paste an image URL instead.', 'info');
+        showToast(t('community.coursesPanel.imageTooLarge'), 'info');
         return;
       }
       setCreateCover(r);
@@ -877,7 +874,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
     reader.onload = () => {
       const r = String(reader.result || '');
       if (r.length > 900_000) {
-        showToast('Image is too large.', 'info');
+        showToast(t('community.coursesPanel.imageTooLargeShort'), 'info');
         return;
       }
       setCourseFull((prev) => {
@@ -907,7 +904,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
     reader.onload = () => {
       const r = String(reader.result || '');
       if (r.length > 2_000_000) {
-        showToast('File is too large for inline storage.', 'info');
+        showToast(t('community.coursesPanel.fileTooLargeInline'), 'info');
         return;
       }
       setCourseFull((prev) => {
@@ -995,23 +992,29 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
           type="button"
           onClick={() => (view === 'editor' ? setView('list') : onBackToCommunity())}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100"
-          aria-label={view === 'editor' ? 'Back to courses' : 'Back to community'}
+          aria-label={
+            view === 'editor'
+              ? t('community.coursesPanel.backToCourses')
+              : t('community.coursesPanel.backToCommunity')
+          }
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-600 text-white">
           <GraduationCap className="h-5 w-5" strokeWidth={2} />
         </div>
-        <h1 className="truncate text-lg font-semibold text-neutral-900">{instanceTitle}</h1>
+        <h1 className="truncate text-lg font-semibold text-neutral-900">
+          {instanceTitle === 'Courses' ? t('community.defaultCoursesTitle') : instanceTitle}
+        </h1>
       </div>
       <div className="flex shrink-0 items-center gap-1">
-        <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title="Copy link">
+        <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title={t('community.coursesPanel.copyLink')}>
           <Link2 className="h-5 w-5" />
         </button>
-        <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title="Members">
+        <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title={t('community.membersLabel')}>
           <Users className="h-5 w-5" />
         </button>
-        <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title="Notifications">
+        <button type="button" className="rounded-full p-2 text-neutral-500 hover:bg-neutral-100" title={t('community.coursesPanel.notifications')}>
           <Bell className="h-5 w-5" />
         </button>
       </div>
@@ -1040,7 +1043,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
             className="rounded-xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
             onClick={() => setConfirmDialog(null)}
           >
-            Cancel
+            {t('community.coursesPanel.cancel')}
           </button>
           <button
             type="button"
@@ -1079,7 +1082,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
               }}
             >
               <Plus className="h-4 w-4 shrink-0" />
-              Add lesson
+              {t('community.coursesPanel.addLesson')}
             </button>
             <div className="my-0.5 h-px bg-neutral-100" />
             <button
@@ -1089,7 +1092,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
               onClick={() => requestDeleteChapter(structureMenu.chapterId)}
             >
               <Trash2 className="h-4 w-4 shrink-0" />
-              Delete chapter
+              {t('community.coursesPanel.deleteChapter')}
             </button>
           </>
         ) : (
@@ -1104,7 +1107,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
               }}
             >
               <Copy className="h-4 w-4 shrink-0" />
-              Duplicate lesson
+              {t('community.coursesPanel.duplicateLesson')}
             </button>
             <div className="my-0.5 h-px bg-neutral-100" />
             <button
@@ -1117,7 +1120,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
               }}
             >
               <Trash2 className="h-4 w-4 shrink-0" />
-              Delete lesson
+              {t('community.coursesPanel.deleteLesson')}
             </button>
           </>
         )}
@@ -1238,7 +1241,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
             <ResponsiveDialogShell
               open={createOpen}
               onClose={() => !createBusy && setCreateOpen(false)}
-              title="Create course module"
+              title={t('community.coursesPanel.createModuleTitle')}
               disableClose={createBusy}
               zIndexClass="z-[200]"
               panelClassName="relative flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-xl"
@@ -1248,37 +1251,37 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                   disabled={createBusy}
                   onClick={() => setCreateOpen(false)}
                   className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100"
-                  aria-label="Close"
+                  aria-label={t('common.close')}
                 >
                   <X className="h-5 w-5" />
                 </button>
                 <div className="border-b border-neutral-100 px-6 py-5 text-center">
                   <h2 id="create-course-modal-title" className="text-lg font-semibold text-neutral-900">
-                    Create course module
+                    {t('community.coursesPanel.createModuleTitle')}
                   </h2>
                 </div>
                 <div className="space-y-4 px-6 py-5">
                   <label className="block text-sm font-medium text-neutral-800">
-                    Name
+                    {t('community.coursesPanel.courseName')}
                     <input
                       value={createName}
                       onChange={(e) => setCreateName(e.target.value)}
-                      placeholder="Enter a name"
+                      placeholder={t('community.coursesPanel.enterNamePh')}
                       className="mt-1.5 w-full rounded-lg border border-[#315efb] px-3 py-2 text-sm outline-none ring-2 ring-[#315efb]/15"
                     />
                   </label>
                   <label className="block text-sm font-medium text-neutral-800">
-                    Description
+                    {t('community.coursesPanel.description')}
                     <textarea
                       value={createDesc}
                       onChange={(e) => setCreateDesc(e.target.value)}
-                      placeholder="Enter a description"
+                      placeholder={t('community.coursesPanel.enterDescriptionPh')}
                       rows={3}
                       className="mt-1.5 w-full resize-none rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-[#315efb] focus:ring-2 focus:ring-[#315efb]/20"
                     />
                   </label>
                   <div className="flex items-center justify-between gap-3 py-1">
-                    <span className="text-sm text-neutral-800">Set course to hidden</span>
+                    <span className="text-sm text-neutral-800">{t('community.coursesPanel.setHiddenToggle')}</span>
                     <button
                       type="button"
                       role="switch"
@@ -1305,8 +1308,8 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-neutral-800">Cover</p>
-                        <p className="mt-1 text-xs text-neutral-500">1500 × 840 px recommended</p>
+                        <p className="text-sm font-medium text-neutral-800">{t('community.coursesPanel.cover')}</p>
+                        <p className="mt-1 text-xs text-neutral-500">{t('community.coursesPanel.coverHint')}</p>
                         <input
                           ref={coverInputRef}
                           type="file"
@@ -1319,7 +1322,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                           onClick={() => coverInputRef.current?.click()}
                           className="mt-3 rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-800 hover:bg-neutral-50"
                         >
-                          Change
+                          {t('community.coursesPanel.changeCover')}
                         </button>
                       </div>
                     </div>
@@ -1332,7 +1335,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                     onClick={() => setCreateOpen(false)}
                     className="rounded-lg border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50"
                   >
-                    Cancel
+                    {t('community.coursesPanel.cancel')}
                   </button>
                   <button
                     type="button"
@@ -1340,7 +1343,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                     onClick={() => void submitCreate()}
                     className="rounded-lg bg-[#315efb] px-4 py-2 text-sm font-semibold text-white hover:bg-[#2547c4] disabled:opacity-45"
                   >
-                    {createBusy ? 'Creating…' : 'Create'}
+                    {createBusy ? t('community.coursesPanel.creating') : t('community.coursesPanel.create')}
                   </button>
                 </div>
             </ResponsiveDialogShell>,
@@ -1703,7 +1706,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
             type="button"
             onClick={() => setView('list')}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-neutral-600 hover:bg-neutral-100"
-            aria-label="Back to courses"
+            aria-label={t('community.coursesPanel.backToCourses')}
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -1711,8 +1714,12 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
             <GraduationCap className="h-5 w-5" strokeWidth={2} />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-xs text-neutral-500">{activeChapter?.title ?? 'Chapter'}</p>
-            <h1 className="truncate text-lg font-semibold text-neutral-900">{activeLesson?.title ?? 'Lesson'}</h1>
+            <p className="truncate text-xs text-neutral-500">
+              {activeChapter?.title ?? t('community.coursesPanel.chapterNumber', { n: 1 })}
+            </p>
+            <h1 className="truncate text-lg font-semibold text-neutral-900">
+              {activeLesson?.title ?? t('community.coursesPanel.lessonNumber', { n: 1 })}
+            </h1>
           </div>
         </div>
         {editorActionBar}
@@ -1732,7 +1739,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                 className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-neutral-600 hover:bg-white"
               >
                 <ArrowLeft className="h-4 w-4 shrink-0" />
-                Back
+                {t('community.coursesPanel.back')}
               </button>
             </div>
             <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
@@ -1763,7 +1770,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                           setChapterDragId(String(ch._id));
                         }}
                         onDragEnd={() => setChapterDragId(null)}
-                        title={isOwner ? 'Drag to reorder' : undefined}
+                        title={isOwner ? t('community.coursesPanel.dragToReorder') : undefined}
                       >
                         <GripVertical className="h-4 w-4" aria-hidden />
                       </span>
@@ -1784,7 +1791,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                         <>
                           <button
                             type="button"
-                            title="Add lesson"
+                            title={t('community.coursesPanel.addLesson')}
                             onClick={() => addLesson(String(ch._id))}
                             className="shrink-0 rounded p-1 text-neutral-500 hover:bg-neutral-100"
                           >
@@ -1792,7 +1799,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                           </button>
                           <button
                             type="button"
-                            title="Chapter options"
+                            title={t('community.coursesPanel.chapterOptions')}
                             className="shrink-0 rounded p-1 text-neutral-500 hover:bg-neutral-100"
                             onClick={(e) => openChapterMenu(e, String(ch._id))}
                           >
@@ -1833,7 +1840,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                                 setLessonDragKey(lk);
                               }}
                               onDragEnd={() => setLessonDragKey(null)}
-                              title={isOwner ? 'Drag to reorder' : undefined}
+                              title={isOwner ? t('community.coursesPanel.dragToReorder') : undefined}
                             >
                               <GripVertical className="h-3.5 w-3.5" aria-hidden />
                             </span>
@@ -1858,7 +1865,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                               <button
                                 type="button"
                                 className="shrink-0 rounded p-1 text-neutral-400 hover:bg-black/5 hover:text-neutral-700"
-                                title="Lesson options"
+                                title={t('community.coursesPanel.lessonOptions')}
                                 onClick={(e) => openLessonMenu(e, String(ch._id), String(ls._id))}
                               >
                                 <MoreVertical className="h-3.5 w-3.5" />
@@ -1922,7 +1929,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                       {youtubeEmbed ? (
                         <div className="mt-3 aspect-video overflow-hidden rounded-lg border border-neutral-200 bg-black">
                           <iframe
-                            title="Lesson video"
+                            title={t('community.coursesPanel.lessonVideo')}
                             src={youtubeEmbed}
                             className="h-full w-full"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -1968,7 +1975,9 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                               key={idx}
                               className="flex items-center justify-between gap-2 rounded-lg border border-neutral-100 bg-neutral-50 px-3 py-2 text-xs"
                             >
-                              <span className="truncate text-neutral-700">Attachment {idx + 1}</span>
+                              <span className="truncate text-neutral-700">
+                                {t('community.coursesPanel.attachmentN', { n: idx + 1 })}
+                              </span>
                               <a
                                 href={att}
                                 target="_blank"
@@ -2056,7 +2065,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                   {youtubeEmbed ? (
                     <div className="mt-4 aspect-video overflow-hidden rounded-lg border border-neutral-200 bg-black">
                       <iframe
-                        title="Lesson video preview"
+                        title={t('community.coursesPanel.lessonVideoPreview')}
                         src={youtubeEmbed}
                         className="h-full w-full"
                         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -2127,8 +2136,8 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                 </section>
 
                 <section>
-                  <h3 className="text-sm font-semibold text-neutral-900">Images</h3>
-                  <p className="mt-1 text-xs text-neutral-500">Add images to this lesson (stored with the course).</p>
+                  <h3 className="text-sm font-semibold text-neutral-900">{t('community.coursesPanel.images')}</h3>
+                  <p className="mt-1 text-xs text-neutral-500">{t('community.coursesPanel.imagesHint')}</p>
                   <input
                     ref={lessonImageInputRef}
                     type="file"
@@ -2148,12 +2157,12 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                       className="flex items-center gap-2 rounded-lg border border-dashed border-neutral-200 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
                     >
                       <ImageIcon className="h-4 w-4" />
-                      Upload photos
+                      {t('community.coursesPanel.uploadPhotos')}
                     </button>
                   </div>
                   <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
                     <label className="min-w-0 flex-1 text-sm font-medium text-neutral-700">
-                      Or paste image URL (https)
+                      {t('community.coursesPanel.addImageUrl')}
                       <input
                         value={lessonImageUrlDraft}
                         onChange={(e) => setLessonImageUrlDraft(e.target.value)}
@@ -2163,7 +2172,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                             addLessonImagesFromUrls([lessonImageUrlDraft]);
                           }
                         }}
-                        placeholder="https://example.com/image.jpg"
+                        placeholder={t('community.coursesPanel.imageUrlPlaceholder')}
                         className="mt-1.5 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm"
                       />
                     </label>
@@ -2173,7 +2182,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                       disabled={!lessonImageUrlDraft.trim()}
                       className="shrink-0 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-800 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      Add from URL
+                      {t('community.coursesPanel.addImageUrl')}
                     </button>
                   </div>
                   {(activeLesson.images || []).length > 0 && (
@@ -2185,7 +2194,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                             <button
                               type="button"
                               className="absolute right-1 top-1 rounded-md bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover/img:opacity-100"
-                              title="Remove image"
+                              title={t('community.coursesPanel.remove')}
                               onClick={() =>
                                 updateLesson({
                                   images: (activeLesson.images || []).filter((_, j) => j !== idx),
@@ -2202,7 +2211,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                 </section>
 
                 <section>
-                  <h3 className="text-sm font-semibold text-neutral-900">File attachments</h3>
+                  <h3 className="text-sm font-semibold text-neutral-900">{t('community.coursesPanel.attachments')}</h3>
                   <input
                     ref={attachmentInputRef}
                     type="file"
@@ -2218,7 +2227,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                     className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-neutral-200 py-8 text-sm text-neutral-500 hover:bg-neutral-50"
                   >
                     <Files className="h-5 w-5" />
-                    Upload attachment
+                    {t('community.coursesPanel.uploadAttachment')}
                   </button>
                   {(activeLesson.attachments || []).length > 0 && (
                     <ul className="mt-3 space-y-2">
@@ -2227,7 +2236,9 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                           key={idx}
                           className="flex items-center justify-between gap-2 rounded-lg border border-neutral-100 bg-neutral-50 px-3 py-2 text-xs"
                         >
-                          <span className="truncate text-neutral-700">Attachment {idx + 1}</span>
+                          <span className="truncate text-neutral-700">
+                            {t('community.coursesPanel.attachmentN', { n: idx + 1 })}
+                          </span>
                           <div className="flex shrink-0 items-center gap-1">
                             <a
                               href={att}
@@ -2236,7 +2247,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                               target="_blank"
                               rel="noreferrer"
                             >
-                              Open
+                              {t('community.coursesPanel.open')}
                             </a>
                             {isOwner && (
                               <button
@@ -2248,7 +2259,7 @@ const CommunityCoursesPanel: React.FC<CommunityCoursesPanelProps> = ({
                                   })
                                 }
                               >
-                                Remove
+                                {t('community.coursesPanel.remove')}
                               </button>
                             )}
                           </div>

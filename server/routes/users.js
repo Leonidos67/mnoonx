@@ -684,12 +684,15 @@ router.post('/:username/follow', auth, async (req, res) => {
       const { dispatchNotification } = require('../services/notificationDispatch');
       await dispatchNotification({
         userId: profileUserId,
-        type: 'community',
+        type: 'engagement',
+        kind: 'follow',
         title: 'New follower',
         body: `@${follower?.username || 'someone'} started following you`,
         actorUserId: currentUserId,
+        link: follower?.username ? `/@${follower.username}` : '/notifications',
         pushUrl: follower?.username ? `/@${follower.username}` : '/notifications',
         prefKey: 'newFollower',
+        dedupeKey: `follow:${currentUserId}`,
       });
     } catch (notifyErr) {
       console.error('Follow notification error:', notifyErr);

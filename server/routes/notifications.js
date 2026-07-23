@@ -20,16 +20,23 @@ router.use((req, res, next) => {
 router.get('/unread-count', async (req, res) => {
   try {
     await ensureUserMessaging(req.userId, requestLocale(req));
-    const mentions = await Notification.countDocuments({
-      userId: req.userId,
-      read: false,
-      type: 'mention',
-    });
-    const all = await Notification.countDocuments({
-      userId: req.userId,
-      read: false,
-    });
-    res.json({ mentions, all });
+    const [mentions, engagement, all] = await Promise.all([
+      Notification.countDocuments({
+        userId: req.userId,
+        read: false,
+        type: 'mention',
+      }),
+      Notification.countDocuments({
+        userId: req.userId,
+        read: false,
+        type: 'engagement',
+      }),
+      Notification.countDocuments({
+        userId: req.userId,
+        read: false,
+      }),
+    ]);
+    res.json({ mentions, engagement, all });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -39,9 +46,10 @@ router.get('/unread-count', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     await ensureUserMessaging(req.userId, requestLocale(req));
-    const tab = req.query.tab === 'mentions' ? 'mentions' : 'all';
+    const tab = String(req.query.tab || 'all');
     const filter = { userId: req.userId };
     if (tab === 'mentions') filter.type = 'mention';
+    else if (tab === 'engagement') filter.type = 'engagement';
 
     const items = await Notification.find(filter)
       .sort({ createdAt: -1 })
@@ -69,7 +77,9 @@ router.get('/', async (req, res) => {
 router.patch('/read-all', async (req, res) => {
   try {
     const filter = { userId: req.userId, read: false };
-    if (req.query.tab === 'mentions') filter.type = 'mention';
+    const tab = String(req.query.tab || '');
+    if (tab === 'mentions') filter.type = 'mention';
+    else if (tab === 'engagement') filter.type = 'engagement';
     await Notification.updateMany(filter, { $set: { read: true } });
     res.json({ ok: true });
   } catch (err) {

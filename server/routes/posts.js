@@ -88,6 +88,33 @@ function parseCoinAttachmentInput(raw) {
   };
 }
 
+const POLL_MIN_OPTIONS = 2;
+const POLL_MAX_OPTIONS = 4;
+const POLL_OPTION_MAX_LEN = 80;
+
+function parsePollInput(raw) {
+  if (raw == null) return null;
+  if (typeof raw !== 'object') return { error: 'Invalid poll' };
+  const list = Array.isArray(raw.options) ? raw.options : [];
+  const cleaned = [];
+  const seenIds = new Set();
+  for (let i = 0; i < list.length; i += 1) {
+    const text = String(list[i]?.text || '').trim().slice(0, POLL_OPTION_MAX_LEN);
+    if (!text) continue;
+    let id = String(list[i]?.id || '').trim().slice(0, 64);
+    if (!id || seenIds.has(id)) {
+      id = `opt_${Date.now().toString(36)}_${i}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+    seenIds.add(id);
+    cleaned.push({ id, text, votes: [], votesCount: 0 });
+    if (cleaned.length >= POLL_MAX_OPTIONS) break;
+  }
+  if (cleaned.length < POLL_MIN_OPTIONS) {
+    return { error: `Poll needs ${POLL_MIN_OPTIONS}–${POLL_MAX_OPTIONS} options` };
+  }
+  return { options: cleaned };
+}
+
 async function parseLinkAttachmentInput(raw, userId) {
   if (!raw || typeof raw !== 'object') return null;
   const title = String(raw.title || '').trim();
@@ -204,7 +231,16 @@ async function serializePostComments(comments) {
 // POST /api/posts - Создать пост
 router.post('/', auth, requireAuth, async (req, res) => {
   try {
-    const { content, media, community, isPrivate, linkAttachment: linkRaw, coinAttachment: coinRaw, quoteOf } = req.body;
+    const {
+      content,
+      media,
+      community,
+      isPrivate,
+      linkAttachment: linkRaw,
+      coinAttachment: coinRaw,
+      poll: pollRaw,
+      quoteOf,
+    } = req.body;
     const authorId = req.userId.toString();
     const { extractHashtags } = require('../utils/hashtags');
 
@@ -227,6 +263,11 @@ router.post('/', auth, requireAuth, async (req, res) => {
       return res.status(400).json({ message: coinParsed.error });
     }
 
+    const pollParsed = parsePollInput(pollRaw);
+    if (pollParsed?.error) {
+      return res.status(400).json({ message: pollParsed.error });
+    }
+
     let quoteOfId = null;
     if (quoteOf) {
       const original = await Post.findById(String(quoteOf));
@@ -236,8 +277,17 @@ router.post('/', auth, requireAuth, async (req, res) => {
       quoteOfId = original._id.toString();
     }
 
-    if (!trimmedContent && mediaList.length === 0 && !linkParsed && !coinParsed && !quoteOfId) {
-      return res.status(400).json({ message: 'Add text, a link, a coin chart, or at least one image' });
+    if (
+      !trimmedContent &&
+      mediaList.length === 0 &&
+      !linkParsed &&
+      !coinParsed &&
+      !pollParsed &&
+      !quoteOfId
+    ) {
+      return res.status(400).json({
+        message: 'Add text, a poll, a link, a coin chart, or at least one image',
+      });
     }
 
     if (community) {
@@ -269,6 +319,7 @@ router.post('/', auth, requireAuth, async (req, res) => {
       isPrivate: isPrivate || false,
       linkAttachment: linkParsed || undefined,
       coinAttachment: coinParsed || undefined,
+      poll: pollParsed || undefined,
       hashtags: extractHashtags(trimmedContent),
       quoteOf: quoteOfId,
     });
@@ -642,6 +693,51 @@ router.post('/:id/comments', auth, async (req, res) => {
     const last = post.comments[post.comments.length - 1];
     const [comment] = await serializePostComments([last]);
 
+    try {
+      const { dispatchNotification } = require('../services/notificationDispatch');
+      const actor = await User.findById(req.userId).select('username').lean();
+      const actorName = actor?.username || 'someone';
+      const postId = post._id.toString();
+      const authorId = String(post.author || '');
+      const preview = String(content).trim().slice(0, 80);
+
+      if (authorId && authorId !== String(req.userId)) {
+        await dispatchNotification({
+          userId: authorId,
+          type: 'engagement',
+          kind: 'comment',
+          title: 'New comment',
+          body: `@${actorName} commented on your post${preview ? `: ${preview}` : ''}`,
+          actorUserId: req.userId,
+          link: `/post/${postId}`,
+          pushUrl: `/post/${postId}`,
+        });
+      }
+
+      if (parentId) {
+        const parent = findPostComment(post, parentId);
+        const parentAuthorId = parent?.user ? String(parent.user) : '';
+        if (
+          parentAuthorId &&
+          parentAuthorId !== String(req.userId) &&
+          parentAuthorId !== authorId
+        ) {
+          await dispatchNotification({
+            userId: parentAuthorId,
+            type: 'engagement',
+            kind: 'comment',
+            title: 'New reply',
+            body: `@${actorName} replied to your comment${preview ? `: ${preview}` : ''}`,
+            actorUserId: req.userId,
+            link: `/post/${postId}`,
+            pushUrl: `/post/${postId}`,
+          });
+        }
+      }
+    } catch (notifyErr) {
+      console.error('Comment notification error:', notifyErr);
+    }
+
     res.status(201).json({
       comment,
       commentsCount: post.commentsCount,
@@ -730,6 +826,47 @@ router.delete('/:id/comments/:commentId', auth, async (req, res) => {
   }
 });
 
+// POST /api/posts/:id/poll/vote — vote (or change vote) on a post poll
+router.post('/:id/poll/vote', auth, requireAuth, async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+    if (!post.poll?.options || post.poll.options.length < 2) {
+      return res.status(400).json({ message: 'This post has no poll' });
+    }
+
+    const optionId = String(req.body?.optionId || '').trim();
+    if (!optionId) {
+      return res.status(400).json({ message: 'optionId is required' });
+    }
+
+    const option = post.poll.options.find((o) => String(o.id) === optionId);
+    if (!option) {
+      return res.status(400).json({ message: 'Invalid poll option' });
+    }
+
+    const uid = String(req.userId);
+    for (const opt of post.poll.options) {
+      opt.votes = (opt.votes || []).filter((id) => String(id) !== uid);
+      opt.votesCount = opt.votes.length;
+    }
+
+    option.votes = option.votes || [];
+    option.votes.push(uid);
+    option.votesCount = option.votes.length;
+    post.markModified('poll');
+    await post.save();
+
+    const { serializePollForFeed } = require('../services/postSerialize');
+    res.json({ poll: serializePollForFeed(post.poll, uid) });
+  } catch (error) {
+    console.error('❌ Poll vote error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // POST /api/posts/:id/like - Лайкнуть/анлайкнуть пост
 router.post('/:id/like', auth, requireAuth, async (req, res) => {
   try {
@@ -740,7 +877,30 @@ router.post('/:id/like', auth, requireAuth, async (req, res) => {
 
     const liked = await post.toggleLike(req.userId);
     console.log(`❤️ ${liked ? 'Liked' : 'Unliked'} post:`, req.params.id);
-    
+
+    if (liked) {
+      try {
+        const authorId = String(post.author || '');
+        if (authorId && authorId !== String(req.userId)) {
+          const { dispatchNotification } = require('../services/notificationDispatch');
+          const actor = await User.findById(req.userId).select('username').lean();
+          await dispatchNotification({
+            userId: authorId,
+            type: 'engagement',
+            kind: 'like',
+            title: 'New like',
+            body: `@${actor?.username || 'someone'} liked your post`,
+            actorUserId: req.userId,
+            link: `/post/${post._id}`,
+            pushUrl: `/post/${post._id}`,
+            dedupeKey: `like:${post._id}:${req.userId}`,
+          });
+        }
+      } catch (notifyErr) {
+        console.error('Like notification error:', notifyErr);
+      }
+    }
+
     res.json({ 
       liked,
       likesCount: post.likesCount
@@ -761,7 +921,8 @@ router.post('/:id/repost', auth, requireAuth, async (req, res) => {
 
     const uid = String(req.userId);
     const index = post.reposts.findIndex((id) => String(id) === uid);
-    if (index === -1) {
+    const didRepost = index === -1;
+    if (didRepost) {
       post.reposts.push(uid);
       post.repostsCount = post.reposts.length;
     } else {
@@ -771,10 +932,33 @@ router.post('/:id/repost', auth, requireAuth, async (req, res) => {
     
     await post.save();
 
-    console.log(`🔄 ${index === -1 ? 'Reposted' : 'Unreposted'} post:`, req.params.id);
+    console.log(`🔄 ${didRepost ? 'Reposted' : 'Unreposted'} post:`, req.params.id);
+
+    if (didRepost) {
+      try {
+        const authorId = String(post.author || '');
+        if (authorId && authorId !== uid) {
+          const { dispatchNotification } = require('../services/notificationDispatch');
+          const actor = await User.findById(req.userId).select('username').lean();
+          await dispatchNotification({
+            userId: authorId,
+            type: 'engagement',
+            kind: 'repost',
+            title: 'New repost',
+            body: `@${actor?.username || 'someone'} reposted your post`,
+            actorUserId: req.userId,
+            link: `/post/${post._id}`,
+            pushUrl: `/post/${post._id}`,
+            dedupeKey: `repost:${post._id}:${req.userId}`,
+          });
+        }
+      } catch (notifyErr) {
+        console.error('Repost notification error:', notifyErr);
+      }
+    }
 
     res.json({ 
-      reposted: index === -1,
+      reposted: didRepost,
       repostsCount: post.repostsCount
     });
   } catch (error) {

@@ -50,6 +50,7 @@ import PostMediaGallery from '../components/Posts/PostMediaGallery';
 import PostComposer from '../components/Posts/PostComposer';
 import PostContentBody from '../components/Posts/PostContentBody';
 import type { PostCoinAttachment } from '../types/postCoin';
+import { isValidPollDraft, type PostPollDraft } from '../types/postPoll';
 import type { PostLinkAttachment } from '../types/postLink';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
@@ -183,6 +184,7 @@ const UserProfileComponent: React.FC = () => {
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
   const [newPostLink, setNewPostLink] = useState<PostLinkAttachment | null>(null);
   const [newPostCoin, setNewPostCoin] = useState<PostCoinAttachment | null>(null);
+  const [newPostPoll, setNewPostPoll] = useState<PostPollDraft | null>(null);
   const [isPosting, setIsPosting] = useState(false);
   const [showPostCreator, setShowPostCreator] = useState(false);
   const mobileComposerFull = showPostCreator && !isLgUp && activeTab === 'posts';
@@ -892,6 +894,7 @@ const UserProfileComponent: React.FC = () => {
     setNewPostMedia([]);
     setNewPostLink(null);
     setNewPostCoin(null);
+    setNewPostPoll(null);
   }, []);
 
   const handleCreatePost = async () => {
@@ -899,7 +902,13 @@ const UserProfileComponent: React.FC = () => {
     const hasCoin = Boolean(
       newPostCoin?.coinId?.trim() && newPostCoin?.name?.trim() && newPostCoin?.symbol?.trim()
     );
-    if ((!newPostContent.trim() && newPostMedia.length === 0 && !hasLink && !hasCoin) || !token || isPosting) return;
+    const hasPoll = isValidPollDraft(newPostPoll);
+    if (
+      (!newPostContent.trim() && newPostMedia.length === 0 && !hasLink && !hasCoin && !hasPoll) ||
+      !token ||
+      isPosting
+    )
+      return;
     try {
       setIsPosting(true);
       const res = await fetch(POSTS_API_URL, {
@@ -913,6 +922,7 @@ const UserProfileComponent: React.FC = () => {
           media: newPostMedia,
           linkAttachment: hasLink ? newPostLink : undefined,
           coinAttachment: hasCoin ? newPostCoin : undefined,
+          poll: hasPoll ? newPostPoll : undefined,
         })
       });
       if (!res.ok) {
@@ -1397,6 +1407,13 @@ const UserProfileComponent: React.FC = () => {
                 content={post.content}
                 linkAttachment={post.linkAttachment}
                 coinAttachment={post.coinAttachment}
+                poll={post.poll}
+                postId={postId}
+                onPollChange={(poll) => {
+                  setPosts((prev) =>
+                    prev.map((p) => (String(p._id) === postId ? { ...p, poll } : p))
+                  );
+                }}
                 contentClassName="text-neutral-900 leading-relaxed whitespace-pre-wrap break-words text-[15px]"
               />
             </div>
@@ -1871,6 +1888,8 @@ const UserProfileComponent: React.FC = () => {
             onLinkAttachmentChange={setNewPostLink}
             coinAttachment={newPostCoin}
             onCoinAttachmentChange={setNewPostCoin}
+            pollAttachment={newPostPoll}
+            onPollAttachmentChange={setNewPostPoll}
             onCancel={closeComposer}
             onSubmit={() => void handleCreatePost()}
             isPosting={isPosting}

@@ -1,22 +1,24 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { CandlestickChart, Image, Link2, Loader2, SquareArrowOutUpRight, X } from 'lucide-react';
+import { CandlestickChart, Image, Link2, Loader2, SquareArrowOutUpRight, X, ChartNoAxesColumn } from 'lucide-react';
 import FloatingMenu, { type FloatingMenuAnchor } from '../Common/FloatingMenu';
 import MobileBottomSheet from '../Common/MobileBottomSheet';
 import AnimatedPlusIcon from '../Common/AnimatedPlusIcon';
 import PostMediaUpload, { PostMediaUploadHandle } from './PostMediaUpload';
 import PostCoinAttachmentModal, { PostCoinAttachmentForm } from './PostCoinAttachmentModal';
 import PostLinkAttachmentModal, { PostLinkAttachmentForm } from './PostLinkAttachmentModal';
+import PostPollAttachmentModal, { PostPollAttachmentForm } from './PostPollAttachmentModal';
 import PostMediaUrlModal, { PostMediaUrlForm } from './PostMediaUrlModal';
 import PostAttachSheetHeader from './PostAttachSheetHeader';
 import type { PostCoinAttachment } from '../../types/postCoin';
 import type { PostLinkAttachment } from '../../types/postLink';
+import { isValidPollDraft, type PostPollDraft } from '../../types/postPoll';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useTranslation } from '../../i18n/useTranslation';
 import { MAX_POST_MEDIA } from '../../utils/postMedia';
 
 export type PostComposerVariant = 'home' | 'profile' | 'community';
 
-type MobileAttachView = 'menu' | 'link' | 'coin' | 'mediaUrl';
+type MobileAttachView = 'menu' | 'link' | 'coin' | 'poll' | 'mediaUrl';
 
 interface PostComposerProps {
   isOpen: boolean;
@@ -29,6 +31,8 @@ interface PostComposerProps {
   onLinkAttachmentChange?: (link: PostLinkAttachment | null) => void;
   coinAttachment?: PostCoinAttachment | null;
   onCoinAttachmentChange?: (coin: PostCoinAttachment | null) => void;
+  pollAttachment?: PostPollDraft | null;
+  onPollAttachmentChange?: (poll: PostPollDraft | null) => void;
   onCancel: () => void;
   onSubmit: () => void;
   isPosting: boolean;
@@ -49,6 +53,8 @@ const PostComposer: React.FC<PostComposerProps> = ({
   onLinkAttachmentChange,
   coinAttachment = null,
   onCoinAttachmentChange,
+  pollAttachment = null,
+  onPollAttachmentChange,
   onCancel,
   onSubmit,
   isPosting,
@@ -65,6 +71,7 @@ const PostComposer: React.FC<PostComposerProps> = ({
   const [mediaUploading, setMediaUploading] = useState(false);
   const [linkModalOpen, setLinkModalOpen] = useState(false);
   const [coinModalOpen, setCoinModalOpen] = useState(false);
+  const [pollModalOpen, setPollModalOpen] = useState(false);
   const [mediaUrlModalOpen, setMediaUrlModalOpen] = useState(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [attachMenuAnchor, setAttachMenuAnchor] = useState<FloatingMenuAnchor | null>(null);
@@ -81,8 +88,9 @@ const PostComposer: React.FC<PostComposerProps> = ({
       coinAttachment?.name?.trim() &&
       coinAttachment?.symbol?.trim()
   );
+  const hasPoll = isValidPollDraft(pollAttachment);
   const canSubmit =
-    Boolean(content.trim()) || media.length > 0 || hasLink || hasCoin;
+    Boolean(content.trim()) || media.length > 0 || hasLink || hasCoin || hasPoll;
 
   // const avatarSrc =
   //   userAvatar ||
@@ -134,6 +142,8 @@ const PostComposer: React.FC<PostComposerProps> = ({
         return t('postLink.modalTitle');
       case 'coin':
         return t('postCoin.modalTitle');
+      case 'poll':
+        return t('postPoll.modalTitle');
       case 'mediaUrl':
         return t('postMedia.urlModalTitle');
       default:
@@ -184,6 +194,16 @@ const PostComposer: React.FC<PostComposerProps> = ({
     openMobileAttach('coin', true);
   };
 
+  const handleAddPoll = () => {
+    if (!requireAuth()) return;
+    if (isLgUp) {
+      closeAttachMenu();
+      setPollModalOpen(true);
+      return;
+    }
+    openMobileAttach('poll', true);
+  };
+
   const openLinkEditor = () => {
     if (isLgUp) setLinkModalOpen(true);
     else openMobileAttach('link', false);
@@ -192,6 +212,11 @@ const PostComposer: React.FC<PostComposerProps> = ({
   const openCoinEditor = () => {
     if (isLgUp) setCoinModalOpen(true);
     else openMobileAttach('coin', false);
+  };
+
+  const openPollEditor = () => {
+    if (isLgUp) setPollModalOpen(true);
+    else openMobileAttach('poll', false);
   };
 
   const toggleAttachMenu = () => {
@@ -258,6 +283,12 @@ const PostComposer: React.FC<PostComposerProps> = ({
         <button type="button" role="menuitem" onClick={handleAddCoin} className={itemClass}>
           <CandlestickChart size={16} className="text-black" aria-hidden />
           {hasCoin ? t('postComposer.editCoin') : t('postComposer.addCoin')}
+        </button>
+      ) : null}
+      {onPollAttachmentChange ? (
+        <button type="button" role="menuitem" onClick={handleAddPoll} className={itemClass}>
+          <ChartNoAxesColumn size={16} className="text-black" aria-hidden />
+          {hasPoll ? t('postComposer.editPoll') : t('postComposer.addPoll')}
         </button>
       ) : null}
     </>
@@ -390,6 +421,30 @@ const PostComposer: React.FC<PostComposerProps> = ({
               ) : null}
             </div>
           ) : null}
+          {hasPoll ? (
+            <div className="mt-2 flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm">
+              <ChartNoAxesColumn className="h-4 w-4 shrink-0 text-violet-700" aria-hidden />
+              <button
+                type="button"
+                onClick={openPollEditor}
+                className="min-w-0 flex-1 truncate text-left font-medium text-violet-900"
+              >
+                {t('postComposer.pollPreview', {
+                  count: pollAttachment!.options.filter((o) => o.text.trim()).length,
+                })}
+              </button>
+              {onPollAttachmentChange ? (
+                <button
+                  type="button"
+                  onClick={() => onPollAttachmentChange(null)}
+                  className="rounded-full p-1 text-neutral-500 hover:bg-white/80"
+                  aria-label={t('postComposer.removePoll')}
+                >
+                  <X size={16} aria-hidden />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
       <div className={`mt-3 flex shrink-0 items-center justify-between border-t pt-3 ${toolbarBorderClass}`}>
@@ -471,6 +526,14 @@ const PostComposer: React.FC<PostComposerProps> = ({
           initialValue={coinAttachment}
         />
       ) : null}
+      {isLgUp && onPollAttachmentChange ? (
+        <PostPollAttachmentModal
+          open={pollModalOpen}
+          onClose={() => setPollModalOpen(false)}
+          onSave={onPollAttachmentChange}
+          initialValue={pollAttachment}
+        />
+      ) : null}
       {isLgUp ? (
         <PostMediaUrlModal
           open={mediaUrlModalOpen}
@@ -517,6 +580,20 @@ const PostComposer: React.FC<PostComposerProps> = ({
                 initialValue={coinAttachment}
                 onSave={(coin) => {
                   onCoinAttachmentChange(coin);
+                  closeMobileAttach();
+                }}
+                onCancel={closeMobileAttach}
+              />
+            </div>
+          ) : null}
+          {mobileAttach.view === 'poll' && onPollAttachmentChange ? (
+            <div className="flex min-h-0 flex-col pb-1">
+              <PostAttachSheetHeader title={t('postPoll.modalTitle')} onBack={backMobileAttach} />
+              <PostPollAttachmentForm
+                variant="sheet"
+                initialValue={pollAttachment}
+                onSave={(poll) => {
+                  onPollAttachmentChange(poll);
                   closeMobileAttach();
                 }}
                 onCancel={closeMobileAttach}

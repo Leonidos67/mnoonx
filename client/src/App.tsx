@@ -14,6 +14,7 @@ import Home from './pages/Home';
 import Discover from './pages/Discover';
 import MarketCoinPage from './pages/MarketCoinPage';
 import CommunityPage from './pages/CommunityPage';
+import MarketingLanding from './pages/MarketingLanding';
 
 import LoginModal from './components/Auth/LoginModal';
 import RegisterModal from './components/Auth/RegisterModal';
@@ -23,6 +24,7 @@ import NewPersonal from './components/Community/NewPersonal';
 import NewBusiness from './components/Community/NewBusiness';
 import Messenger from './pages/Messenger';
 import Notifications from './pages/Notifications';
+import NotificationsEngagement from './pages/NotificationsEngagement';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
@@ -58,8 +60,13 @@ function App() {
 
   useEffect(() => {
     const openLogin = () => setIsLoginOpen(true);
+    const openRegister = () => setIsRegisterOpen(true);
     window.addEventListener('openLogin', openLogin);
-    return () => window.removeEventListener('openLogin', openLogin);
+    window.addEventListener('openRegister', openRegister);
+    return () => {
+      window.removeEventListener('openLogin', openLogin);
+      window.removeEventListener('openRegister', openRegister);
+    };
   }, []);
 
   return (
@@ -82,6 +89,7 @@ function App() {
 
           {/* Основные страницы */}
           <Route path="/" element={<AppLayout><Home /></AppLayout>} />
+          <Route path="/welcome" element={<MarketingLanding />} />
           <Route path="/discover/coin/:coinId" element={<AppLayout><MarketCoinPage /></AppLayout>} />
           <Route path="/discover" element={<AppLayout><Discover /></AppLayout>} />
           <Route
@@ -146,6 +154,14 @@ function App() {
           <Route path="/new/business" element={<AppLayout><NewBusiness /></AppLayout>} />
           <Route path="/messenger" element={<AppLayout><Messenger /></AppLayout>} />
           <Route path="/notifications" element={<AppLayout><Notifications /></AppLayout>} />
+          <Route
+            path="/notifications/engagement"
+            element={
+              <AppLayout>
+                <NotificationsEngagement />
+              </AppLayout>
+            }
+          />
           <Route
             path="/users"
             element={
