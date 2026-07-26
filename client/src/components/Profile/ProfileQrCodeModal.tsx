@@ -16,6 +16,12 @@ function profileAbsoluteUrl(username: string): string {
   return `${window.location.origin}${path}`;
 }
 
+function absolutePageUrl(pathOrUrl: string): string {
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+  if (typeof window === 'undefined') return pathOrUrl;
+  return `${window.location.origin}${pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`}`;
+}
+
 const AnimatedActionIcon: React.FC<{
   kind: 'share' | 'download' | 'scan';
   size?: number;
@@ -84,15 +90,29 @@ const EnlargeStyles = () => (
 interface ProfileQrCodeModalProps {
   open: boolean;
   onClose: () => void;
-  username: string;
+  /** Profile username — builds profile URL when pageUrl is omitted */
+  username?: string;
   fullName?: string;
+  /** Direct page URL (community etc.) — overrides profile URL */
+  pageUrl?: string;
+  /** Modal heading override */
+  title?: string;
+  shareTitle?: string;
+  shareText?: string;
+  /** PNG download filename base (without extension) */
+  fileSlug?: string;
 }
 
 export const ProfileQrCodeModal: React.FC<ProfileQrCodeModalProps> = ({
   open,
   onClose,
-  username,
+  username = '',
   fullName,
+  pageUrl,
+  title,
+  shareTitle,
+  shareText,
+  fileSlug,
 }) => {
   const { t } = useTranslation();
   const { showToast } = useToast();
@@ -100,9 +120,15 @@ export const ProfileQrCodeModal: React.FC<ProfileQrCodeModalProps> = ({
   const ignoreShellCloseRef = useRef(false);
   const [busy, setBusy] = useState<'share' | 'save' | null>(null);
   const [scanFocus, setScanFocus] = useState(false);
-  const url = useMemo(() => profileAbsoluteUrl(username), [username]);
-  const displayName = fullName || username;
-  const fileBase = `mnoonx-${username.replace(/[^a-zA-Z0-9_-]/g, '') || 'profile'}-qr`;
+  const url = useMemo(() => {
+    if (pageUrl) return absolutePageUrl(pageUrl);
+    return profileAbsoluteUrl(username);
+  }, [pageUrl, username]);
+  const displayName = fullName || username || 'MNOONX';
+  const modalTitle = title || t('userProfile.qr.title');
+  const fileBase =
+    fileSlug ||
+    `mnoonx-${(username || 'page').replace(/[^a-zA-Z0-9_-]/g, '') || 'profile'}-qr`;
 
   useEffect(() => {
     if (!open) setScanFocus(false);
@@ -168,8 +194,10 @@ export const ProfileQrCodeModal: React.FC<ProfileQrCodeModalProps> = ({
   const shareProfile = async () => {
     setBusy('share');
     try {
-      const title = t('userProfile.qr.shareTitle', { name: displayName });
-      const text = t('userProfile.qr.shareText', { name: displayName });
+      const shareTitleText =
+        shareTitle || t('userProfile.qr.shareTitle', { name: displayName });
+      const shareBodyText =
+        shareText || t('userProfile.qr.shareText', { name: displayName });
       const blob = await qrRef.current?.getPngBlob();
       const file =
         blob != null
@@ -182,12 +210,17 @@ export const ProfileQrCodeModal: React.FC<ProfileQrCodeModalProps> = ({
         typeof navigator.canShare === 'function' &&
         navigator.canShare({ files: [file] })
       ) {
-        await navigator.share({ title, text, url, files: [file] });
+        await navigator.share({
+          title: shareTitleText,
+          text: shareBodyText,
+          url,
+          files: [file],
+        });
         return;
       }
 
       if (typeof navigator.share === 'function') {
-        await navigator.share({ title, text, url });
+        await navigator.share({ title: shareTitleText, text: shareBodyText, url });
         return;
       }
 
@@ -267,7 +300,7 @@ export const ProfileQrCodeModal: React.FC<ProfileQrCodeModalProps> = ({
       <ResponsiveDialogShell
         open={open && !scanFocus}
         onClose={handleShellClose}
-        title={t('userProfile.qr.title')}
+        title={modalTitle}
         sheetPadded
         panelClassName="relative w-full max-w-sm overflow-hidden rounded-3xl bg-white p-6 shadow-xl"
       >
@@ -283,7 +316,7 @@ export const ProfileQrCodeModal: React.FC<ProfileQrCodeModalProps> = ({
         </div>
 
         <div className="relative flex min-h-[20rem] flex-col items-center text-center">
-          <h2 className="text-lg font-bold text-neutral-900">{t('userProfile.qr.title')}</h2>
+          <h2 className="text-lg font-bold text-neutral-900">{modalTitle}</h2>
           <div className="mt-3 flex justify-center">
             <button
               type="button"

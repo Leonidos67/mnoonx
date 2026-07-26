@@ -1665,9 +1665,6 @@ const Messenger: React.FC = () => {
             </div>
             <h3 className="text-lg font-semibold text-neutral-800">{t('messenger.yourMessages')}</h3>
             <p className="mt-1 text-neutral-500">{t('messenger.selectConversationHint')}</p>
-            {/* <Link to="/users" className="mt-4 inline-block text-sm font-medium text-[#315efb] hover:underline">
-              Browse all members
-            </Link> */}
           </div>
         </div>
       )}

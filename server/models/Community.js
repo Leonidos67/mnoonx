@@ -47,6 +47,21 @@ const CommunitySchema = new mongoose.Schema({
     ref: 'User',
     default: null,
   },
+  /**
+   * Optional “face” communities for collaborations:
+   * show this community instead of the personal profile for owner / coOwner.
+   * Must be a non-collaboration community owned by that user.
+   */
+  ownerDisplayCommunity: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Community',
+    default: null,
+  },
+  coOwnerDisplayCommunity: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Community',
+    default: null,
+  },
   members: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -67,7 +82,32 @@ const CommunitySchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['Memecoins', 'Futures', 'On-Chain', 'Airdrops', 'Education', 'DeFi', 'NFT', 'Other'],
+    enum: [
+      'Technology',
+      'Business',
+      'Education',
+      'Finance',
+      'Investing',
+      'Marketing',
+      'Design',
+      'Startups',
+      'Health',
+      'Entertainment',
+      'Gaming',
+      'Art',
+      'Sports',
+      'Science',
+      'Career',
+      'Lifestyle',
+      'Crypto',
+      'Memecoins',
+      'Futures',
+      'On-Chain',
+      'Airdrops',
+      'DeFi',
+      'NFT',
+      'Other',
+    ],
     default: 'Other',
   },
   isPublic: {
@@ -108,6 +148,24 @@ const CommunitySchema = new mongoose.Schema({
         title: { type: String, default: 'Chat', trim: true },
         visibleToMembers: { type: Boolean, default: true },
         note: { type: String, default: '', maxlength: 500 },
+        archivedAt: { type: Date, default: null },
+        stats: {
+          opens: { type: Number, default: 0 },
+          pageViews: { type: Number, default: 0 },
+          clicks: { type: Number, default: 0 },
+          lastOpenedAt: { type: Date, default: null },
+          daily: {
+            type: [
+              {
+                date: { type: String, required: true },
+                opens: { type: Number, default: 0 },
+                pageViews: { type: Number, default: 0 },
+                clicks: { type: Number, default: 0 },
+              },
+            ],
+            default: [],
+          },
+        },
       },
     ],
     default: [],

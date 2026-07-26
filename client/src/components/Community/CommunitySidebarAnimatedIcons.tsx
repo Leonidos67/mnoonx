@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import {
   BoltIcon,
   CheckIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   CopyIcon,
   EllipsisVerticalIcon,
   EyeIcon,
@@ -9,6 +11,7 @@ import {
   GlobeLockIcon,
   LayoutGridIcon,
   TrashIcon,
+  UserPenIcon,
   UserPlusIcon,
   UserRoundPenIcon,
   type IconHandle,
@@ -26,7 +29,10 @@ export type CommunitySidebarIconKind =
   | 'bolt'
   | 'copy'
   | 'userPlus'
-  | 'check';
+  | 'check'
+  | 'arrowUp'
+  | 'arrowDown'
+  | 'rename';
 
 type AnimatedCommunitySidebarIconProps = {
   kind: CommunitySidebarIconKind;
@@ -87,7 +93,13 @@ export const AnimatedCommunitySidebarIcon: React.FC<AnimatedCommunitySidebarIcon
                       ? UserPlusIcon
                       : kind === 'check'
                         ? CheckIcon
-                        : CopyIcon;
+                        : kind === 'arrowUp'
+                          ? ChevronUpIcon
+                          : kind === 'arrowDown'
+                            ? ChevronDownIcon
+                            : kind === 'rename'
+                              ? UserPenIcon
+                              : CopyIcon;
 
   return (
     <span

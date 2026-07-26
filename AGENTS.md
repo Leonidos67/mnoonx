@@ -1,8 +1,8 @@
-# MNOONX Alpha Space — документация для AI-агентов
+# MNOONX — документация для AI-агентов
 
 ## Краткое описание
 
-**MNOONX Alpha Space** — full-stack социальная платформа для Web3/крипто: посты, подписки, лайки, репосты, сообщества с installable apps, мессенджер (system + DM), уведомления, Discover.
+**MNOONX** — full-stack социальная платформа для Web3/крипто: посты, подписки, лайки, репосты, сообщества с installable apps, мессенджер (system + DM), уведомления, Discover.
 
 Монорепозиторий: `client/` (React) + `server/` (Express + MongoDB).
 

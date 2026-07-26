@@ -50,310 +50,308 @@ function toFaq(items: { question: string; answer: string }[]): DocsFaqItem[] {
 const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
   'start/overview': {
     context:
-      'Эта страница — отправная точка. Вы можете идти по порядку слева в меню или перепрыгивать к нужной теме: сообщества, приложения, аналитика. Каждый раздел написан простым языком и сфокусирован на действиях в интерфейсе.',
+      'This page is your starting point. Follow the left menu in order or jump to the topic you need: communities, apps, analytics. Every section describes concrete actions in the interface.',
     extraSections: [
       {
-        heading: 'Сколько времени занимает освоение',
+        heading: 'How long onboarding takes',
         paragraphs: [
-          'Базовые сценарии (регистрация, профиль, первый пост) — 5–10 минут. Запуск простого сообщества с чатом и объявлениями — от нескольких часов до одного дня, если контент уже готов.',
-          'Не обязательно читать всё подряд: закладка в браузере на нужный раздел и поиск в шапке документации помогут быстро вернуться к инструкции.',
+          'Basics — registration, profile, first post — take 5–10 minutes. Launching a simple community with chat and announcements takes a few hours to one day if content is ready.',
+          'You do not need to read everything at once: bookmark the section you need or use search in the docs header.',
         ],
       },
     ],
     faq: [
       {
-        question: 'Нужен ли опыт в Web3?',
+        question: 'Do I need special experience to get started?',
         answer:
-          'Нет. Платформа подходит и для крипто-сообществ, и для обычных клубов по интересам, обучения или закрытых групп.',
+          'No. The platform works for interest clubs, learning communities, private groups, professional networks, and team spaces.',
       },
       {
-        question: 'Документация на русском — а интерфейс?',
+        question: 'Docs are in English — what about the interface?',
         answer:
-          'Часть панели владельца (Dashboard) на английском, основной интерфейс — с переключением языка в меню профиля. Подписи кнопок совпадают с описаниями здесь.',
+          'The main interface can be switched in the profile menu. The community owner dashboard is partly in English; button labels match the descriptions in these guides.',
       },
     ],
   },
 
   'start/account': {
     context:
-      'Аккаунт — это ваше имя на платформе, лента, сообщения и право создавать сообщества. Чем полнее заполнен профиль, тем проще другим людям вам доверять и вступать в ваши клубы.',
+      'Your account is your identity on the platform: feed, messages, and the ability to create communities. A complete profile builds trust and helps convert visitors into members.',
     extraSections: [
       {
-        heading: 'Что видят другие пользователи',
+        heading: 'What others see',
         paragraphs: [
-          'После регистрации у вас появляется публичная страница с именем, аватаром, описанием и счётчиками подписок. Её можно отправлять как визитку в Telegram, X или email-рассылке.',
-          'Email в профиле по умолчанию не показывается всем — он нужен вам для входа и для владельцев сообществ в панели участников (если вы вступили).',
+          'After registration you get a public page with name, avatar, bio, and follow counts. Share it as a card in messengers, social media, or email.',
+          'Email is not shown to everyone by default — it is for sign-in and appears to community owners in the members section if you joined their club.',
         ],
       },
     ],
     extraTips: [
-      'Используйте один и тот же стиль аватара в соцсетях и на MNOONX — так вас узнают быстрее.',
-      'Если забыли пароль, восстановление идёт через email, указанный при регистрации.',
+      'Use the same avatar style on social media and MNOONX so people recognize you faster.',
+      'If you forget your password, recovery uses the email from registration.',
     ],
     faq: [
       {
-        question: 'Можно ли сменить username?',
+        question: 'Can I change my username?',
         answer:
-          'Смена имени пользователя ограничена: от него зависят ссылки. Лучше сразу выбрать финальный вариант, совпадающий с брендом.',
+          'Changes are limited because links depend on it. Pick a final username that matches your brand from the start.',
       },
     ],
   },
 
   'start/navigation': {
     context:
-      'Навигация построена так, чтобы лента и сообщества были на расстоянии одного клика. На телефоне те же разделы — в нижней панели; на компьютере — в боковом меню слева.',
+      'Navigation keeps the feed and communities one click away. On mobile, sections are in the bottom bar; on desktop, in the left sidebar.',
     extraSections: [
       {
-        heading: 'Где искать свои сообщества',
+        heading: 'Where to find your communities',
         paragraphs: [
-          'После входа в боковом меню появится блок «Мои сообщества» — быстрый переход без поиска в Discover.',
-          'Созданное сообщество также можно открыть из панели владельца или по прямой ссылке, которую вы копируете со страницы клуба.',
+          'After sign-in, My communities appears in the sidebar — quick access without browsing the catalog.',
+          'You can also open a community from the owner dashboard or via the link you copy from the community page.',
         ],
       },
     ],
     faq: [
       {
-        question: 'Почему не вижу кнопку «Создать сообщество»?',
-        answer: 'Убедитесь, что вы вошли в аккаунт. Гостям доступен только просмотр части страниц.',
+        question: 'Why do I not see Create community?',
+        answer: 'Make sure you are signed in. Guests can only view some public pages.',
       },
     ],
   },
 
   'profile/basics': {
     context:
-      'Профиль работает как витрина: сюда смотрят перед подпиской, сюда ведёт ссылка из поста, отсюда начинают личный диалог. Заполненный профиль повышает доверие и конверсию в подписчиков сообщества.',
+      'Your profile is a storefront: people check it before following, links from posts land here, and direct messages start here. A filled profile builds trust in you and your communities.',
     extraSections: [
       {
-        heading: 'Компактная шапка при скролле',
+        heading: 'Compact header while scrolling',
         paragraphs: [
-          'При прокрутке ленты профиля сверху появляется компактная полоса с именем и кнопками — удобно подписаться или написать, не возвращаясь наверх.',
-          'На своём профиле доступны «Редактировать профиль» и раздел «Активность» (достижения и прогресс).',
+          'While scrolling the profile feed, a compact bar with name and actions stays visible — easy to follow or message without scrolling back.',
+          'On your own profile you can edit details and view activity with achievements and progress.',
         ],
       },
       {
-        heading: 'Публикации и медиа',
+        heading: 'Posts and media',
         paragraphs: [
-          'В композере можно добавить несколько изображений, вставить ссылку на картинку или видео и прикрепить превью статьи по URL.',
-          'Посты из приватного сообщества не «засоряют» главную ленту без вашего намерения — они остаются в контексте клуба.',
+          'The post composer supports multiple images, image and video links, and article link previews.',
+          'Posts from a private community stay in the club context and do not appear on the home feed unless you intend them to.',
         ],
       },
     ],
     extraTips: [
-      'Первый пост лучше сделать приветственным: кто вы, о чём пишете, ссылка на сообщество.',
+      'Make your first post a welcome: who you are, what you share, and a link to your community.',
     ],
     faq: [
       {
-        question: 'Чем профиль отличается от сообщества?',
+        question: 'How is a profile different from a community?',
         answer:
-          'Профиль — личная страница человека. Сообщество — отдельное пространство с лентой, приложениями и своими участниками.',
+          'A profile is a person’s page. A community is a separate space with its own feed, apps, and members.',
       },
     ],
   },
 
   'profile/connections': {
     context:
-      'Подписки формируют вашу ленту на главной: вы видите посты тех, на кого подписаны. Подписчики — люди, которые следят за вами. Обе связи публичны через счётчики на профиле.',
+      'Follows shape your home feed. Followers are people who track you. Both are visible through counters on your profile.',
     extraSections: [
       {
-        heading: 'Как растить подписчиков',
+        heading: 'Growing your audience',
         paragraphs: [
-          'Регулярные посты, комментарии в чужих обсуждениях и активность в своём сообществе приводят новых подписчиков на профиль.',
-          'Ссылку на профиль (@username) стоит добавить в био других соцсетей и в описание сообщества.',
+          'Regular posts, comments in discussions, and activity in your community bring new followers.',
+          'Add your profile link to other social bios and your community description.',
         ],
       },
     ],
     faq: [
       {
-        question: 'Увидит ли человек, что я отписался?',
-        answer: 'Счётчик подписчиков обновится; отдельного уведомления об отписке обычно нет.',
+        question: 'Will someone know if I unfollow?',
+        answer: 'The follower count updates; there is usually no separate unfollow notification.',
       },
     ],
   },
 
   'community/roadmap': {
     context:
-      'Дорожная карта помогает не распыляться: сначала смысл и оформление, потом инструменты, потом люди. Так вы не потратите день на настройку приложений до того, как решите, публичный клуб или закрытый.',
+      'The roadmap keeps you focused: concept and branding first, then tools, then people. You avoid spending a day on apps before deciding public vs private access.',
     extraSections: [
       {
-        heading: 'Типичные ошибки на старте',
+        heading: 'Common launch mistakes',
         paragraphs: [
-          'Слишком много приложений в первый день — участники теряются. Достаточно чата и объявлений.',
-          'Пустая лента: перед рекламой опубликуйте 2–3 поста и правила.',
-          'Приватный клуб без кода входа — никто не сможет вступить, пока вы не пришлёте код вручную.',
+          'Too many apps on day one — members get lost. Chat and announcements are enough to start.',
+          'Empty feed: publish 2–3 posts and rules before promotion.',
+          'Private club without an invite code — new people cannot join until you send the code manually.',
         ],
       },
     ],
     extraTips: [
-      'Запишите дату «мягкого запуска» и «публичного анонса» — так проще планировать контент.',
+      'Set dates for soft launch and public announcement — it makes content planning easier.',
     ],
   },
 
   'community/create': {
     context:
-      'Создание сообщества — один раз настроить пространство, которое потом живёт месяцами. Handle (короткий адрес) лучше выбрать так же, как ник в соцсетях: коротко и без пробелов.',
+      'Creating a community is a one-time setup for a space that runs for months. Pick a short address like your social handle: concise and without spaces.',
     extraSections: [
       {
-        heading: 'Как выбрать handle',
+        heading: 'Choosing a community address',
         paragraphs: [
-          'Используйте латиницу и цифры, без пробелов: например my-trading-club или agyra_lab.',
-          'Handle попадает в ссылку, которую вы будете давать везде — его сложно менять после анонса.',
+          'Use Latin letters and numbers, no spaces — for example my-club or brand_lab.',
+          'The address appears in every link you share — changing it after launch is difficult.',
         ],
       },
       {
-        heading: 'Personal и Business в мастере',
+        heading: 'Create wizard options',
         paragraphs: [
-          'Мастер «Создать» задаёт разные подсказки в форме, но в итоге вы получаете то же сообщество. Выберите тот путь, где вам понятнее вопросы.',
+          'The wizard uses different prompts for Personal and Business paths, but both create the same type of community. Pick the path with questions that feel clearer to you.',
         ],
       },
     ],
     faq: [
       {
-        question: 'Сколько сообществ можно создать?',
+        question: 'How many communities can I create?',
         answer:
-          'Ограничений в интерфейсе обычно нет, но для качества лучше вести один основной клуб и при необходимости тестовый.',
+          'There is usually no hard limit, but one main club plus an optional test community is easier to run well.',
       },
     ],
   },
 
   'community/access': {
     context:
-      'Настройки доступа определяют ощущение клуба: открытая площадь для всех или закрытое ядро. Их можно менять позже, но резкая смена с публичного на приватный путает уже вступивших.',
+      'Access settings define the feel of your club: open plaza or closed core. You can change them later, but switching from public to private suddenly confuses existing members.',
     extraSections: [
       {
-        heading: 'Когда делать сообщество приватным',
+        heading: 'When to make a community private',
         paragraphs: [
-          'Платный контент, внутренние обсуждения, трейдинг-сигналы, закрытые курсы — типичные причины.',
-          'Для роста через Discover удобнее публичное сообщество с понятным описанием и активной лентой.',
+          'Paid content, internal discussions, and closed courses are common reasons.',
+          'For growth through the community catalog, a public club with a clear description and active feed works best.',
         ],
       },
       {
-        heading: 'Код приглашения',
+        heading: 'Invite code',
         paragraphs: [
-          'Код — это пароль для вступления. Разошлите его в личку, email или закрепите в канале. Без кода новые люди увидят только превью и не попадут внутрь.',
+          'The code is the password to join. Share it in direct messages, email, or a pinned channel post. Without it, new people only see a preview.',
         ],
       },
     ],
     faq: [
       {
-        question: 'Участники видят, что клуб приватный, в Discover?',
+        question: 'Does the catalog show that a club is private?',
         answer:
-          'Сообщество может отображаться в каталоге, но контент внутри доступен только после вступления (и кода, если он включён).',
+          'The community may appear in the catalog, but content inside is available only after joining and entering the code if one is enabled.',
       },
     ],
   },
 
   'community/branding': {
     context:
-      'Визуальный стиль сообщества — первое, что видят в Discover и на странице клуба. Единый аватар и баннер делают продукт «своим», даже если лента пока пустая.',
+      'Visual style is the first thing people see in the catalog and on the community page. A consistent avatar and banner make the product recognizable even when the feed is empty.',
     extraSections: [
       {
-        heading: 'Рекомендации по баннеру',
+        heading: 'Banner tips',
         paragraphs: [
-          'Используйте горизонтальное изображение без мелкого текста по краям — на телефоне края обрезаются.',
-          'Баннер можно обновить под сезон, акцию или партнёрство — это не требует пересоздания сообщества.',
+          'Use a horizontal image without small text near the edges — mobile crops the sides.',
+          'Update the banner for a season or campaign without recreating the community.',
         ],
       },
     ],
     extraTips: [
-      'Согласуйте цвета баннера с аватаром — лента выглядит цельно.',
+      'Match banner colors to the avatar — the page feels cohesive.',
     ],
   },
 
   'community/members': {
     context:
-      'Участники — сердце сообщества. Владелец видит полный список в панели управления; обычные участники — друг друга в чате и ленте.',
+      'Members are the heart of the community. The owner sees the full list in the dashboard; regular members interact in chat and the feed.',
     extraSections: [
       {
-        heading: 'Модерация и тон',
+        heading: 'Moderation and tone',
         paragraphs: [
-          'Закрепите правила в ленте и в объявлениях. При конфликтах владелец может ограничить публикации, отключив «участники могут постить».',
-          'Для больших клубов назначьте админов с правом смотреть участников и аналитику — не делайте всё в одиночку.',
+          'Pin rules in the feed and announcements. If conflicts arise, the owner can limit posting by turning off member posts.',
+          'For large clubs, assign admins with access to members and analytics.',
         ],
       },
     ],
     faq: [
       {
-        question: 'Как удалить участника?',
-        answer:
-          'Используйте управление участниками в настройках сообщества или панели владельца — точное название кнопки смотрите в интерфейсе вашей версии.',
+        question: 'How do I remove a member?',
+        answer: 'Use member management in community settings or the owner dashboard.',
       },
     ],
   },
 
   'community/feed': {
     context:
-      'Лента сообщества — главная сцена: сюда попадают анонсы, обсуждения, медиа. Она похожа на главную страницу платформы, но контент виден в контексте вашего клуба.',
+      'The community feed is the main stage: announcements, discussions, media. It works like the home feed but content lives in your club’s context.',
     extraSections: [
       {
-        heading: 'Контент-план для ленты',
+        heading: 'Feed content plan',
         paragraphs: [
-          'Чередуйте форматы: короткие апдейты, длинные разборы, опросы в комментариях, закреплённое правило.',
-          'Публичные посты от имени сообщества (с аватаром клуба) усиливают бренд в глобальной ленте.',
+          'Mix formats: short updates, deep dives, comment discussions, pinned rules.',
+          'Public posts published as the community strengthen your brand on the home feed.',
         ],
       },
     ],
     extraTips: [
-      'Отвечайте на комментарии в первые часы — так алгоритм вовлечённости работает на людях, не на роботах.',
+      'Reply to comments in the first hours — engagement grows when conversations stay active.',
     ],
   },
 
   'apps/overview': {
     context:
-      'Приложения превращают страницу сообщества из «ещё одной ленты» в продукт: чат, курсы, файлы, календарь. Каждое приложение ставится отдельно и при необходимости несколько раз (например два чата).',
+      'Apps turn a community page into a product: chat, courses, files, calendar. Each is installed separately; you can add multiple instances when needed.',
     extraSections: [
       {
-        heading: 'Какие приложения выбрать первыми',
+        heading: 'Which apps to install first',
         paragraphs: [
-          'Чат — для ежедневного общения. Объявления — для правил и важных новостей. Курсы или файлы — когда есть обучающий продукт.',
-          'События — если проводите звонки, AMA или офлайн-встречи.',
+          'Chat for daily conversation. Announcements for rules and important news. Courses or files when you have learning content.',
+          'Events if you run calls, AMAs, or offline meetups.',
         ],
       },
       {
-        heading: 'Видимость для участников',
+        heading: 'Visibility for members',
         paragraphs: [
-          'Можно скрыть приложение, пока готовите контент (черновик курса), и включить видимость, когда всё готово — в панели владельца, раздел продуктов.',
+          'Hide an app while you prepare a draft course, then enable visibility on launch day — in the Products section of the owner dashboard.',
         ],
       },
     ],
     faq: [
       {
-        question: 'Можно ли удалить приложение?',
-        answer:
-          'Да, через панель продуктов или магазин. Перед удалением сохраните важные материалы — часть данных может остаться в архиве.',
+        question: 'Can I remove an app?',
+        answer: 'Yes, via Products or the store. Save important materials before removing.',
       },
     ],
   },
 
   'apps/store': {
     context:
-      'Магазин — каталог модулей только для владельца. Участники видят уже установленные вкладки на странице сообщества, а не сам магазин.',
+      'The store is a module catalog for owners only. Members see installed tabs on the community page, not the store itself.',
     extraSections: [
       {
-        heading: 'Как ориентироваться в категориях',
+        heading: 'Browsing categories',
         paragraphs: [
-          'Community — базовые инструменты клуба. Education — курсы. Остальные категории — для будущих расширений и тематических модулей.',
-          'Используйте поиск по названию, если приложений в каталоге много.',
+          'Core club tools, education, and themed modules are grouped by category.',
+          'Use search by name when the catalog is large.',
         ],
       },
     ],
     faq: [
       {
-        question: 'Платные приложения?',
+        question: 'Are apps paid?',
         answer:
-          'В каталоге отображается цена (часто Free). Платный доступ к самому сообществу настраивается отдельно в настройках клуба.',
+          'Each card shows a price — often free. Paid access to the community itself is configured separately in community settings.',
       },
     ],
   },
 
   'apps/install': {
     context:
-      'Установка занимает минуту: выбрали приложение, подтвердили название вкладки — готово. Название видят участники (например «Чат VIP» вместо просто «Chat»).',
+      'Installation takes about a minute: pick an app, confirm the tab name, done. Members see that name — for example VIP Chat instead of plain Chat.',
     extraSections: [
       {
-        heading: 'После установки',
+        heading: 'After installation',
         paragraphs: [
-          'Зайдите на страницу сообщества и откройте новую вкладку — убедитесь, что она видна. Напишите приветственное сообщение в чат или первое объявление.',
-          'Если вкладки нет — проверьте видимость для участников в настройках продукта.',
+          'Open the community page and the new tab — confirm it is visible. Post a welcome in chat or your first announcement.',
+          'If the tab is missing, check member visibility in product settings.',
         ],
       },
     ],
@@ -361,12 +359,12 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'apps/configure': {
     context:
-      'Настройка экземпляров — про порядок и названия: два чата, скрытый курс, переименование вкладки под ваш бренд.',
+      'Instance settings are about order and naming: two chats, a hidden course, renaming a tab to match your brand.',
     extraSections: [
       {
-        heading: 'Несколько одинаковых приложений',
+        heading: 'Multiple instances of the same app',
         paragraphs: [
-          'Два чата удобны для «Общий» и «Только для Pro», два курса — для новичков и продвинутых. У каждого своё имя и своя история сообщений.',
+          'Two chats work well for General and Pro-only. Two courses for beginners and advanced. Each has its own name and history.',
         ],
       },
     ],
@@ -374,13 +372,13 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'apps/chat': {
     context:
-      'Чат даёт ощущение «живого» клуба. Участники пишут в реальном времени; владелец задаёт тон первым сообщением.',
+      'Chat makes the club feel alive. Members write in real time; the owner sets tone with the first message.',
     extraSections: [
       {
-        heading: 'Правила чата',
+        heading: 'Chat guidelines',
         paragraphs: [
-          'Продублируйте ключевые правила в объявлениях. Крупные клубы назначают модераторов из админов.',
-          'Непрочитанные сообщения видны в панели владельца — отвечайте на пики активности.',
+          'Repeat key rules in announcements. Large clubs assign moderators from admins.',
+          'Unread messages appear on the owner dashboard — respond during activity peaks.',
         ],
       },
     ],
@@ -388,13 +386,13 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'apps/courses': {
     context:
-      'Курсы подходят для пошагового обучения: модули, уроки, прогресс. Идеально для платных клубов и долгих программ.',
+      'Courses support step-by-step learning: modules, lessons, progress. Ideal for paid clubs and long programs.',
     extraSections: [
       {
-        heading: 'Структура курса',
+        heading: 'Course structure',
         paragraphs: [
-          'Начните с короткого вводного урока, затем основные модули, в конце — бонус или сертификат (текстом).',
-          'Скрывайте курс до запуска, включайте видимость в день старта.',
+          'Start with a short intro lesson, then core modules, then a bonus or final assignment.',
+          'Hide the course until launch, then enable visibility on start day.',
         ],
       },
     ],
@@ -402,12 +400,12 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'apps/content': {
     context:
-      'Раздел контента — для статей, гайдов и длинных материалов, которые не смешиваются с короткой лентой.',
+      'The content section holds articles, guides, and long materials that should not mix with short feed posts.',
     extraSections: [
       {
-        heading: 'Когда использовать контент vs ленту',
+        heading: 'Content vs feed',
         paragraphs: [
-          'Лента — новости и дискуссии. Контент — evergreen-материалы: «как начать», FAQ, база знаний.',
+          'Feed — news and discussion. Content — evergreen material: getting started, FAQ, knowledge base.',
         ],
       },
     ],
@@ -415,12 +413,12 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'apps/files': {
     context:
-      'Файлы — хранилище PDF, таблиц, шаблонов. Удобно для рабочих групп и курсов с материалами.',
+      'Files store PDFs, spreadsheets, and templates. Useful for working groups and courses with downloads.',
     extraSections: [
       {
-        heading: 'Организация',
+        heading: 'Organization',
         paragraphs: [
-          'Подписывайте файлы понятными именами. В объявлении дайте ссылку на папку или новый upload.',
+          'Use clear file names. Mention new uploads in an announcement.',
         ],
       },
     ],
@@ -428,12 +426,12 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'apps/announcements': {
     context:
-      'Объявления — канал для важного: правила, изменения расписания, партнёрства. Не смешивается с потоком болтовни в чате.',
+      'Announcements carry what matters: rules, schedule changes, partnerships. They stay separate from casual chat traffic.',
     extraSections: [
       {
-        heading: 'Первое объявление',
+        heading: 'First announcement',
         paragraphs: [
-          'Сделайте «Добро пожаловать» с правилами, ссылками на чат и расписанием. Обновляйте закреп при смене сезона.',
+          'Publish a welcome note with rules, chat links, and schedule. Update it when the season changes.',
         ],
       },
     ],
@@ -441,12 +439,12 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'apps/events': {
     context:
-      'События помогают не терять AMA, созвоны и дедлайны. Участники видят календарь внутри клуба.',
+      'Events keep AMAs, calls, and deadlines visible. Members see a calendar inside the club.',
     extraSections: [
       {
-        heading: 'Типы событий',
+        heading: 'Event types',
         paragraphs: [
-          'Регулярные созвоны, разовые AMA, дедлайны челленджей — всё с датой и описанием в одном месте.',
+          'Recurring calls, one-off AMAs, challenge deadlines — all with date and description in one place.',
         ],
       },
     ],
@@ -454,12 +452,12 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'dashboard/overview': {
     context:
-      'Панель владельца — ваш центр управления: не нужно искать настройки по всей платформе. Отсюда видно предупреждения (скрытые приложения, непрочитанный чат).',
+      'The owner dashboard is your control center: settings, members, apps, and analytics without extra navigation.',
     extraSections: [
       {
-        heading: 'Разделы панели',
+        heading: 'Dashboard sections',
         paragraphs: [
-          'Home — сводка. Settings — название, доступ, оплата. Users — таблица участников. Products — приложения. Analytics — графики. Invites — приглашения.',
+          'Home — summary. Settings — name, access, payments. Members — member table. Products — apps. Analytics — charts. Invites — links for new people.',
         ],
       },
     ],
@@ -467,13 +465,13 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'dashboard/analytics': {
     context:
-      'Аналитика отвечает на вопрос «растём или стоим?». Смотрите новых участников и посты за 7 дней, сравнивайте недели.',
+      'Analytics answers “are we growing or stalling?” Track new members and posts over 7 days and compare weeks.',
     extraSections: [
       {
-        heading: 'Как реагировать на цифры',
+        heading: 'How to respond to the numbers',
         paragraphs: [
-          'Рост участников без постов — сделайте активность или ивент. Много постов, мало вступлений — улучшите описание и Discover.',
-          'Непрочитанный чат — сигнал ответить или назначить модератора.',
+          'Member growth without posts — schedule activity or an event. Many posts, few joins — improve description and catalog presence.',
+          'Unread chat — a signal to reply or assign a moderator.',
         ],
       },
     ],
@@ -481,12 +479,12 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'dashboard/members': {
     context:
-      'Таблица участников помогает понять, кто давно не заходил, кого можно лично пригласить в активность, кого экспортировать для email-рассылки (с учётом законов о персональных данных).',
+      'The member table shows who has been inactive, who to invite personally, and who to export for email — respecting data privacy laws.',
     extraSections: [
       {
-        heading: 'Экспорт',
+        heading: 'Export',
         paragraphs: [
-          'CSV удобен для CRM и рассылок. Не спамьте — используйте только с согласия участников.',
+          'CSV export works for CRM and newsletters. Use it only with member consent.',
         ],
       },
     ],
@@ -494,12 +492,12 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'social/posts': {
     context:
-      'Посты — основа вовлечения: лайки и комментарии показывают, что контент живой. Репосты распространяют его в сеть подписчиков.',
+      'Posts drive engagement: likes and comments show live content. Reposts spread it to follower networks.',
     extraSections: [
       {
-        heading: 'Комментарии',
+        heading: 'Comments',
         paragraphs: [
-          'Разворачивайте комментарии под постом или открывайте карточку поста целиком. Ответы владельца поста видны всем участникам обсуждения.',
+          'Expand comments under the post or open the full post card. The author’s replies are visible to everyone in the thread.',
         ],
       },
     ],
@@ -507,12 +505,12 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'social/messenger': {
     context:
-      'Мессенджер объединяет личные диалоги и служебные каналы платформы. Из профиля человека открывается личный чат одним кликом.',
+      'Direct messages combine member conversations and platform service channels. Open a chat from someone’s profile in one click.',
     extraSections: [
       {
-        heading: 'Служебные чаты',
+        heading: 'Service chats',
         paragraphs: [
-          'При первом входе появляются системные диалоги платформы и поддержки — туда можно писать по вопросам сервиса.',
+          'On first sign-in, platform and support conversations appear — use them for product questions.',
         ],
       },
     ],
@@ -520,12 +518,12 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'social/discover': {
     context:
-      'Discover — витрина всех сообществ. Хорошее описание, аватар и активная лента повышают шанс, что нажмут Join.',
+      'The community catalog lists every club. A strong description, avatar, and active feed increase the chance someone clicks Join.',
     extraSections: [
       {
-        heading: 'Как выделиться в каталоге',
+        heading: 'Standing out in the catalog',
         paragraphs: [
-          'Чёткое название и ниша в описании, свежий пост в ленте, понятный баннер — три фактора, которые видит новый человек до вступления.',
+          'Clear name and niche in the description, a recent feed post, and a readable banner — three things new visitors see before joining.',
         ],
       },
     ],
@@ -533,12 +531,12 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'growth/strategy': {
     context:
-      'Рост — это ритм, а не разовая реклама. Неделя за неделей: контент, событие, личные приглашения, ответы в чате.',
+      'Growth is rhythm, not a one-time ad. Week by week: content, events, personal invites, replies in chat.',
     extraSections: [
       {
-        heading: 'Каналы привлечения',
+        heading: 'Acquisition channels',
         paragraphs: [
-          'Telegram, X, YouTube, email — везде одна и та же ссылка на сообщество. Просите ядро аудитории репостить лучшие посты.',
+          'Messengers, social media, email — use the same community link everywhere. Ask your core audience to share strong posts.',
         ],
       },
     ],
@@ -546,12 +544,12 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'growth/monetization': {
     context:
-      'Монетизация имеет смысл, когда ценность уже видна: контент в ленте, живой чат, отзывы. Платный доступ настраивается в параметрах сообщества.',
+      'Monetization works when value is visible: feed content, active chat, social proof. Paid access is configured in community settings.',
     extraSections: [
       {
-        heading: 'Бесплатно → платно',
+        heading: 'Free to paid',
         paragraphs: [
-          'Частая схема: публичная часть бесплатно, закрытый чат или курсы — по подписке. Анонсируйте, что входит в платный уровень.',
+          'A common model: public area free, closed chat or courses by subscription. Announce clearly what the paid tier includes.',
         ],
       },
     ],
@@ -559,12 +557,12 @@ const ENRICHMENTS: Record<PageKey, EnrichmentDef> = {
 
   'growth/checklist': {
     context:
-      'Пройдите чеклист за день до анонса и в день запуска. Отмечайте пункты — так меньше шанс забыть код входа или скрытое приложение.',
+      'Run through the checklist the day before and the day of launch. Checking items reduces the risk of forgetting an invite code or hidden app.',
     extraSections: [
       {
-        heading: 'После запуска',
+        heading: 'After launch',
         paragraphs: [
-          'В первую неделю ежедневно проверяйте чат, ленту и аналитику. Корректируйте контент-план по отклику.',
+          'In the first week, review chat, feed, and analytics daily. Adjust the content plan based on response.',
         ],
       },
     ],

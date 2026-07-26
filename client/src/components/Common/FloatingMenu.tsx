@@ -26,18 +26,24 @@ const FloatingMenu: React.FC<FloatingMenuProps> = ({
 
   useEffect(() => {
     if (!open) return;
+
     const onPointerDown = (event: MouseEvent) => {
-      if (menuRef.current?.contains(event.target as Node)) return;
+      const target = event.target as Node;
+      if (menuRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest('[data-floating-menu-trigger]')) return;
       onClose();
     };
-    const onScroll = () => onClose();
+
+    // Only close on viewport scroll/resize — nested overflow scroll must not kill clicks.
+    const onWindowScroll = () => onClose();
+
     document.addEventListener('mousedown', onPointerDown);
-    window.addEventListener('scroll', onScroll, true);
-    window.addEventListener('resize', onScroll);
+    window.addEventListener('scroll', onWindowScroll);
+    window.addEventListener('resize', onWindowScroll);
     return () => {
       document.removeEventListener('mousedown', onPointerDown);
-      window.removeEventListener('scroll', onScroll, true);
-      window.removeEventListener('resize', onScroll);
+      window.removeEventListener('scroll', onWindowScroll);
+      window.removeEventListener('resize', onWindowScroll);
     };
   }, [open, onClose]);
 
@@ -46,7 +52,7 @@ const FloatingMenu: React.FC<FloatingMenuProps> = ({
   const gap = 4;
   const left = Math.min(
     Math.max(8, anchor.rect.right - width),
-    window.innerWidth - width - 8
+    window.innerWidth - width - 8,
   );
   const positionStyle =
     placement === 'top'
@@ -56,14 +62,15 @@ const FloatingMenu: React.FC<FloatingMenuProps> = ({
   return createPortal(
     <div
       ref={menuRef}
-      className="fixed z-[10000] rounded-lg border border-neutral-200 bg-white p-1 shadow-lg"
+      className="fixed z-[99999] rounded-lg border border-neutral-200 bg-white p-1 shadow-lg"
       style={positionStyle}
+      onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
       role="menu"
     >
       {children}
     </div>,
-    document.body
+    document.body,
   );
 };
 

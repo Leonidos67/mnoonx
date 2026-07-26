@@ -1,7 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { communityDashboardPath, communitySettingsPath } from '../../constants/communityRoutes';
+import { QrCode } from 'lucide-react';
+import {
+  communityDashboardPath,
+  communityPath,
+  communitySettingsPath,
+} from '../../constants/communityRoutes';
 import { useTranslation } from '../../i18n/useTranslation';
+import { ProfileQrCodeModal } from '../Profile/ProfileQrCodeModal';
 import { AnimatedCommunitySidebarIcon } from './CommunitySidebarAnimatedIcons';
 
 export interface CommunityRightSidebarOwner {
@@ -12,6 +18,7 @@ export interface CommunityRightSidebarOwner {
 
 export interface CommunityRightSidebarProps {
   handle: string;
+  name?: string;
   memberCount: number;
   owner: CommunityRightSidebarOwner;
   canOpenDashboard: boolean;
@@ -26,6 +33,7 @@ const SUCCESS_ICON_MS = 3000;
 
 const CommunityRightSidebar: React.FC<CommunityRightSidebarProps> = ({
   handle,
+  name,
   memberCount,
   owner,
   canOpenDashboard,
@@ -38,6 +46,7 @@ const CommunityRightSidebar: React.FC<CommunityRightSidebarProps> = ({
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [copySuccess, setCopySuccess] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const copyTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -62,22 +71,35 @@ const CommunityRightSidebar: React.FC<CommunityRightSidebarProps> = ({
     }, SUCCESS_ICON_MS);
   };
 
+  const displayName = name?.trim() || handle;
+
   return (
     <div className={`space-y-4 p-3 ${className}`}>
       <div className="rounded-[24px] border border-[#e7e7e7] bg-white p-2">
         <div className="space-y-4">
-          <button
-            type="button"
-            onClick={() => void handleCopy()}
-            className="flex h-10 w-full items-center justify-center gap-2 rounded-2xl bg-[#f5f5f5] font-medium transition-all hover:bg-[#ececec]"
-          >
-            <AnimatedCommunitySidebarIcon
-              kind={copySuccess ? 'check' : 'copy'}
-              size={16}
-              autoPlay={copySuccess}
-            />
-            {t('common.copyLink')}
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => void handleCopy()}
+              className="flex h-10 min-w-0 flex-1 items-center justify-center gap-2 rounded-2xl bg-[#f5f5f5] font-medium transition-all hover:bg-[#ececec]"
+            >
+              <AnimatedCommunitySidebarIcon
+                kind={copySuccess ? 'check' : 'copy'}
+                size={16}
+                autoPlay={copySuccess}
+              />
+              {t('common.copyLink')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setQrOpen(true)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5f5f5] text-neutral-700 transition-all hover:bg-[#ececec]"
+              aria-label={t('community.qr.openAria')}
+              title={t('community.qr.openAria')}
+            >
+              <QrCode size={18} strokeWidth={2} aria-hidden />
+            </button>
+          </div>
           {canOpenDashboard && (
             <button
               type="button"
@@ -110,7 +132,9 @@ const CommunityRightSidebar: React.FC<CommunityRightSidebarProps> = ({
         </div>
 
         <div className="p-2">
-          <p className="mb-2 px-2 text-sm uppercase tracking-[0.08em] text-[#999]">{t('community.peopleCreator')}</p>
+          <p className="mb-2 px-2 text-sm uppercase tracking-[0.08em] text-[#999]">
+            {t('community.peopleCreator')}
+          </p>
           <div className="flex items-center justify-between">
             <Link
               to={`/@${owner.username}`}
@@ -120,7 +144,9 @@ const CommunityRightSidebar: React.FC<CommunityRightSidebarProps> = ({
               <img
                 src={
                   owner.avatar ||
-                  `https://ui-avatars.com/api/?name=${encodeURIComponent(owner.fullName || owner.username)}&background=5d6472&color=fff&size=48&bold=true`
+                  `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                    owner.fullName || owner.username
+                  )}&background=5d6472&color=fff&size=48&bold=true`
                 }
                 alt=""
                 className="h-12 w-12 rounded-full object-cover"
@@ -136,6 +162,17 @@ const CommunityRightSidebar: React.FC<CommunityRightSidebarProps> = ({
           </div>
         </div>
       </div>
+
+      <ProfileQrCodeModal
+        open={qrOpen}
+        onClose={() => setQrOpen(false)}
+        pageUrl={communityPath(handle)}
+        fullName={displayName}
+        title={t('community.qr.title')}
+        shareTitle={t('community.qr.shareTitle', { name: displayName })}
+        shareText={t('community.qr.shareText', { name: displayName })}
+        fileSlug={`mnoonx-community-${handle}-qr`}
+      />
     </div>
   );
 };

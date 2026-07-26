@@ -33,6 +33,7 @@ import CreateCommunity from './pages/CreateCommunity';
 import CreateCollaboration from './pages/CreateCollaboration';
 import CommunitySettings from './pages/CommunitySettings';
 import CommunityStore from './pages/CommunityStore';
+import CollaborationSideLayout from './components/Community/CollaborationSideLayout';
 import CommunityDashboardLayout from './components/Community/Dashboard/CommunityDashboardLayout';
 import CommunityDashboardHome from './pages/community-dashboard/CommunityDashboardHome';
 import CommunityDashboardSettings from './pages/community-dashboard/CommunityDashboardSettings';
@@ -110,24 +111,28 @@ function App() {
               <AppLayout>
                 <RequireAuth>
                   <RequireCommunityOwner>
-                    <CommunitySettings />
+                    <CollaborationSideLayout />
                   </RequireCommunityOwner>
                 </RequireAuth>
               </AppLayout>
             }
-          />
+          >
+            <Route index element={<CommunitySettings />} />
+          </Route>
           <Route
             path={`/community/:handle/${COMMUNITY_STORE_SEGMENT}`}
             element={
               <AppLayout>
                 <RequireAuth>
                   <RequireCommunityOwner>
-                    <CommunityStore />
+                    <CollaborationSideLayout />
                   </RequireCommunityOwner>
                 </RequireAuth>
               </AppLayout>
             }
-          />
+          >
+            <Route index element={<CommunityStore />} />
+          </Route>
           <Route path="/community/:handle" element={<AppLayout><CommunityPage /></AppLayout>} />
           <Route
             path="/dashboard/:handle"
@@ -160,6 +165,7 @@ function App() {
           />
           <Route path="/new" element={<AppLayout><NewPage /></AppLayout>} />
           <Route path="/new/personal" element={<Navigate to="/new" replace />} />
+          <Route path="/new/group" element={<Navigate to="/new" replace />} />
           <Route path="/new/business" element={<AppLayout><NewBusiness /></AppLayout>} />
           <Route path="/messenger" element={<AppLayout><Messenger /></AppLayout>} />
           <Route path="/notifications" element={<AppLayout><Notifications /></AppLayout>} />

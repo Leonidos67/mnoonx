@@ -40,6 +40,23 @@ const NewPage: React.FC = () => {
     },
   ];
 
+  const options = [
+    {
+      to: '/new/business',
+      icon: Briefcase,
+      iconWrap: 'bg-[#f3f3f3] text-black',
+      title: t('newPage.businessTitle'),
+      desc: t('newPage.businessDesc'),
+    },
+    {
+      to: '/create-collaboration',
+      icon: Users2,
+      iconWrap: 'bg-[#eef2ff] text-[#315efb]',
+      title: t('newPage.collabTitle'),
+      desc: t('newPage.collabDesc'),
+    },
+  ] as const;
+
   return (
     <>
       <style>{`
@@ -89,49 +106,35 @@ const NewPage: React.FC = () => {
               </h1>
 
               <div className="flex flex-col gap-6">
-                <Link
-                  to="/new/business"
-                  className="group rounded-[32px] border border-[#e5e5e5] bg-white p-7 transition-all duration-200 hover:border-[#d4d4d4] hover:shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-5">
-                      <div className="flex h-[64px] w-[64px] items-center justify-center rounded-2xl bg-[#f3f3f3] text-black">
-                        <Briefcase size={28} strokeWidth={2.2} />
+                {options.map((opt) => {
+                  const Icon = opt.icon;
+                  return (
+                    <Link
+                      key={opt.to}
+                      to={opt.to}
+                      className="group rounded-[32px] border border-[#e5e5e5] bg-white p-7 transition-all duration-200 hover:border-[#d4d4d4] hover:shadow-sm"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-5">
+                          <div
+                            className={`flex h-[64px] w-[64px] items-center justify-center rounded-2xl ${opt.iconWrap}`}
+                          >
+                            <Icon size={28} strokeWidth={2.2} />
+                          </div>
+                          <div>
+                            <h2 className="text-[30px] font-semibold tracking-[-0.03em] text-black">
+                              {opt.title}
+                            </h2>
+                            <p className="mt-1 text-[15px] text-[#666]">{opt.desc}</p>
+                          </div>
+                        </div>
+                        <div className="text-[#999] transition group-hover:text-black">
+                          <ArrowRight size={28} />
+                        </div>
                       </div>
-                      <div>
-                        <h2 className="text-[30px] font-semibold tracking-[-0.03em] text-black">
-                          {t('newPage.businessTitle')}
-                        </h2>
-                        <p className="mt-1 text-[15px] text-[#666]">{t('newPage.businessDesc')}</p>
-                      </div>
-                    </div>
-                    <div className="text-[#999] transition group-hover:text-black">
-                      <ArrowRight size={28} />
-                    </div>
-                  </div>
-                </Link>
-
-                <Link
-                  to="/create-collaboration"
-                  className="group rounded-[32px] border border-[#e5e5e5] bg-white p-7 transition-all duration-200 hover:border-[#d4d4d4] hover:shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-5">
-                      <div className="flex h-[64px] w-[64px] items-center justify-center rounded-2xl bg-[#eef2ff] text-[#315efb]">
-                        <Users2 size={28} strokeWidth={2.2} />
-                      </div>
-                      <div>
-                        <h2 className="text-[30px] font-semibold tracking-[-0.03em] text-black">
-                          {t('newPage.collabTitle')}
-                        </h2>
-                        <p className="mt-1 text-[15px] text-[#666]">{t('newPage.collabDesc')}</p>
-                      </div>
-                    </div>
-                    <div className="text-[#999] transition group-hover:text-black">
-                      <ArrowRight size={28} />
-                    </div>
-                  </div>
-                </Link>
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           </div>

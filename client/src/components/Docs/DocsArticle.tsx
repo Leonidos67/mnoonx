@@ -98,7 +98,7 @@ const DocsArticle: React.FC<DocsArticleProps> = ({
         {showHero ? (
           <div className="mb-10 overflow-hidden rounded-2xl border border-stone-200 bg-gradient-to-br from-neutral-900 via-neutral-800 to-stone-700 p-8 shadow-lg">
             <p className="text-sm font-medium uppercase tracking-wider text-orange-300/90">
-              MNOONX Alpha Space
+              MNOONX
             </p>
             <p className="mt-2 max-w-lg text-lg leading-relaxed text-white/90">
               {t('docs.article.heroTagline')}

@@ -30,7 +30,7 @@ If you have any questions, please contact our Support Team.
 We're excited to see what you build!`;
 
 const USERS_2000_CONTENT =
-  '2000 users in MNOONX — thank you for building with us on Alpha Space! 🚀';
+  '2000 users in MNOONX — thank you for building with us! 🚀';
 
 const RESTORE_SPECS = [
   {

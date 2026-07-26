@@ -17,6 +17,7 @@ import type { PostCoinAttachment } from '../types/postCoin';
 import type { PostLinkAttachment } from '../types/postLink';
 import { isValidPollDraft, type PostPollDraft } from '../types/postPoll';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
+import { followUserByUsername } from '../utils/followUser';
 import HomeSidebarPromoCarousel from '../components/Home/HomeSidebarPromoCarousel';
 import HomeRecommendedCommunities from '../components/Home/HomeRecommendedCommunities';
 import PixelTrail from '../components/Home/PixelTrail';
@@ -34,6 +35,9 @@ import { useTranslation } from '../i18n/useTranslation';
 
 /** Temporary: hide home feed while under construction */
 const HOME_FEED_UNDER_MAINTENANCE = true;
+
+/** Temporary: hide right-column promo (maintenance art + Discover carousel) */
+const HOME_RIGHT_PROMO_HIDDEN = true;
 
 interface PostComment {
   _id: string;
@@ -941,14 +945,25 @@ const Home: React.FC = () => {
         {/* Posts Feed */}
         <div className={`min-h-0 flex-1 overflow-hidden`}>
           {HOME_FEED_UNDER_MAINTENANCE ? (
-            <div className="flex h-full min-h-0 flex-col items-center px-4 py-6 text-center sm:px-8 sm:py-8">
-              <p className="max-w-md shrink-0 text-lg font-semibold text-neutral-900 sm:text-xl">
+            <div className="relative flex h-full min-h-0 flex-col items-center overflow-hidden px-4 py-6 text-center sm:px-8 sm:py-8">
+              <div className="absolute inset-0 z-10">
+                <PixelTrail
+                  gridSize={50}
+                  trailSize={0.1}
+                  maxAge={250}
+                  interpolate={5}
+                  color="#5227FF"
+                  gooeyFilter={{ id: 'home-feed-maintenance-goo-filter', strength: 2 }}
+                  className="h-full w-full"
+                />
+              </div>
+              <p className="pointer-events-none relative z-20 max-w-md shrink-0 text-lg font-semibold text-neutral-900 sm:text-xl">
                 {t('home.feedMaintenanceTitle')}
               </p>
-              <p className="mt-2 max-w-md shrink-0 text-sm text-neutral-500 sm:text-base">
+              <p className="pointer-events-none relative z-20 mt-2 max-w-md shrink-0 text-sm text-neutral-500 sm:text-base">
                 {t('home.feedMaintenanceBody')}
               </p>
-              <div className="mt-6 flex min-h-0 w-full max-w-lg flex-1 items-center justify-center">
+              <div className="pointer-events-none relative z-0 mt-6 flex min-h-0 w-full max-w-lg flex-1 items-center justify-center">
                 <video
                   className="max-h-full max-w-full object-contain"
                   src="/edit-video.mp4"
@@ -1037,9 +1052,33 @@ const Home: React.FC = () => {
                         
                         {menuOpenPostId === post._id && (
                           <div 
-                            className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg border border-neutral-200 p-1 z-50 shadow-lg"
+                            className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg border border-neutral-200 p-1 z-50 shadow-lg"
                             onClick={(e) => e.stopPropagation()}
                           >
+                            {!isPostOwner(post) && post.author?.username && (
+                              <button
+                                onClick={async () => {
+                                  if (!token) {
+                                    window.dispatchEvent(new CustomEvent('openLogin'));
+                                    return;
+                                  }
+                                  const username = String(post.author.username).replace(/^@/, '');
+                                  const result = await followUserByUsername(username, token);
+                                  if (!result.ok) {
+                                    showToast(t('common.followFailed'), 'error');
+                                    return;
+                                  }
+                                  showToast(t('home.followUserSuccess', { username }));
+                                  setMenuOpenPostId(null);
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-neutral-50 transition-colors flex items-center gap-2"
+                              >
+                                <AnimatedPostMenuIcon kind="follow" size={14} />
+                                {t('home.followUser', {
+                                  username: String(post.author.username).replace(/^@/, ''),
+                                })}
+                              </button>
+                            )}
                             <button
                               onClick={() => {
                                 copyPostLink(post._id);
@@ -1134,39 +1173,41 @@ const Home: React.FC = () => {
       </div>
 
       {/* RIGHT COLUMN — post details + market promo */}
-      <div className="hidden h-full min-h-0 w-[400px] shrink-0 flex-col gap-4 py-4 pr-4 lg:flex">
-        <div className="flex min-h-0 flex-1 flex-col">
-          {HOME_FEED_UNDER_MAINTENANCE ? (
-            <div className="relative h-full min-h-0 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
-              <video
-                className="absolute inset-0 h-full w-full object-cover"
-                src="/error-video.mp4"
-                autoPlay
-                muted
-                loop
-                playsInline
-              />
-              <div className="absolute inset-0">
-                <PixelTrail
-                  gridSize={50}
-                  trailSize={0.1}
-                  maxAge={250}
-                  interpolate={5}
-                  color="#5227FF"
-                  gooeyFilter={{ id: 'home-maintenance-goo-filter', strength: 2 }}
+      {!HOME_RIGHT_PROMO_HIDDEN ? (
+        <div className="hidden h-full min-h-0 w-[400px] shrink-0 flex-col gap-4 py-4 pr-4 lg:flex">
+          <div className="flex min-h-0 flex-1 flex-col">
+            {HOME_FEED_UNDER_MAINTENANCE ? (
+              <div className="relative h-full min-h-0 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
+                <video
+                  className="absolute inset-0 h-full w-full object-cover"
+                  src="/error-video.mp4"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
                 />
+                <div className="absolute inset-0">
+                  <PixelTrail
+                    gridSize={50}
+                    trailSize={0.1}
+                    maxAge={250}
+                    interpolate={5}
+                    color="#5227FF"
+                    gooeyFilter={{ id: 'home-maintenance-goo-filter', strength: 2 }}
+                  />
+                </div>
               </div>
-            </div>
-          ) : selectedPost ? (
-            renderSelectedPostDetail(selectedPost)
-          ) : (
-            <div className="flex h-full min-h-0 items-center justify-center rounded-2xl border border-neutral-200 bg-white px-6 text-neutral-500 shadow-sm">
-              <p className="text-center">{t('home.selectPostDetails')}</p>
-            </div>
-          )}
+            ) : selectedPost ? (
+              renderSelectedPostDetail(selectedPost)
+            ) : (
+              <div className="flex h-full min-h-0 items-center justify-center rounded-2xl border border-neutral-200 bg-white px-6 text-neutral-500 shadow-sm">
+                <p className="text-center">{t('home.selectPostDetails')}</p>
+              </div>
+            )}
+          </div>
+          <HomeSidebarPromoCarousel />
         </div>
-        <HomeSidebarPromoCarousel />
-      </div>
+      ) : null}
 
       <MobileBottomSheet
         open={!!selectedPost}

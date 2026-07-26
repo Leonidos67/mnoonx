@@ -30,6 +30,8 @@ import SettingsOrdersPanel from '../components/Settings/SettingsOrdersPanel';
 import SettingsPaymentsPanel from '../components/Settings/SettingsPaymentsPanel';
 import SettingsResolutionPanel from '../components/Settings/SettingsResolutionPanel';
 import { ProfileQrCodeModal, ProfileQrTrigger } from '../components/Profile/ProfileQrCodeModal';
+import AvatarPickerModal from '../components/Profile/AvatarPickerModal';
+import { resolveMediaUrl } from '../utils/mediaUrl';
 
 type SettingsSectionId =
   | 'account'
@@ -78,6 +80,7 @@ const Settings: React.FC = () => {
   });
   const [socialLinks, setSocialLinks] = useState<SocialLinks>({ ...EMPTY_SOCIAL_LINKS });
   const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
 
   const menuGroups: MenuGroup[] = useMemo(
     () => [
@@ -329,15 +332,18 @@ const Settings: React.FC = () => {
               <div className="relative shrink-0">
                 <img
                   src={
-                    user?.avatar ||
-                    `https://ui-avatars.com/api/?name=${formData.name}&background=6366f1&color=fff&size=96`
+                    user?.avatar
+                      ? resolveMediaUrl(user.avatar)
+                      : `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name || 'U')}&background=6366f1&color=fff&size=96`
                   }
                   alt={t('settings.avatarAlt')}
                   className="h-24 w-24 rounded-full object-cover"
                 />
                 <button
                   type="button"
+                  onClick={() => setAvatarPickerOpen(true)}
                   className="absolute bottom-0 right-0 rounded-full bg-black p-2 text-white transition-colors hover:bg-gray-800"
+                  aria-label={t('settings.avatarPickerTitle')}
                 >
                   <Camera size={16} />
                 </button>
@@ -345,6 +351,13 @@ const Settings: React.FC = () => {
               <div className="min-w-0">
                 <p className="truncate text-lg font-semibold">{formData.name}</p>
                 <p className="truncate text-neutral-500">@{formData.username}</p>
+                <button
+                  type="button"
+                  onClick={() => setAvatarPickerOpen(true)}
+                  className="mt-2 text-sm font-semibold text-[#315efb] hover:underline"
+                >
+                  {t('settings.avatarPickerTitle')}
+                </button>
               </div>
             </div>
 
@@ -623,6 +636,13 @@ const Settings: React.FC = () => {
           fullName={formData.name.trim() || formData.username.trim()}
         />
       ) : null}
+
+      <AvatarPickerModal
+        open={avatarPickerOpen}
+        onClose={() => setAvatarPickerOpen(false)}
+        currentAvatar={user?.avatar}
+        displayName={formData.name || formData.username || 'U'}
+      />
     </div>
   );
 };

@@ -4,7 +4,7 @@ const { buildCoinAnalysisTemplate } = require('./coinAnalysisTemplate');
 
 const DISCLAIMER = 'This is not financial advice. AI output can be wrong. Always DYOR.';
 
-const ALPHA_SYSTEM = `You are AI Alpha — the focused crypto intelligence persona for MNOONX Alpha Space.
+const ALPHA_SYSTEM = `You are AI Alpha — the focused crypto intelligence persona for MNOONX.
 
 Rules:
 - Give clear, structured analysis in Markdown (## headings, bullet lists, **bold** for key levels and risks).

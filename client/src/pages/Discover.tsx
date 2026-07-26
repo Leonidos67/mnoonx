@@ -9,7 +9,11 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import DiscoverCoursesTab from '../components/Discover/DiscoverCoursesTab';
-import DiscoverCreatorsSection from '../components/Discover/DiscoverCreatorsSection';
+import DiscoverCreatorsSection, {
+  ActiveCreatorsCarousel,
+  CreatorBlock,
+  useDiscoverCreators,
+} from '../components/Discover/DiscoverCreatorsSection';
 import DiscoverCollaborationsCarousel, {
   type CollaborationItem,
 } from '../components/Discover/DiscoverCollaborationsCarousel';
@@ -18,9 +22,12 @@ import DiscoverExportBackground from '../components/Discover/DiscoverExportBackg
 import DiscoverTabHeader from '../components/Discover/DiscoverTabHeader';
 import DiscoverTabSwitcher from '../components/Discover/DiscoverTabSwitcher';
 import MobileBottomSheet from '../components/Common/MobileBottomSheet';
-import { DiscoverCardSkeleton } from '../components/Common/Skeleton';
+import { DiscoverCardSkeleton, DiscoverCreatorCardSkeleton, SkeletonPulse } from '../components/Common/Skeleton';
 import { COMMUNITIES_API as API_URL } from '../config/api';
+import { profilePath } from '../constants/paths';
 import { useTranslation } from '../i18n/useTranslation';
+import { resolveMediaUrl } from '../utils/mediaUrl';
+import { communityCategoryLabel } from '../constants/communityCategories';
 
 const SECTION_PAGE_SIZE = 4;
 const POPULAR_SECTION_LIMIT = 20;
@@ -51,9 +58,26 @@ interface Community {
     fullName: string;
     avatar?: string;
   } | null;
+  ownerFace?: {
+    type: 'user' | 'community';
+    name: string;
+    handle: string;
+    username?: string;
+    fullName?: string;
+  } | null;
+  coOwnerFace?: {
+    type: 'user' | 'community';
+    name: string;
+    handle: string;
+    username?: string;
+    fullName?: string;
+  } | null;
   isPublic: boolean;
   isPaid: boolean;
   price: number;
+  isMember?: boolean;
+  isOwner?: boolean;
+  requiresJoinCode?: boolean;
 }
 
 function isCollaboration(c: Community): boolean {
@@ -80,10 +104,17 @@ function tabFromParams(params: URLSearchParams): DiscoverTab {
 }
 
 function communityAvatar(community: Community, size = 56): string {
-  return (
+  const src =
     community.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(community.name)}&background=111827&color=fff&size=${size}&bold=true`
-  );
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(community.name)}&background=111827&color=fff&size=${size}&bold=true`;
+  return resolveMediaUrl(src) || src;
+}
+
+/** Real uploaded banner only — never fall back to avatar / ui-avatars. */
+function communityBannerUrl(community: Community): string | null {
+  const raw = String(community.banner || '').trim();
+  if (!raw) return null;
+  return resolveMediaUrl(raw) || raw;
 }
 
 interface CommunityCardProps {
@@ -93,63 +124,91 @@ interface CommunityCardProps {
 
 const CommunityCard: React.FC<CommunityCardProps> = ({ community, onOpen }) => {
   const { t } = useTranslation();
-  const cover =
-    community.banner ||
-    community.avatar ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(community.name)}&background=111827&color=fff&size=400&bold=true`;
+  const bannerUrl = communityBannerUrl(community);
 
   return (
     <button
       type="button"
       onClick={() => onOpen(community)}
-      className="group w-full overflow-hidden rounded-2xl border border-gray-200 bg-white text-left transition-all hover:border-gray-300 hover:shadow-sm active:scale-[0.99] sm:rounded-3xl"
+      className="group flex w-full overflow-hidden rounded-2xl border border-neutral-200/90 bg-white text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-[border-color,box-shadow,transform] hover:border-neutral-300 hover:shadow-md active:scale-[0.99] sm:flex-col sm:rounded-[1.25rem]"
     >
-      <div className="aspect-[16/10] overflow-hidden bg-neutral-100">
+      {/* Mobile: narrow cover strip | Desktop: short banner */}
+      <div className="relative z-10 h-auto w-[5.25rem] shrink-0 self-stretch bg-neutral-100 sm:h-24 sm:w-full sm:self-auto lg:h-[6.5rem]">
+        <div className="absolute inset-0 overflow-hidden bg-neutral-100">
+          {bannerUrl ? (
+            <>
+              <img
+                src={bannerUrl}
+                alt=""
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              />
+              <div
+                aria-hidden
+                className="absolute inset-0 bg-gradient-to-t from-black/35 via-black/5 to-transparent sm:from-black/40"
+              />
+            </>
+          ) : (
+            <div className="flex h-full w-full items-center justify-center px-2 sm:px-4">
+              <p className="line-clamp-3 text-center text-[11px] font-medium leading-snug text-neutral-400 sm:line-clamp-2 sm:text-sm">
+                {community.name}
+              </p>
+            </div>
+          )}
+        </div>
+        {/* Half on cover / half on white block */}
         <img
-          src={cover}
+          src={communityAvatar(community, 64)}
           alt=""
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+          className="pointer-events-none absolute right-0 top-1/2 z-20 h-9 w-9 translate-x-1/2 -translate-y-1/2 rounded-full object-cover shadow-md ring-2 ring-white sm:bottom-0 sm:left-4 sm:right-auto sm:top-auto sm:h-11 sm:w-11 sm:translate-x-0 sm:translate-y-1/2"
         />
       </div>
-      <div className="p-3 sm:p-4">
-        <div className="flex items-start gap-3">
-          <img
-            src={communityAvatar(community, 48)}
-            alt=""
-            className="h-10 w-10 shrink-0 rounded-full object-cover ring-2 ring-white"
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <p className="truncate text-[15px] font-semibold text-gray-900">{community.name}</p>
-              {community.isPublic === false ? (
-                <span className="rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600">
-                  {t('discover.private')}
-                </span>
-              ) : null}
-              {community.isPaid ? (
-                <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
-                  {t('discover.paid')}
-                </span>
-              ) : null}
-            </div>
-            <p className="truncate text-xs text-gray-500">
-              {t('discover.byOwner', {
+
+      <div className="relative z-0 flex min-w-0 flex-1 flex-col justify-center px-3 py-2.5 pl-5 sm:px-4 sm:pb-3.5 sm:pl-4 sm:pt-7">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p className="min-w-0 truncate text-sm font-semibold text-neutral-900 sm:text-[15px]">
+            {community.name}
+          </p>
+          {community.isPublic === false ? (
+            <span className="shrink-0 rounded-md bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600">
+              {t('discover.private')}
+            </span>
+          ) : null}
+          {community.isPaid ? (
+            <span className="shrink-0 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+              {t('discover.paid')}
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-0.5 truncate text-[11px] text-neutral-500 sm:text-xs">
+          {isCollaboration(community) && community.coOwner
+            ? t('discover.collaborationByTwo', {
+                a:
+                  community.ownerFace?.name ||
+                  community.owner?.fullName ||
+                  community.owner?.username ||
+                  '',
+                b:
+                  community.coOwnerFace?.name ||
+                  community.coOwner.fullName ||
+                  community.coOwner.username,
+              })
+            : t('discover.byOwner', {
                 name: community.owner?.fullName || community.owner?.username || '',
               })}
-            </p>
-          </div>
-        </div>
+        </p>
         {community.description ? (
-          <p className="mt-2 line-clamp-2 text-sm text-gray-600">{community.description}</p>
+          <p className="mt-1.5 line-clamp-1 text-xs text-neutral-600 sm:mt-2 sm:line-clamp-2 sm:text-sm">
+            {community.description}
+          </p>
         ) : null}
-        <div className="mt-3 flex items-center justify-between gap-2 text-xs text-gray-500">
+        <div className="mt-2 flex items-center justify-between gap-2 text-[11px] text-neutral-500 sm:mt-2.5 sm:text-xs">
           <span className="inline-flex items-center gap-1">
-            <Users className="h-3.5 w-3.5" aria-hidden />
+            <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5" aria-hidden />
             {t('discover.membersCount', { count: community.memberCount.toLocaleString() })}
           </span>
           {community.category ? (
-            <span className="max-w-[45%] truncate rounded-full bg-gray-100 px-2 py-0.5">
-              {community.category}
+            <span className="max-w-[42%] truncate rounded-full bg-neutral-100 px-2 py-0.5 text-neutral-600">
+              {communityCategoryLabel(community.category, t)}
             </span>
           ) : null}
         </div>
@@ -216,7 +275,7 @@ const CommunitySection: React.FC<CommunitySectionProps> = ({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-2 sm:grid sm:grid-cols-2 sm:gap-3 md:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+      <div className="flex flex-col gap-2.5 sm:grid sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 lg:gap-3.5 xl:grid-cols-4">
         {visible.map((community) => (
           <CommunityCard key={community._id} community={community} onOpen={onOpen} />
         ))}
@@ -257,6 +316,15 @@ const Discover: React.FC = () => {
     new: { fullyExpanded: false },
   });
 
+  const searchQuery = discoverSearch.trim();
+  const isSearching = searchQuery.length > 0;
+  /** Browse-mode creators only (search uses DiscoverCreatorsSection). */
+  const creators = useDiscoverCreators('');
+  const openCreatorProfile = useCallback(
+    (username: string) => navigate(profilePath(username)),
+    [navigate]
+  );
+
   const setActiveTab = useCallback(
     (tab: DiscoverTab) => {
       if (tab === 'courses') {
@@ -270,7 +338,7 @@ const Discover: React.FC = () => {
 
   useEffect(() => {
     void fetchCommunities();
-  }, []);
+  }, [token]);
 
   const fetchCommunities = async () => {
     if (!isBrowserOnline()) {
@@ -281,7 +349,9 @@ const Discover: React.FC = () => {
 
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/list`);
+      const res = await fetch(`${API_URL}/list`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
       if (res.ok) {
         const data = await res.json();
         setCommunities(data);
@@ -297,7 +367,73 @@ const Discover: React.FC = () => {
     }
   };
 
-  const handleJoin = async (communityHandle: string) => {
+  const patchCommunityMembership = (handle: string, isMember: boolean, memberCount?: number) => {
+    setCommunities((prev) =>
+      prev.map((c) =>
+        c.handle === handle
+          ? {
+              ...c,
+              isMember,
+              memberCount: typeof memberCount === 'number' ? memberCount : c.memberCount,
+            }
+          : c
+      )
+    );
+    setSelectedCommunity((prev) =>
+      prev && prev.handle === handle
+        ? {
+            ...prev,
+            isMember,
+            memberCount: typeof memberCount === 'number' ? memberCount : prev.memberCount,
+          }
+        : prev
+    );
+  };
+
+  const handleJoin = async (community: Community) => {
+    if (!token) {
+      window.dispatchEvent(new CustomEvent('openLogin'));
+      return;
+    }
+
+    const handle = community.handle;
+    try {
+      setJoinLoading(true);
+      const res = await fetch(`${API_URL}/${handle}/join`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showToast(t('discover.joinSuccess'));
+        patchCommunityMembership(handle, true, data.memberCount);
+        closeCommunityPreview();
+        navigate(`/community/${handle}`);
+        return;
+      }
+
+      const data = await res.json().catch(() => ({}));
+      // Passphrase / gate: open the community page so the user can join there
+      if (data.code === 'INVALID_JOIN_CODE' || community.requiresJoinCode) {
+        closeCommunityPreview();
+        navigate(`/community/${handle}`);
+        return;
+      }
+      showToast(data.message || t('discover.joinFailed'), 'error');
+    } catch (err) {
+      console.error('Join error:', err);
+      showToast(t('discover.joinFailed'), 'error');
+    } finally {
+      setJoinLoading(false);
+    }
+  };
+
+  const handleLeave = async (communityHandle: string) => {
     if (!token) {
       window.dispatchEvent(new CustomEvent('openLogin'));
       return;
@@ -305,28 +441,26 @@ const Discover: React.FC = () => {
 
     try {
       setJoinLoading(true);
-      const res = await fetch(`${API_URL}/${communityHandle}/join`, {
+      const res = await fetch(`${API_URL}/${communityHandle}/leave`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       });
 
       if (res.ok) {
-        showToast(t('discover.joinSuccess'));
-        void fetchCommunities();
-        closeCommunityPreview();
+        const data = await res.json().catch(() => ({}));
+        showToast(t('discover.leaveSuccess'));
+        patchCommunityMembership(communityHandle, false, data.memberCount);
       } else {
-        const data = await res.json();
-        showToast(data.message || t('discover.joinFailed'), 'error');
+        const data = await res.json().catch(() => ({}));
+        showToast(data.message || t('discover.leaveFailed'), 'error');
       }
     } catch (err) {
-      console.error('Join error:', err);
+      console.error('Leave error:', err);
+      showToast(t('discover.leaveFailed'), 'error');
     } finally {
       setJoinLoading(false);
     }
   };
-
-  const searchQuery = discoverSearch.trim();
-  const isSearching = searchQuery.length > 0;
 
   const regularCommunities = useMemo(
     () => communities.filter((c) => !isCollaboration(c)),
@@ -460,8 +594,15 @@ const Discover: React.FC = () => {
             {isCollaboration(community) && community.coOwner ? (
               <p className="mt-1 text-sm text-gray-600">
                 {t('discover.collaborationByTwo', {
-                  a: community.owner?.fullName || community.owner?.username || '',
-                  b: community.coOwner.fullName || community.coOwner.username,
+                  a:
+                    community.ownerFace?.name ||
+                    community.owner?.fullName ||
+                    community.owner?.username ||
+                    '',
+                  b:
+                    community.coOwnerFace?.name ||
+                    community.coOwner.fullName ||
+                    community.coOwner.username,
                 })}
               </p>
             ) : null}
@@ -484,7 +625,9 @@ const Discover: React.FC = () => {
           </div>
           <div>
             <p className="text-xs text-gray-500">{t('discover.category')}</p>
-            <p className="text-lg font-semibold text-gray-900">{community.category}</p>
+            <p className="text-lg font-semibold text-gray-900">
+              {communityCategoryLabel(community.category, t)}
+            </p>
           </div>
           <div>
             <p className="text-xs text-gray-500">{t('discover.type')}</p>
@@ -495,14 +638,27 @@ const Discover: React.FC = () => {
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row">
-          <button
-            type="button"
-            onClick={() => void handleJoin(community.handle)}
-            disabled={joinLoading}
-            className="flex-1 rounded-2xl bg-black py-3 font-semibold text-white transition-colors hover:bg-neutral-800 disabled:opacity-50"
-          >
-            {joinLoading ? t('discover.joining') : t('discover.joinCommunity')}
-          </button>
+          {!community.isOwner ? (
+            community.isMember ? (
+              <button
+                type="button"
+                onClick={() => void handleLeave(community.handle)}
+                disabled={joinLoading}
+                className="flex-1 rounded-2xl border border-red-200 bg-white py-3 font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-50"
+              >
+                {joinLoading ? t('discover.leaving') : t('discover.leaveCommunity')}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void handleJoin(community)}
+                disabled={joinLoading}
+                className="flex-1 rounded-2xl bg-black py-3 font-semibold text-white transition-colors hover:bg-neutral-800 disabled:opacity-50"
+              >
+                {joinLoading ? t('discover.joining') : t('discover.joinCommunity')}
+              </button>
+            )
+          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -546,10 +702,41 @@ const Discover: React.FC = () => {
 
           <div className="mx-auto w-full">
           {loading ? (
-            <div className="flex flex-col gap-2 sm:grid sm:grid-cols-2 sm:gap-3 md:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <DiscoverCardSkeleton key={i} />
-              ))}
+            <div className="flex flex-col gap-8 sm:gap-10">
+              <div className="flex flex-col gap-2.5 sm:grid sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 lg:gap-3.5 xl:grid-cols-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <DiscoverCardSkeleton key={`community-sk-${i}`} />
+                ))}
+              </div>
+              <section>
+                <div className="mb-3 sm:mb-4">
+                  <SkeletonPulse className="h-5 w-40" />
+                  <SkeletonPulse className="mt-2 h-3 w-56" />
+                </div>
+                <div className="flex gap-3 overflow-hidden">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div
+                      key={`active-sk-${i}`}
+                      className="flex w-[5.25rem] shrink-0 flex-col items-center gap-1.5 sm:w-[5.75rem]"
+                    >
+                      <SkeletonPulse className="aspect-square w-full rounded-2xl" />
+                      <SkeletonPulse className="h-3 w-3/4" />
+                      <SkeletonPulse className="h-2.5 w-1/2" />
+                    </div>
+                  ))}
+                </div>
+              </section>
+              <section>
+                <div className="mb-3 sm:mb-4">
+                  <SkeletonPulse className="h-5 w-48" />
+                  <SkeletonPulse className="mt-2 h-3 w-64" />
+                </div>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3 lg:grid-cols-3 lg:gap-3.5 xl:grid-cols-4">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <DiscoverCreatorCardSkeleton key={`creator-sk-${i}`} />
+                  ))}
+                </div>
+              </section>
             </div>
           ) : isSearching ? (
             <>
@@ -620,6 +807,11 @@ const Discover: React.FC = () => {
                 fullyExpanded={sections.popular.fullyExpanded}
                 onToggleSection={toggleSection}
               />
+              <ActiveCreatorsCarousel
+                creators={creators.active}
+                loading={creators.loading}
+                onOpen={openCreatorProfile}
+              />
               <CommunitySection
                 sectionId="new"
                 title={t('discover.sectionNew')}
@@ -628,6 +820,13 @@ const Discover: React.FC = () => {
                 onOpen={openCommunityPreview}
                 fullyExpanded={sections.new.fullyExpanded}
                 onToggleSection={toggleSection}
+              />
+              <CreatorBlock
+                title={t('discover.sectionCreatorsFeatured')}
+                subtitle={t('discover.sectionCreatorsFeaturedHint')}
+                creators={creators.featuredList}
+                loading={creators.loading}
+                onOpen={openCreatorProfile}
               />
               <CommunitySection
                 sectionId="public"
@@ -638,7 +837,12 @@ const Discover: React.FC = () => {
                 fullyExpanded={sections.public.fullyExpanded}
                 onToggleSection={toggleSection}
               />
-              <DiscoverCreatorsSection />
+              <CreatorBlock
+                title={t('discover.sectionCreatorsMore')}
+                subtitle={t('discover.sectionCreatorsMoreHint')}
+                creators={creators.moreList}
+                onOpen={openCreatorProfile}
+              />
             </>
           )}
           </div>

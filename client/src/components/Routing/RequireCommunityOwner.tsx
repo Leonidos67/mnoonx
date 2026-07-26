@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { communityPath } from '../../constants/communityRoutes';
-import { canAccessCommunityDashboard } from '../../utils/communityRoles';
+import {
+  canAccessCommunityDashboard,
+  canManageCommunitySettings,
+} from '../../utils/communityRoles';
 
 import { COMMUNITIES_API as API_URL } from '../../config/api';
 
@@ -15,6 +18,7 @@ const RequireCommunityOwner: React.FC<RequireCommunityOwnerProps> = ({ children 
   const handle = handleParam?.toLowerCase() || '';
   const { token, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [status, setStatus] = useState<'loading' | 'allowed' | 'denied'>('loading');
 
   const verify = useCallback(async () => {
@@ -41,7 +45,11 @@ const RequireCommunityOwner: React.FC<RequireCommunityOwnerProps> = ({ children 
         return;
       }
       const data = await res.json();
-      if (!canAccessCommunityDashboard(data)) {
+      const isDashboardRoute = location.pathname.startsWith('/dashboard/');
+      const allowed = isDashboardRoute
+        ? canAccessCommunityDashboard(data)
+        : canManageCommunitySettings(data, user.id);
+      if (!allowed) {
         navigate(communityPath(handle), { replace: true });
         setStatus('denied');
         return;
@@ -50,7 +58,7 @@ const RequireCommunityOwner: React.FC<RequireCommunityOwnerProps> = ({ children 
     } catch {
       setStatus('denied');
     }
-  }, [handle, token, user, navigate]);
+  }, [handle, token, user, navigate, location.pathname]);
 
   useEffect(() => {
     if (authLoading) return;

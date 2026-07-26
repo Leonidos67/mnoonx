@@ -30,6 +30,12 @@ const communityAdmin = require('../utils/communityAdmin');
 const {
   evaluateCollaborationInvite,
   createCollaborationCommunity,
+  swapCollaborationCreators,
+  setCollaborationCreatorFaces,
+  resolveOwnedDisplayCommunity,
+  attachCollaborationFaces,
+  listOwnedCommunitiesForUser,
+  COLLAB_POPULATE,
 } = require('../services/collaboration');
 const CollaborationRequest = require('../models/CollaborationRequest');
 const {
@@ -184,7 +190,7 @@ async function deleteCommunityCascade(communityDoc) {
 }
 
 function communityByHandle(handle) {
-  return Community.findOne({ handle: String(handle).toLowerCase() });
+  return Community.findOne({ handle: String(handle).toLowerCase() }).populate(COLLAB_POPULATE);
 }
 
 function ownerIdString(community) {
@@ -296,6 +302,76 @@ function syncInstalledAppsFromInstances(community) {
   community.installedApps = [...new Set(instances.map((i) => i.appId))];
 }
 
+function plainAppInstance(inst) {
+  const plain = typeof inst?.toObject === 'function' ? inst.toObject() : { ...(inst || {}) };
+  delete plain.stats;
+  return plain;
+}
+
+function ensureInstanceStats(inst) {
+  if (!inst.stats) {
+    inst.stats = { opens: 0, pageViews: 0, clicks: 0, lastOpenedAt: null, daily: [] };
+  }
+  if (!Array.isArray(inst.stats.daily)) inst.stats.daily = [];
+  return inst.stats;
+}
+
+function bumpInstanceStat(inst, event) {
+  const stats = ensureInstanceStats(inst);
+  const today = new Date().toISOString().slice(0, 10);
+  let day = stats.daily.find((d) => d.date === today);
+  if (!day) {
+    day = { date: today, opens: 0, pageViews: 0, clicks: 0 };
+    stats.daily.push(day);
+  }
+  if (stats.daily.length > 60) {
+    stats.daily = stats.daily.slice(-60);
+    day = stats.daily.find((d) => d.date === today) || day;
+  }
+  if (event === 'open') {
+    stats.opens = (stats.opens || 0) + 1;
+    day.opens = (day.opens || 0) + 1;
+    stats.lastOpenedAt = new Date();
+  } else if (event === 'view') {
+    stats.pageViews = (stats.pageViews || 0) + 1;
+    day.pageViews = (day.pageViews || 0) + 1;
+  } else if (event === 'click') {
+    stats.clicks = (stats.clicks || 0) + 1;
+    day.clicks = (day.clicks || 0) + 1;
+  }
+}
+
+function buildEmptyDailySeries(days) {
+  const out = [];
+  const now = new Date();
+  for (let i = days - 1; i >= 0; i -= 1) {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() - i);
+    out.push({
+      date: d.toISOString().slice(0, 10),
+      opens: 0,
+      pageViews: 0,
+      clicks: 0,
+    });
+  }
+  return out;
+}
+
+function mergeDailyStats(storedDaily, days = 30) {
+  const series = buildEmptyDailySeries(days);
+  const map = new Map((storedDaily || []).map((row) => [row.date, row]));
+  return series.map((row) => {
+    const hit = map.get(row.date);
+    if (!hit) return row;
+    return {
+      date: row.date,
+      opens: hit.opens || 0,
+      pageViews: hit.pageViews || 0,
+      clicks: hit.clicks || 0,
+    };
+  });
+}
+
 async function migrateLegacyInstances(community) {
   const hasChat = (community.installedApps || []).includes('chat');
   const inst = community.installedAppInstances || [];
@@ -324,27 +400,27 @@ async function migrateLegacyInstances(community) {
 
 function filterInstancesForViewer(community, userId) {
   const instances = community.installedAppInstances || [];
-  if (
+  const isManager =
     userId &&
     (ownerIdString(community) === userId.toString() ||
-      communityAdmin.hasAdminPermission(community, userId, 'canManageApps'))
-  ) {
+      communityAdmin.hasAdminPermission(community, userId, 'canManageApps') ||
+      communityAdmin.hasAdminPermission(community, userId, 'canManageProducts'));
+  if (isManager) {
     return instances;
   }
-  return instances.filter((i) => i.visibleToMembers);
+  return instances.filter((i) => i.visibleToMembers !== false && !i.archivedAt);
 }
 
 async function loadCommunityWithAdmins(handle) {
   return Community.findOne({ handle: handle.toLowerCase() })
-    .populate('owner', 'username fullName avatar')
-    .populate('coOwner', 'username fullName avatar')
+    .populate(COLLAB_POPULATE)
     .populate('admins.user', 'username fullName avatar');
 }
 
 function serializeCommunityDoc(community, userId) {
   const obj = community.toObject();
   const visible = filterInstancesForViewer(community, userId);
-  obj.installedAppInstances = visible;
+  obj.installedAppInstances = visible.map(plainAppInstance);
   obj.installedApps = [...new Set(visible.map((i) => i.appId))];
   const member = isCommunityMember(community, userId);
   const owner = isCommunityOwner(community, userId);
@@ -364,6 +440,7 @@ function serializeCommunityDoc(community, userId) {
   if (!owner) {
     delete obj.joinCode;
   }
+  attachCollaborationFaces(obj, community);
   return obj;
 }
 
@@ -841,6 +918,9 @@ router.post('/', auth, async (req, res) => {
       price,
       kind,
       partnerUsername,
+      primaryCreator,
+      myDisplayCommunity,
+      partnerDisplayCommunity,
     } = req.body;
 
     const isCollab = String(kind || '').toLowerCase() === 'collaboration';
@@ -861,6 +941,22 @@ router.post('/', auth, async (req, res) => {
       );
       if (!partnerUser) {
         return res.status(404).json({ message: 'Partner user not found' });
+      }
+
+      const primary =
+        String(primaryCreator || 'me').toLowerCase() === 'partner' ? 'partner' : 'me';
+      const primaryForRequest = primary === 'partner' ? 'partner' : 'inviter';
+
+      let myFaceId = null;
+      let partnerFaceId = null;
+      try {
+        myFaceId = await resolveOwnedDisplayCommunity(req.userId, myDisplayCommunity);
+        partnerFaceId = await resolveOwnedDisplayCommunity(partnerUser._id, partnerDisplayCommunity);
+      } catch (e) {
+        if (e.code === 'invalid_display_community') {
+          return res.status(400).json({ message: e.message, code: e.code });
+        }
+        throw e;
       }
 
       const verdict = await evaluateCollaborationInvite(req.userId, partnerUser);
@@ -890,6 +986,9 @@ router.post('/', auth, async (req, res) => {
           name: String(name).trim(),
           description: String(description || '').trim(),
           status: 'pending',
+          primaryCreator: primaryForRequest,
+          fromDisplayCommunity: myFaceId,
+          toDisplayCommunity: partnerFaceId,
         });
         return res.status(201).json({
           type: 'request',
@@ -899,19 +998,31 @@ router.post('/', auth, async (req, res) => {
             description: request.description,
             status: request.status,
             toUsername: partnerUser.username,
+            primaryCreator: request.primaryCreator,
           },
         });
       }
 
+      const ownerId = primary === 'partner' ? partnerUser._id : req.userId;
+      const coOwnerId = primary === 'partner' ? req.userId : partnerUser._id;
+      const ownerDisplayCommunityId =
+        String(ownerId) === String(req.userId) ? myFaceId : partnerFaceId;
+      const coOwnerDisplayCommunityId =
+        String(coOwnerId) === String(req.userId) ? myFaceId : partnerFaceId;
+
       const populated = await createCollaborationCommunity({
-        ownerId: req.userId,
-        coOwnerId: partnerUser._id,
+        ownerId,
+        coOwnerId,
         name: String(name).trim(),
         description: String(description || '').trim(),
         category: category || 'Other',
         isPublic: isPublic !== undefined ? isPublic : true,
+        ownerDisplayCommunityId,
+        coOwnerDisplayCommunityId,
       });
-      return res.status(201).json({ type: 'collaboration', ...populated.toObject() });
+      const obj = populated.toObject();
+      attachCollaborationFaces(obj, populated);
+      return res.status(201).json({ type: 'collaboration', ...obj });
     }
 
     let finalHandle = String(handle || '')
@@ -988,16 +1099,15 @@ router.get('/mine', auth, async (req, res) => {
 
 // @route   GET /api/communities/list
 // @desc    All communities for Discover (public and private)
-// @access  Public
-router.get('/list', async (req, res) => {
+// @access  Public (auth optional — sets isMember / isOwner when logged in)
+router.get('/list', auth, async (req, res) => {
   try {
     const communities = await Community.find()
       .sort({ memberCount: -1 })
-      .populate('owner', 'username fullName avatar')
-      .populate('coOwner', 'username fullName avatar');
-    
+      .populate(COLLAB_POPULATE);
+
     console.log(`Found ${communities.length} communities`);
-    res.json(communities);
+    res.json(communities.map((c) => serializeCommunityDoc(c, req.userId)));
   } catch (err) {
     console.error('Error fetching communities:', err);
     res.status(500).json({ message: 'Server error', error: err.message });
@@ -1194,7 +1304,32 @@ router.patch('/:handle', auth, async (req, res) => {
       'membersCanPost',
       'joinCode',
     ];
-    const categories = ['Memecoins', 'Futures', 'On-Chain', 'Airdrops', 'Education', 'DeFi', 'NFT', 'Other'];
+    const categories = [
+      'Technology',
+      'Business',
+      'Education',
+      'Finance',
+      'Investing',
+      'Marketing',
+      'Design',
+      'Startups',
+      'Health',
+      'Entertainment',
+      'Gaming',
+      'Art',
+      'Sports',
+      'Science',
+      'Career',
+      'Lifestyle',
+      'Crypto',
+      'Memecoins',
+      'Futures',
+      'On-Chain',
+      'Airdrops',
+      'DeFi',
+      'NFT',
+      'Other',
+    ];
 
     for (const key of allowed) {
       if (req.body[key] === undefined) continue;
@@ -1252,8 +1387,114 @@ router.patch('/:handle', auth, async (req, res) => {
     }
 
     await community.save();
-    const updated = await Community.findById(community._id).populate('owner', 'username fullName avatar');
+    const updated = await Community.findById(community._id).populate(COLLAB_POPULATE);
     res.json(serializeCommunityDoc(updated, req.userId));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/communities/:handle/swap-creators
+// @desc    Swap primary owner ↔ co-owner on a collaboration
+// @access  Private (owner or coOwner)
+router.post('/:handle/swap-creators', auth, async (req, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    const community = await Community.findOne({ handle: req.params.handle.toLowerCase() });
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' });
+    }
+    if (community.kind !== 'collaboration') {
+      return res.status(400).json({ message: 'Only collaborations can swap creators' });
+    }
+    if (!isCommunityOwner(community, req.userId)) {
+      return res.status(403).json({ message: 'Only collaboration creators can swap authorship' });
+    }
+    const updated = await swapCollaborationCreators(community);
+    const obj = updated.toObject();
+    attachCollaborationFaces(obj, updated);
+    res.json(serializeCommunityDoc(updated, req.userId));
+  } catch (err) {
+    console.error(err);
+    if (err.code === 'not_collaboration' || err.code === 'no_coowner') {
+      return res.status(400).json({ message: err.message });
+    }
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/communities/:handle/creator-faces
+// @desc    Set display communities for collab owner / coOwner slots
+// @access  Private (owner or coOwner)
+router.post('/:handle/creator-faces', auth, async (req, res) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+    const community = await Community.findOne({ handle: req.params.handle.toLowerCase() });
+    if (!community) {
+      return res.status(404).json({ message: 'Community not found' });
+    }
+    if (community.kind !== 'collaboration') {
+      return res.status(400).json({ message: 'Only collaborations support creator faces' });
+    }
+    if (!isCommunityOwner(community, req.userId)) {
+      return res.status(403).json({ message: 'Only collaboration creators can update faces' });
+    }
+
+    const body = req.body || {};
+    const payload = {};
+    if ('ownerDisplayCommunity' in body) {
+      payload.ownerDisplayCommunityId =
+        body.ownerDisplayCommunity == null || body.ownerDisplayCommunity === '' || body.ownerDisplayCommunity === 'user'
+          ? null
+          : body.ownerDisplayCommunity;
+    }
+    if ('coOwnerDisplayCommunity' in body) {
+      payload.coOwnerDisplayCommunityId =
+        body.coOwnerDisplayCommunity == null ||
+        body.coOwnerDisplayCommunity === '' ||
+        body.coOwnerDisplayCommunity === 'user'
+          ? null
+          : body.coOwnerDisplayCommunity;
+    }
+
+    const updated = await setCollaborationCreatorFaces(community, payload);
+    res.json(serializeCommunityDoc(updated, req.userId));
+  } catch (err) {
+    console.error(err);
+    if (
+      err.code === 'not_collaboration' ||
+      err.code === 'no_coowner' ||
+      err.code === 'invalid_display_community'
+    ) {
+      return res.status(400).json({ message: err.message, code: err.code });
+    }
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /api/communities/owned-by/:username
+// @desc    Regular communities owned by a user (for collab face pickers)
+// @access  Public
+router.get('/owned-by/:username', async (req, res) => {
+  try {
+    const username = String(req.params.username || '')
+      .trim()
+      .replace(/^@/, '')
+      .toLowerCase();
+    if (!username) {
+      return res.status(400).json({ message: 'Username required' });
+    }
+    const user = await User.findOne({ username }).select('_id').lean();
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    const rows = await listOwnedCommunitiesForUser(user._id);
+    res.json(rows);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -1371,7 +1612,7 @@ router.patch('/:handle/apps/instances/:instanceId', auth, async (req, res) => {
     const idx = instances.findIndex((i) => i.id === instanceId);
     if (idx === -1) return res.status(404).json({ message: 'Instance not found' });
 
-    const { title, visibleToMembers, note } = req.body;
+    const { title, visibleToMembers, note, archived } = req.body;
     if (title !== undefined) {
       const t = String(title).trim();
       if (!t) return res.status(400).json({ message: 'Title cannot be empty' });
@@ -1386,11 +1627,192 @@ router.patch('/:handle/apps/instances/:instanceId', auth, async (req, res) => {
     if (note !== undefined) {
       instances[idx].note = String(note).slice(0, 500);
     }
+    if (archived !== undefined) {
+      if (typeof archived !== 'boolean') {
+        return res.status(400).json({ message: 'archived must be boolean' });
+      }
+      instances[idx].archivedAt = archived ? new Date() : null;
+    }
+    fresh.installedAppInstances = instances;
+    fresh.markModified('installedAppInstances');
+    syncInstalledAppsFromInstances(fresh);
+    await fresh.save();
+    const updated = await Community.findById(fresh._id).populate('owner', 'username fullName avatar');
+    res.json(serializeCommunityDoc(updated, req.userId));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/communities/:handle/apps/instances/:instanceId/duplicate
+// @desc    Duplicate an app instance
+// @access  Private (owner)
+router.post('/:handle/apps/instances/:instanceId/duplicate', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    if (!isCommunityOwner(community, req.userId)) {
+      return res.status(403).json({ message: 'Only the owner can duplicate apps' });
+    }
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const source = (fresh.installedAppInstances || []).find((i) => i.id === req.params.instanceId);
+    if (!source) return res.status(404).json({ message: 'Instance not found' });
+    if (source.archivedAt) {
+      return res.status(400).json({ message: 'Restore the app from archive before duplicating' });
+    }
+    const copySuffix = String(req.body?.copySuffix || 'copy').trim() || 'copy';
+    const baseTitle = String(source.title || '').trim() || source.appId;
+    const newId = crypto.randomUUID();
+    const next = [
+      ...(fresh.installedAppInstances || []),
+      {
+        id: newId,
+        appId: source.appId,
+        title: `${baseTitle} (${copySuffix})`.slice(0, 120),
+        visibleToMembers: source.visibleToMembers !== false,
+        note: String(source.note || '').slice(0, 500),
+        archivedAt: null,
+      },
+    ];
+    fresh.installedAppInstances = next;
+    syncInstalledAppsFromInstances(fresh);
+    await fresh.save();
+    const updated = await Community.findById(fresh._id).populate('owner', 'username fullName avatar');
+    res.json({ ...serializeCommunityDoc(updated, req.userId), newInstanceId: newId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/communities/:handle/apps/instances/:instanceId/move
+// @desc    Move app instance up or down in the sidebar order
+// @access  Private (owner)
+router.post('/:handle/apps/instances/:instanceId/move', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    if (!isCommunityOwner(community, req.userId)) {
+      return res.status(403).json({ message: 'Only the owner can reorder apps' });
+    }
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instanceId = req.params.instanceId;
+    const direction = String(req.body?.direction || '').toLowerCase() === 'down' ? 'down' : 'up';
+    const instances = [...(fresh.installedAppInstances || [])];
+    const idx = instances.findIndex((i) => i.id === instanceId);
+    if (idx === -1) return res.status(404).json({ message: 'Instance not found' });
+    if (instances[idx].archivedAt) {
+      return res.status(400).json({ message: 'Cannot reorder archived apps', code: 'cannot_move' });
+    }
+
+    const step = direction === 'up' ? -1 : 1;
+    let swapWith = idx + step;
+    while (swapWith >= 0 && swapWith < instances.length && instances[swapWith].archivedAt) {
+      swapWith += step;
+    }
+    if (swapWith < 0 || swapWith >= instances.length) {
+      return res.status(400).json({
+        message: direction === 'up' ? 'Already at the top' : 'Already at the bottom',
+        code: 'cannot_move',
+      });
+    }
+
+    const tmp = instances[idx];
+    instances[idx] = instances[swapWith];
+    instances[swapWith] = tmp;
     fresh.installedAppInstances = instances;
     syncInstalledAppsFromInstances(fresh);
     await fresh.save();
     const updated = await Community.findById(fresh._id).populate('owner', 'username fullName avatar');
     res.json(serializeCommunityDoc(updated, req.userId));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   POST /api/communities/:handle/apps/instances/:instanceId/track
+// @desc    Track app open / page view / click
+// @access  Private (viewer with access)
+router.post('/:handle/apps/instances/:instanceId/track', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    if (!canViewCommunity(community, req.userId)) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instanceId = req.params.instanceId;
+    const eventRaw = String(req.body?.event || 'open').toLowerCase();
+    const event = eventRaw === 'view' || eventRaw === 'click' ? eventRaw : 'open';
+    const instances = fresh.installedAppInstances || [];
+    const idx = instances.findIndex((i) => i.id === instanceId);
+    if (idx === -1) return res.status(404).json({ message: 'Instance not found' });
+    const inst = instances[idx];
+    const isManager =
+      isCommunityOwner(fresh, req.userId) ||
+      communityAdmin.hasAdminPermission(fresh, req.userId, 'canManageApps');
+    if (!isManager && inst.visibleToMembers === false) {
+      return res.status(403).json({ message: 'App is hidden' });
+    }
+    if (inst.archivedAt && !isManager) {
+      return res.status(403).json({ message: 'App is archived' });
+    }
+    bumpInstanceStat(inst, event);
+    fresh.installedAppInstances = instances;
+    fresh.markModified('installedAppInstances');
+    await fresh.save();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// @route   GET /api/communities/:handle/apps/instances/:instanceId/stats
+// @desc    App instance engagement stats for dashboard
+// @access  Private (analytics permission)
+router.get('/:handle/apps/instances/:instanceId/stats', auth, async (req, res) => {
+  try {
+    if (!req.userId) return res.status(401).json({ message: 'Unauthorized' });
+    const community = await communityByHandle(req.params.handle);
+    if (!community) return res.status(404).json({ message: 'Community not found' });
+    if (!communityAdmin.hasAdminPermission(community, req.userId, 'canViewAnalytics')) {
+      return res.status(403).json({ message: 'You do not have permission to view analytics' });
+    }
+    await migrateLegacyInstances(community);
+    const fresh = await communityByHandle(req.params.handle);
+    const instanceId = req.params.instanceId;
+    const inst = (fresh.installedAppInstances || []).find((i) => i.id === instanceId);
+    if (!inst) return res.status(404).json({ message: 'Instance not found' });
+    const stats = ensureInstanceStats(inst);
+    const daily = mergeDailyStats(stats.daily, 30);
+    const extras = {};
+    if (inst.appId === 'chat') {
+      extras.chatMessages = await CommunityChatMessage.countDocuments({
+        community: fresh._id,
+        chatInstanceId: instanceId,
+      });
+    }
+    res.json({
+      instanceId: inst.id,
+      appId: inst.appId,
+      title: inst.title,
+      visibleToMembers: inst.visibleToMembers !== false,
+      opens: stats.opens || 0,
+      pageViews: stats.pageViews || 0,
+      clicks: stats.clicks || 0,
+      lastOpenedAt: stats.lastOpenedAt || null,
+      daily,
+      extras,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -4755,7 +5177,8 @@ router.post('/:handle/leave', auth, async (req, res) => {
       return res.status(404).json({ message: 'Community not found' });
     }
 
-    const memberIndex = community.members.indexOf(req.userId);
+    const uid = String(req.userId);
+    const memberIndex = community.members.findIndex((m) => m.toString() === uid);
     if (memberIndex === -1) {
       return res.status(400).json({ message: 'Not a member' });
     }

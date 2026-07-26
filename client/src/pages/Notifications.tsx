@@ -18,6 +18,7 @@ const Notifications: React.FC = () => {
   const { t } = useTranslation();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [markingAll, setMarkingAll] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) {
@@ -54,6 +55,27 @@ const Notifications: React.FC = () => {
     refreshUnreads();
   };
 
+  const unreadCount = useMemo(() => items.filter((n) => !n.read).length, [items]);
+
+  const markAllRead = async () => {
+    if (!token || unreadCount === 0 || markingAll) return;
+    setMarkingAll(true);
+    try {
+      const res = await fetch(`${API_URL}/read-all`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setItems((prev) => prev.map((n) => ({ ...n, read: true })));
+        refreshUnreads();
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setMarkingAll(false);
+    }
+  };
+
   const engagementItems = useMemo(
     () => items.filter((n) => n.type === 'engagement'),
     [items]
@@ -76,9 +98,17 @@ const Notifications: React.FC = () => {
 
   return (
     <div className="mx-auto max-w-full">
-      <h1 className="px-4 pt-4 text-xl font-semibold text-neutral-800">
-        {t('notifications.title')}
-      </h1>
+      <div className="flex items-center justify-between gap-3 px-4 pt-4">
+        <h1 className="text-xl font-semibold text-neutral-800">{t('notifications.title')}</h1>
+        <button
+          type="button"
+          onClick={() => void markAllRead()}
+          disabled={unreadCount === 0 || markingAll || loading}
+          className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:text-neutral-300 disabled:hover:bg-transparent"
+        >
+          {markingAll ? t('notifications.markAllReadBusy') : t('notifications.markAllRead')}
+        </button>
+      </div>
 
       {loading ? (
         <div className="flex justify-center py-16">

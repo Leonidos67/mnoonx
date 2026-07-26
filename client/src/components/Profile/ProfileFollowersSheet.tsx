@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import ResponsiveDialogShell from '../Common/ResponsiveDialogShell';
 import { profilePath } from '../../constants/paths';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
 
 export interface ProfileFollowListUser {
   _id: string;
@@ -41,8 +42,10 @@ const ProfileFollowersSheet: React.FC<ProfileFollowersSheetProps> = ({
     onClose={onClose}
     title={title}
     sheetPadded
-    panelClassName="flex max-h-[min(520px,85vh)] w-full max-w-md flex-col rounded-3xl bg-white p-6 shadow-2xl"
+    sheetContentClassName="!max-h-[92dvh]"
+    panelClassName="flex max-h-[min(640px,85vh)] w-full max-w-md flex-col rounded-3xl bg-white p-6 shadow-2xl"
   >
+    <h2 className="mb-4 text-lg font-bold text-neutral-900 lg:hidden">{title}</h2>
     {showSearch ? (
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden />
@@ -66,8 +69,9 @@ const ProfileFollowersSheet: React.FC<ProfileFollowersSheetProps> = ({
           >
             <img
               src={
-                u.avatar ||
-                `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName || u.username)}&background=000&color=fff&size=40&bold=true`
+                u.avatar
+                  ? resolveMediaUrl(u.avatar)
+                  : `https://ui-avatars.com/api/?name=${encodeURIComponent(u.fullName || u.username)}&background=000&color=fff&size=40&bold=true`
               }
               alt=""
               className="h-10 w-10 shrink-0 rounded-full object-cover"

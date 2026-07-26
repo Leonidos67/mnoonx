@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Globe, Lock } from 'lucide-react';
 import PostContentBody from './PostContentBody';
@@ -7,10 +7,14 @@ import { PostCommentsSection } from './PostCommentsSection';
 import { AnimatedPostMenuIcon } from './PostMenuAnimatedIcons';
 import PostFeedActionButtons from './PostFeedActionButtons';
 import QuotedPostCard from './QuotedPostCard';
+import FloatingMenu, { type FloatingMenuAnchor } from '../Common/FloatingMenu';
 import { buildPostLightboxMeta } from '../../utils/buildPostLightboxMeta';
 import type { FeedPost } from '../../types/postFeed';
 import { useTranslation } from '../../i18n/useTranslation';
 import { getPostDisplayMeta, type PostCommunityMeta } from '../../utils/postDisplay';
+import { useAuth } from '../../context/AuthContext';
+import { useToast } from '../../context/ToastContext';
+import { followUserByUsername } from '../../utils/followUser';
 
 export type PostFeedCardCommunityContext = PostCommunityMeta;
 
@@ -31,7 +35,7 @@ export interface PostFeedCardProps {
   onToggleComments: (postId: string, e: React.MouseEvent) => void;
   expandedCommentsPostId: string | null;
   menuOpenPostId: string | null;
-  onMenuToggle: (postId: string, e: React.MouseEvent) => void;
+  onMenuToggle: (postId: string, e?: React.MouseEvent) => void;
   menuRef?: React.RefObject<HTMLDivElement>;
   onCopyLink: (postId: string) => void;
   onEdit?: (postId: string, content: string) => void;
@@ -91,10 +95,50 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
   onPollChange,
 }) => {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const { showToast } = useToast();
+  const [followBusy, setFollowBusy] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<FloatingMenuAnchor | null>(null);
   const postId = String(post._id);
+  const menuOpen = menuOpenPostId === postId;
+
+  useEffect(() => {
+    if (!menuOpen) setMenuAnchor(null);
+  }, [menuOpen]);
+
+  const closeMenu = useCallback(() => {
+    if (menuOpen) onMenuToggle(postId);
+  }, [menuOpen, onMenuToggle, postId]);
 
   const { communityMeta, displayAsCommunity, displayName, displayUsername, displayAvatar, profileLink } =
     getPostDisplayMeta(post, communityContext);
+
+  const authorUsername = String(post.author?.username || '').replace(/^@/, '').trim();
+  const isOwnPost =
+    Boolean(user) &&
+    (String(user?.id || '') === String(post.author?._id || '') ||
+      String(user?.username || '').toLowerCase() === authorUsername.toLowerCase());
+  const canFollowAuthor = Boolean(authorUsername) && !isOwnPost;
+
+  const handleFollowAuthor = async () => {
+    if (!token) {
+      window.dispatchEvent(new CustomEvent('openLogin'));
+      return;
+    }
+    if (!authorUsername || followBusy) return;
+    setFollowBusy(true);
+    try {
+      const result = await followUserByUsername(authorUsername, token);
+      if (!result.ok) {
+        showToast(t('common.followFailed'), 'error');
+        return;
+      }
+      showToast(t('home.followUserSuccess', { username: authorUsername }));
+      onMenuToggle(postId);
+    } finally {
+      setFollowBusy(false);
+    }
+  };
 
   const lightboxMeta = buildPostLightboxMeta(
     { ...post, community: communityMeta },
@@ -149,64 +193,98 @@ const PostFeedCard: React.FC<PostFeedCardProps> = ({
               </span>
             )}
 
-            <div className="relative ml-auto" ref={menuOpenPostId === postId ? menuRef : null}>
+            <div className="relative ml-auto" ref={menuOpen ? menuRef : null}>
               <button
                 type="button"
+                data-floating-menu-trigger
+                onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
+                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                  if (menuOpen) {
+                    closeMenu();
+                    return;
+                  }
+                  setMenuAnchor({ rect });
                   onMenuToggle(postId, e);
                 }}
                 className={`post-feed-card-menu flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${
-                  menuOpenPostId === postId
+                  menuOpen
                     ? 'bg-black/10 text-black opacity-100'
                     : 'text-neutral-500 opacity-60 hover:bg-black/5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/article:opacity-100'
                 }`}
-                aria-expanded={menuOpenPostId === postId}
+                aria-expanded={menuOpen}
                 aria-haspopup="menu"
               >
                 <AnimatedPostMenuIcon kind="ellipsis" size={16} />
               </button>
 
-              {menuOpenPostId === postId && (
-                <div
-                  className="absolute right-0 top-full z-50 mt-1 w-48 rounded-lg border border-neutral-200 bg-white p-1 shadow-lg"
-                  onClick={(e) => e.stopPropagation()}
-                  role="menu"
-                >
+              <FloatingMenu
+                open={menuOpen}
+                anchor={menuAnchor}
+                onClose={closeMenu}
+                width={224}
+              >
+                {canFollowAuthor && (
                   <button
                     type="button"
-                    onClick={() => onCopyLink(postId)}
-                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
+                    disabled={followBusy}
+                    onClick={() => void handleFollowAuthor()}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50 disabled:opacity-50"
                     role="menuitem"
                   >
-                    <AnimatedPostMenuIcon kind="link" size={14} />
-                    {t('home.copyLink')}
+                    <AnimatedPostMenuIcon kind="follow" size={14} />
+                    {t('home.followUser', { username: authorUsername })}
                   </button>
-                  {canManagePost && onEdit && onDelete && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => onEdit(postId, post.content)}
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
-                        role="menuitem"
-                      >
-                        <AnimatedPostMenuIcon kind="edit" size={14} />
-                        {t('common.edit')}
-                      </button>
-                      <div className="my-1 h-px bg-neutral-100" />
-                      <button
-                        type="button"
-                        onClick={() => onDelete(postId)}
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
-                        role="menuitem"
-                      >
-                        <AnimatedPostMenuIcon kind="trash" size={14} color="#dc2626" />
-                        {t('common.delete')}
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
+                )}
+                <button
+                  type="button"
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCopyLink(postId);
+                    closeMenu();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
+                  role="menuitem"
+                >
+                  <AnimatedPostMenuIcon kind="link" size={14} />
+                  {t('home.copyLink')}
+                </button>
+                {canManagePost && onEdit && onDelete && (
+                  <>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onEdit(postId, post.content);
+                        closeMenu();
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
+                      role="menuitem"
+                    >
+                      <AnimatedPostMenuIcon kind="edit" size={14} />
+                      {t('common.edit')}
+                    </button>
+                    <div className="my-1 h-px bg-neutral-100" />
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void onDelete(postId);
+                        closeMenu();
+                      }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
+                      role="menuitem"
+                    >
+                      <AnimatedPostMenuIcon kind="trash" size={14} color="#dc2626" />
+                      {t('common.delete')}
+                    </button>
+                  </>
+                )}
+              </FloatingMenu>
             </div>
           </div>
 

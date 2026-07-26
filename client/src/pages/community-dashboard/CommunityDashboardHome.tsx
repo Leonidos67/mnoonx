@@ -23,6 +23,7 @@ import { useDashboardOverview } from '../../hooks/useDashboardOverview';
 import { formatUsd, useDashboardAnalytics } from '../../hooks/useDashboardAnalytics';
 import { dashboardAppIcon, getDashboardAppLabel } from '../../components/Community/Dashboard/dashboardAppMeta';
 import { useTranslation } from '../../i18n/useTranslation';
+import { communityCategoryLabel } from '../../constants/communityCategories';
 import {
   communityPath,
   communityDashboardAnalyticsPath,
@@ -304,7 +305,8 @@ const CommunityDashboardHome: React.FC = () => {
       <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-neutral-500">
         <span className="inline-flex items-center gap-1.5">
           {isPublic ? <Globe className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
-          {isPublic ? t('common.public') : t('common.private')} · {community.category}
+          {isPublic ? t('common.public') : t('common.private')} ·{' '}
+          {communityCategoryLabel(community.category, t)}
         </span>
         {community.isPaid && (
           <span>

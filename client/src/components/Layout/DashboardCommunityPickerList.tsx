@@ -26,7 +26,7 @@ const DashboardCommunityPickerList: React.FC<DashboardCommunityPickerListProps> 
     );
   }
 
-  if (communities.length === 0) {
+  if (communities.filter((c) => c.kind !== 'collaboration').length === 0) {
     return (
       <div className={`px-3 py-4 text-center ${className}`}>
         <p className="text-sm text-neutral-600">{t('nav.noCommunitiesYet')}</p>
@@ -44,7 +44,9 @@ const DashboardCommunityPickerList: React.FC<DashboardCommunityPickerListProps> 
 
   return (
     <ul className={`max-h-[min(50vh,320px)] overflow-y-auto py-1 ${className}`} role="menu">
-      {communities.map((c) => (
+      {communities
+        .filter((c) => c.kind !== 'collaboration')
+        .map((c) => (
         <li key={c._id} role="none">
           <Link
             to={communityDashboardPath(c.handle)}
@@ -65,7 +67,6 @@ const DashboardCommunityPickerList: React.FC<DashboardCommunityPickerListProps> 
               <span className="block truncate text-sm font-medium text-neutral-900">{c.name}</span>
               <span className="block truncate text-xs text-neutral-500">@{c.handle}</span>
             </span>
-            {/* <LayoutDashboard className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden /> */}
           </Link>
         </li>
       ))}

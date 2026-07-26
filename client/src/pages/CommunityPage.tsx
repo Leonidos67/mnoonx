@@ -5,10 +5,14 @@ import {
   communityPath,
   communityStorePath,
 } from '../constants/communityRoutes';
-import CommunityLeftSidebar, { type CommunityLeftNav } from '../components/Community/CommunityLeftSidebar';
+import CommunityLeftSidebar, {
+  type CommunityLeftNav,
+  type CommunitySidebarAppInstance,
+} from '../components/Community/CommunityLeftSidebar';
 import CommunityRightSidebar from '../components/Community/CommunityRightSidebar';
 import CommunityMobileSideAccess from '../components/Community/CommunityMobileSideAccess';
 import { COMMUNITY_APP_IDS } from '../constants/communityApps';
+import { trackCommunityAppStat } from '../utils/trackCommunityAppStat';
 import CommunityChatPanel from '../components/Community/CommunityChatPanel';
 import CommunityCoursesPanel from '../components/Community/CommunityCoursesPanel';
 import CommunityContentPanel from '../components/Community/CommunityContentPanel';
@@ -18,6 +22,13 @@ import CommunityEventsPanel from '../components/Community/CommunityEventsPanel';
 import CommunityAiPanel from '../components/Community/CommunityAiPanel';
 import CommunityKanbanPanel from '../components/Community/CommunityKanbanPanel';
 import CommunityFormsPanel from '../components/Community/CommunityFormsPanel';
+import {
+  CollaborationAppsStrip,
+  CollaborationCenterHeader,
+  CollaborationRightPanel,
+  resolveCreatorFace,
+  type CreatorFace,
+} from '../components/Community/CollaborationWorkspace';
 import {
   Plus,
   UserPlus,
@@ -49,6 +60,7 @@ import { AnimatedPostMenuIcon } from '../components/Posts/PostMenuAnimatedIcons'
 import PostDetailPanel from '../components/Posts/PostDetailPanel';
 import type { PostCoinAttachment } from '../types/postCoin';
 import type { PostLinkAttachment } from '../types/postLink';
+import { isValidPollDraft, type PostPollDraft } from '../types/postPoll';
 import type { FeedPost } from '../types/postFeed';
 import EditTextModal from '../components/Common/EditTextModal';
 import FloatingMenu from '../components/Common/FloatingMenu';
@@ -59,6 +71,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import AddCommunityAdminModal from '../components/Community/AddCommunityAdminModal';
 import CommunityBannerModal from '../components/Community/CommunityBannerModal';
 import { canAccessCommunityDashboard } from '../utils/communityRoles';
+import { isCommunityOwner } from '../utils/communityOwner';
 import { isPopulatedCommunity } from '../utils/postDisplay';
 import { useToast } from '../context/ToastContext';
 import { useConfirm } from '../context/ConfirmContext';
@@ -75,6 +88,7 @@ interface InstalledAppInstance {
   title: string;
   visibleToMembers: boolean;
   note?: string;
+  archivedAt?: string | null;
 }
 
 interface Community {
@@ -113,6 +127,24 @@ interface Community {
     username: string;
     fullName: string;
     avatar: string;
+  } | null;
+  ownerFace?: {
+    type: 'user' | 'community';
+    name: string;
+    handle: string;
+    avatar?: string;
+    userId?: string;
+    username?: string;
+    fullName?: string;
+  } | null;
+  coOwnerFace?: {
+    type: 'user' | 'community';
+    name: string;
+    handle: string;
+    avatar?: string;
+    userId?: string;
+    username?: string;
+    fullName?: string;
   } | null;
 }
 
@@ -169,6 +201,7 @@ const CommunityPage: React.FC = () => {
   const [activeKanbanInstanceId, setActiveKanbanInstanceId] = useState<string | null>(null);
   const [activeFormsInstanceId, setActiveFormsInstanceId] = useState<string | null>(null);
   const [mainTab, setMainTab] = useState<'home' | 'apps' | 'products' | 'about'>('home');
+  const [collabRightOpen, setCollabRightOpen] = useState(false);
   const [productsBundleOpen, setProductsBundleOpen] = useState(true);
   const avatarFileRef = useRef<HTMLInputElement | null>(null);
   const [brandingFieldBusy, setBrandingFieldBusy] = useState<'banner' | 'avatar' | null>(null);
@@ -178,6 +211,7 @@ const CommunityPage: React.FC = () => {
   const [newPostMedia, setNewPostMedia] = useState<string[]>([]);
   const [newPostLink, setNewPostLink] = useState<PostLinkAttachment | null>(null);
   const [newPostCoin, setNewPostCoin] = useState<PostCoinAttachment | null>(null);
+  const [newPostPoll, setNewPostPoll] = useState<PostPollDraft | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const isLgUp = useMediaQuery('(min-width: 1024px)');
@@ -188,6 +222,8 @@ const CommunityPage: React.FC = () => {
   const [menuOpenPostId, setMenuOpenPostId] = useState<string | null>(null);
   const [editPostTarget, setEditPostTarget] = useState<{ postId: string; content: string } | null>(null);
   const [editPostSaving, setEditPostSaving] = useState(false);
+  const [renameAppTarget, setRenameAppTarget] = useState<{ instanceId: string; title: string } | null>(null);
+  const [renameAppSaving, setRenameAppSaving] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const postDetail = usePostDetail(posts, [], setPosts);
@@ -253,10 +289,10 @@ const CommunityPage: React.FC = () => {
   }, [handle]);
 
   // Загрузка данных сообщества
-  const fetchCommunity = useCallback(async () => {
+  const fetchCommunity = useCallback(async (opts?: { soft?: boolean }) => {
     if (!handle) return;
     try {
-      setLoading(true);
+      if (!opts?.soft) setLoading(true);
       const headers: Record<string, string> = {};
       if (token) headers['Authorization'] = `Bearer ${token}`;
       
@@ -285,9 +321,9 @@ const CommunityPage: React.FC = () => {
       console.error('Fetch community error:', err);
       navigate('/discover');
     } finally {
-      setLoading(false);
+      if (!opts?.soft) setLoading(false);
     }
-  }, [handle, token, user, navigate]);
+  }, [handle, token, navigate]);
 
   const attachCommunityToPosts = useCallback(
     (items: Post[]): Post[] => {
@@ -401,7 +437,7 @@ const CommunityPage: React.FC = () => {
   );
 
   useEffect(() => {
-    fetchCommunity();
+    void fetchCommunity();
   }, [fetchCommunity]);
 
   useEffect(() => {
@@ -633,7 +669,7 @@ const CommunityPage: React.FC = () => {
   }, [community]);
 
   useEffect(() => {
-    if (!token || !handle || !community) return;
+    if (!token || !handle) return;
     const fetchUnread = async () => {
       try {
         const res = await fetch(`${API_URL}/${encodeURIComponent(handle)}/chat/unread`, {
@@ -642,7 +678,18 @@ const CommunityPage: React.FC = () => {
         if (!res.ok) return;
         const data = await res.json();
         if (data && typeof data.counts === 'object' && data.counts !== null) {
-          setUnreadByInstance(data.counts as Record<string, number>);
+          setUnreadByInstance((prev) => {
+            const next = data.counts as Record<string, number>;
+            const prevKeys = Object.keys(prev);
+            const nextKeys = Object.keys(next);
+            if (
+              prevKeys.length === nextKeys.length &&
+              nextKeys.every((k) => prev[k] === next[k])
+            ) {
+              return prev;
+            }
+            return next;
+          });
         }
       } catch {
         /* ignore */
@@ -651,7 +698,7 @@ const CommunityPage: React.FC = () => {
     void fetchUnread();
     const id = window.setInterval(fetchUnread, 3000);
     return () => clearInterval(id);
-  }, [token, handle, community]);
+  }, [token, handle]);
 
   const canViewFeed =
     Boolean(community) &&
@@ -735,7 +782,15 @@ const CommunityPage: React.FC = () => {
     const hasCoin = Boolean(
       newPostCoin?.coinId?.trim() && newPostCoin?.name?.trim() && newPostCoin?.symbol?.trim()
     );
-    if ((!newPostContent.trim() && newPostMedia.length === 0 && !hasLink && !hasCoin) || !token || !canPost || isPosting) return;
+    const hasPoll = isValidPollDraft(newPostPoll);
+    if (
+      (!newPostContent.trim() && newPostMedia.length === 0 && !hasLink && !hasCoin && !hasPoll) ||
+      !token ||
+      !canPost ||
+      isPosting
+    ) {
+      return;
+    }
     
     try {
       setIsPosting(true);
@@ -750,6 +805,7 @@ const CommunityPage: React.FC = () => {
           media: newPostMedia,
           linkAttachment: hasLink ? newPostLink : undefined,
           coinAttachment: hasCoin ? newPostCoin : undefined,
+          poll: hasPoll ? newPostPoll : undefined,
           community: community?._id,
           isPrivate: postVisibility === 'private'
         })
@@ -1018,7 +1074,7 @@ const CommunityPage: React.FC = () => {
   };
 
   const isOwner =
-    community?.isOwner === true || String(user?.id) === String(community?.owner?._id);
+    community?.isOwner === true || isCommunityOwner(community || {}, user?.id);
   const canOpenDashboard = community ? canAccessCommunityDashboard(community) : false;
 
   const handleRemoveAdmin = useCallback(
@@ -1066,6 +1122,7 @@ const CommunityPage: React.FC = () => {
     setNewPostMedia([]);
     setNewPostLink(null);
     setNewPostCoin(null);
+    setNewPostPoll(null);
   }, []);
   const chatInstances =
     community?.installedAppInstances?.filter((i) => i.appId === COMMUNITY_APP_IDS.CHAT) ?? [];
@@ -1096,18 +1153,23 @@ const CommunityPage: React.FC = () => {
   const hasFormsApp = formInstances.length > 0;
   const sidebarAppInstances = (community?.installedAppInstances ?? []).filter(
     (i) =>
-      i.appId === COMMUNITY_APP_IDS.CHAT ||
-      i.appId === COMMUNITY_APP_IDS.COURSES ||
-      i.appId === COMMUNITY_APP_IDS.CONTENT ||
-      i.appId === COMMUNITY_APP_IDS.FILES ||
-      i.appId === COMMUNITY_APP_IDS.ANNOUNCEMENTS ||
-      i.appId === COMMUNITY_APP_IDS.EVENTS ||
-      i.appId === COMMUNITY_APP_IDS.AI ||
-      i.appId === COMMUNITY_APP_IDS.KANBAN ||
-      i.appId === COMMUNITY_APP_IDS.FORMS
+      !i.archivedAt &&
+      (i.appId === COMMUNITY_APP_IDS.CHAT ||
+        i.appId === COMMUNITY_APP_IDS.COURSES ||
+        i.appId === COMMUNITY_APP_IDS.CONTENT ||
+        i.appId === COMMUNITY_APP_IDS.FILES ||
+        i.appId === COMMUNITY_APP_IDS.ANNOUNCEMENTS ||
+        i.appId === COMMUNITY_APP_IDS.EVENTS ||
+        i.appId === COMMUNITY_APP_IDS.AI ||
+        i.appId === COMMUNITY_APP_IDS.KANBAN ||
+        i.appId === COMMUNITY_APP_IDS.FORMS)
   );
 
   const activateAppInstance = useCallback((inst: InstalledAppInstance) => {
+    if (handle) {
+      trackCommunityAppStat(handle, inst.id, 'open', token);
+      trackCommunityAppStat(handle, inst.id, 'click', token);
+    }
     if (inst.appId === COMMUNITY_APP_IDS.CHAT) {
       setActiveChatInstanceId(inst.id);
       setLeftNav('chat');
@@ -1136,7 +1198,61 @@ const CommunityPage: React.FC = () => {
       setActiveFormsInstanceId(inst.id);
       setLeftNav('forms');
     }
-  }, []);
+  }, [handle, token]);
+
+  useEffect(() => {
+    if (!community || !handle) return;
+    const params = new URLSearchParams(location.search);
+    const openApp = params.get('openApp');
+    if (!openApp) return;
+    const inst = (community.installedAppInstances ?? []).find(
+      (i) => i.id === openApp && !i.archivedAt,
+    );
+    if (!inst) return;
+    activateAppInstance(inst);
+    params.delete('openApp');
+    const next = params.toString();
+    navigate(`${location.pathname}${next ? `?${next}` : ''}`, { replace: true });
+  }, [community, handle, location.search, location.pathname, activateAppInstance, navigate]);
+
+  useEffect(() => {
+    if (!handle || !token) return;
+    const viewId =
+      leftNav === 'chat'
+        ? activeChatInstanceId
+        : leftNav === 'courses'
+          ? activeCoursesInstanceId
+          : leftNav === 'content'
+            ? activeContentInstanceId
+            : leftNav === 'files'
+              ? activeFilesInstanceId
+              : leftNav === 'announcements'
+                ? activeAnnouncementsInstanceId
+                : leftNav === 'events'
+                  ? activeEventsInstanceId
+                  : leftNav === 'ai'
+                    ? activeAiInstanceId
+                    : leftNav === 'kanban'
+                      ? activeKanbanInstanceId
+                      : leftNav === 'forms'
+                        ? activeFormsInstanceId
+                        : null;
+    if (!viewId) return;
+    trackCommunityAppStat(handle, viewId, 'view', token);
+  }, [
+    handle,
+    token,
+    leftNav,
+    activeChatInstanceId,
+    activeCoursesInstanceId,
+    activeContentInstanceId,
+    activeFilesInstanceId,
+    activeAnnouncementsInstanceId,
+    activeEventsInstanceId,
+    activeAiInstanceId,
+    activeKanbanInstanceId,
+    activeFormsInstanceId,
+  ]);
 
   const patchInstanceVisibility = useCallback(
     async (instanceId: string, visibleToMembers: boolean) => {
@@ -1370,6 +1486,84 @@ const CommunityPage: React.FC = () => {
     [token, handle, community, showToast, t, activateAppInstance],
   );
 
+  const moveAppInstance = useCallback(
+    async (instanceId: string, direction: 'up' | 'down') => {
+      if (!token || !handle) return;
+      try {
+        const res = await fetch(
+          `${API_URL}/${handle}/apps/instances/${encodeURIComponent(instanceId)}/move`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ direction }),
+          },
+        );
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data?.code !== 'cannot_move') {
+            showToast(
+              typeof data?.message === 'string' ? data.message : t('community.failedMoveApp'),
+              'error',
+            );
+          }
+          return;
+        }
+        const data = await res.json();
+        setCommunity(data);
+      } catch (e) {
+        console.error(e);
+        showToast(t('community.failedMoveApp'), 'error');
+      }
+    },
+    [token, handle, showToast, t],
+  );
+
+  const submitRenameApp = useCallback(
+    async (value: string) => {
+      if (!token || !handle || !renameAppTarget) return;
+      const title = value.trim();
+      if (!title) {
+        showToast(t('community.failedRenameApp'), 'error');
+        return;
+      }
+      setRenameAppSaving(true);
+      try {
+        const res = await fetch(
+          `${API_URL}/${handle}/apps/instances/${encodeURIComponent(renameAppTarget.instanceId)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ title }),
+          },
+        );
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          showToast(
+            typeof data?.message === 'string' ? data.message : t('community.failedRenameApp'),
+            'error',
+          );
+          return;
+        }
+        const data = await res.json();
+        setCommunity(data);
+        setRenameAppTarget(null);
+        showToast(t('community.appRenamedToast'));
+      } catch (e) {
+        console.error(e);
+        showToast(t('community.failedRenameApp'), 'error');
+      } finally {
+        setRenameAppSaving(false);
+      }
+    },
+    [token, handle, renameAppTarget, showToast, t],
+  );
+
   const leftSidebarProps = useMemo(() => {
     if (!community) return null;
     return {
@@ -1399,6 +1593,9 @@ const CommunityPage: React.FC = () => {
       onPatchVisibility: patchInstanceVisibility,
       onDeleteApp: deleteAppInstance,
       onDuplicateApp: duplicateAppInstance,
+      onRenameApp: (inst: CommunitySidebarAppInstance) =>
+        setRenameAppTarget({ instanceId: inst.id, title: inst.title }),
+      onMoveApp: moveAppInstance,
     };
   }, [
     community,
@@ -1419,12 +1616,14 @@ const CommunityPage: React.FC = () => {
     patchInstanceVisibility,
     deleteAppInstance,
     duplicateAppInstance,
+    moveAppInstance,
   ]);
 
   const rightSidebarProps = useMemo(() => {
     if (!community?.owner) return null;
     return {
       handle: community.handle,
+      name: community.name,
       memberCount: community.memberCount,
       owner: community.owner,
       canOpenDashboard,
@@ -1589,6 +1788,8 @@ const CommunityPage: React.FC = () => {
 
   if (!community) return null;
 
+  const isCollaboration = community.kind === 'collaboration';
+
   const isAppNavActive =
     leftNav === 'chat' ||
     leftNav === 'courses' ||
@@ -1600,15 +1801,50 @@ const CommunityPage: React.FC = () => {
     leftNav === 'kanban' ||
     leftNav === 'forms';
 
+  const openCollabApp = (inst: { id: string }) => {
+    const full = sidebarAppInstances.find((i) => i.id === inst.id);
+    if (full) activateAppInstance(full);
+  };
+
+  const collabTabPanel = 'w-full';
+  const collabSectionCard =
+    'overflow-hidden rounded-2xl border border-neutral-200 bg-white';
+
+  const gridColsClass = isCollaboration
+    ? isAppNavActive
+      ? 'grid-cols-1'
+      : 'grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)]'
+    : isAppNavActive
+      ? 'grid-cols-1 lg:grid-cols-[280px_1fr]'
+      : 'grid-cols-1 lg:grid-cols-[280px_1fr_340px]';
+
   return (
     <div className="flex h-full min-h-[calc(100dvh-var(--app-header-height)-var(--app-mobile-nav-height))] flex-col overflow-hidden lg:min-h-[calc(100dvh-var(--app-header-height))]">
       <div
-        className={`mx-auto grid h-full min-h-full w-full max-w-[1600px] flex-1 grid-rows-[minmax(0,1fr)] gap-2 p-2 max-lg:min-h-[calc(100dvh-var(--app-header-height)-var(--app-mobile-nav-height))] max-lg:gap-0 max-lg:p-0 lg:min-h-[calc(100dvh-var(--app-header-height)-1rem)] ${
-          isAppNavActive ? 'grid-cols-1 lg:grid-cols-[280px_1fr]' : 'grid-cols-1 lg:grid-cols-[280px_1fr_340px]'
-        }`}
+        className={`mx-auto grid h-full min-h-full w-full max-w-[1600px] flex-1 grid-rows-[minmax(0,1fr)] p-2 max-lg:min-h-[calc(100dvh-var(--app-header-height)-var(--app-mobile-nav-height))] max-lg:gap-0 max-lg:p-0 lg:min-h-[calc(100dvh-var(--app-header-height)-1rem)] ${
+          isCollaboration ? 'gap-1' : 'gap-2'
+        } ${gridColsClass}`}
       >
-        {/* LEFT SIDEBAR — desktop */}
-        {leftSidebarProps && (
+        {/* Collab side panel — left of center */}
+        {!isAppNavActive && isCollaboration && community.owner && (
+          <div className="hidden h-full min-h-0 overflow-y-auto lg:block">
+            <CollaborationRightPanel
+              handle={community.handle}
+              name={community.name}
+              owner={community.owner}
+              coOwner={community.coOwner}
+              ownerFace={community.ownerFace}
+              coOwnerFace={community.coOwnerFace}
+              instances={sidebarAppInstances}
+              isOwner={isOwner}
+              onCopyLink={copyCommunityLink}
+              onOpenApp={openCollabApp}
+            />
+          </div>
+        )}
+
+        {/* LEFT SIDEBAR — desktop (hidden for collaborations) */}
+        {!isCollaboration && leftSidebarProps && (
           <div className="relative z-20 hidden h-full min-h-0 min-w-0 overflow-hidden rounded-xl border border-[#e7e7e7] lg:block">
             <CommunityLeftSidebar {...leftSidebarProps} className="h-full" />
           </div>
@@ -1725,10 +1961,67 @@ const CommunityPage: React.FC = () => {
               }
             >
           <div
-            className={`flex min-h-full flex-col rounded-xl border border-[#e7e7e7] bg-white max-lg:rounded-none max-lg:border-x-0 ${
-              mobileComposerFull ? 'min-h-0 flex-1 overflow-hidden' : ''
-            }`}
+            className={
+              isCollaboration
+                ? `flex min-h-full w-full flex-col space-y-3 p-3 ${
+                    mobileComposerFull ? 'min-h-0 flex-1 overflow-hidden' : ''
+                  }`
+                : `flex min-h-full flex-col rounded-xl border border-[#e7e7e7] bg-white max-lg:rounded-none max-lg:border-x-0 ${
+                    mobileComposerFull ? 'min-h-0 flex-1 overflow-hidden' : ''
+                  }`
+            }
           >
+            {isCollaboration ? (
+              <CollaborationCenterHeader
+                name={community.name}
+                description={community.description}
+                isPublic={community.isPublic !== false}
+                memberCount={community.memberCount}
+                formatCount={formatCount}
+                owner={community.owner}
+                coOwner={community.coOwner}
+                ownerFace={community.ownerFace}
+                coOwnerFace={community.coOwnerFace}
+                instances={sidebarAppInstances}
+                isOwner={isOwner}
+                onOpenApp={openCollabApp}
+                onAddApp={handle ? () => navigate(communityStorePath(handle)) : undefined}
+                mobileTrailing={
+                  !isLgUp && !isAppNavActive ? (
+                    <button
+                      type="button"
+                      onClick={() => setCollabRightOpen(true)}
+                      className="flex h-10 w-10 items-center justify-center rounded-2xl border border-neutral-200 bg-white text-neutral-800 shadow-sm"
+                      aria-label={t('community.mobileOpenPeopleAria')}
+                    >
+                      <Users size={20} aria-hidden />
+                    </button>
+                  ) : undefined
+                }
+                joinSlot={
+                  user && !isOwner ? (
+                    <button
+                      type="button"
+                      onClick={handleJoin}
+                      disabled={joinLoading}
+                      className={`inline-flex h-10 w-fit items-center gap-2 rounded-2xl px-4 font-medium transition-all ${
+                        isMember
+                          ? 'border border-red-200 bg-white text-red-600 hover:bg-red-50'
+                          : 'bg-neutral-900 text-white hover:bg-neutral-800'
+                      }`}
+                    >
+                      {isMember ? <UserPlus size={18} /> : <Plus size={18} />}
+                      {joinLoading
+                        ? t('community.joinLoading')
+                        : isMember
+                          ? t('community.leave')
+                          : t('community.join')}
+                    </button>
+                  ) : null
+                }
+              />
+            ) : (
+              <>
             {/* BANNER — top radius matches parent card */}
             <div className="relative h-[140px] shrink-0 overflow-hidden rounded-t-xl bg-gradient-to-r from-gray-800 to-gray-900 max-lg:rounded-t-none sm:h-[200px] lg:h-[250px]">
               {community.banner && (
@@ -1801,14 +2094,6 @@ const CommunityPage: React.FC = () => {
                       )}
                     </span>
                     <span>•</span>
-                    {community.kind === 'collaboration' ? (
-                      <>
-                        <span className="inline-flex items-center rounded-full bg-[#eef2ff] px-2.5 py-0.5 text-xs font-semibold text-[#315efb]">
-                          {t('discover.collaborationBadge')}
-                        </span>
-                        <span>•</span>
-                      </>
-                    ) : null}
                     <span
                       className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         community.isPublic !== false
@@ -1837,17 +2122,6 @@ const CommunityPage: React.FC = () => {
                       >
                         {community.owner?.fullName || community.owner?.username}
                       </Link>
-                      {community.kind === 'collaboration' && community.coOwner?.username ? (
-                        <>
-                          <span className="text-[#888]">&</span>
-                          <Link
-                            to={`/@${community.coOwner.username}`}
-                            className="font-semibold text-black hover:underline"
-                          >
-                            {community.coOwner.fullName || community.coOwner.username}
-                          </Link>
-                        </>
-                      ) : null}
                     </div>
                   </div>
 
@@ -1869,56 +2143,106 @@ const CommunityPage: React.FC = () => {
                 </div>
               </div>
             </div>
+              </>
+            )}
 
-            {/* TABS — full width, active bg + centered thick underline */}
-            <div className="grid w-full grid-cols-4 border-t border-[#ececec]">
-              {(['home', 'apps', 'products', 'about'] as const).map((tab) => {
-                const tabLabel =
-                  tab === 'home'
-                    ? t('community.tabHome')
-                    : tab === 'apps'
-                      ? t('community.tabApps')
-                      : tab === 'products'
-                        ? t('community.tabProducts')
-                        : t('community.tabAbout');
-                return (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => {
-                    setMainTab(tab);
-                    setLeftNav('home');
-                  }}
-                  className={`flex w-full flex-col items-center pt-3 transition-colors ${
-                    mainTab === tab ? 'bg-neutral-100 text-black' : 'text-[#777] hover:bg-neutral-100'
-                  }`}
-                >
-                  <span className="pb-2 text-center text-[13px] font-medium sm:text-[17px]">{tabLabel}</span>
-                  <span
-                    className={`mb-0 h-1 w-[38%] max-w-[96px] rounded-full ${
-                      mainTab === tab ? 'bg-[#315efb]' : 'bg-transparent'
-                    }`}
-                    aria-hidden
-                  />
-                </button>
-              );
-              })}
-            </div>
+            {/* TABS */}
+            {isCollaboration ? (
+              <div className="rounded-2xl border border-neutral-200 bg-white p-2">
+                <div className="flex w-full flex-wrap justify-center gap-2">
+                  {(['home', 'apps', 'products', 'about'] as const).map((tab) => {
+                    const tabLabel =
+                      tab === 'home'
+                        ? t('community.tabHome')
+                        : tab === 'apps'
+                          ? t('community.tabApps')
+                          : tab === 'products'
+                            ? t('community.tabProducts')
+                            : t('community.tabAbout');
+                    const active = mainTab === tab;
+                    return (
+                      <button
+                        key={tab}
+                        type="button"
+                        onClick={() => {
+                          setMainTab(tab);
+                          setLeftNav('home');
+                        }}
+                        className={`min-w-0 flex-1 basis-[calc(50%-0.35rem)] rounded-xl px-3 py-2.5 text-center text-[13px] font-semibold transition-colors sm:basis-0 sm:px-4 sm:text-[15px] ${
+                          active
+                            ? 'bg-neutral-900 text-white'
+                            : 'border border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-50'
+                        }`}
+                      >
+                        {tabLabel}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="grid w-full grid-cols-4 border-t border-[#ececec]">
+                {(['home', 'apps', 'products', 'about'] as const).map((tab) => {
+                  const tabLabel =
+                    tab === 'home'
+                      ? t('community.tabHome')
+                      : tab === 'apps'
+                        ? t('community.tabApps')
+                        : tab === 'products'
+                          ? t('community.tabProducts')
+                          : t('community.tabAbout');
+                  return (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => {
+                        setMainTab(tab);
+                        setLeftNav('home');
+                      }}
+                      className={`flex w-full flex-col items-center pt-3 transition-colors ${
+                        mainTab === tab
+                          ? 'bg-neutral-100 text-black'
+                          : 'text-[#777] hover:bg-neutral-100'
+                      }`}
+                    >
+                      <span className="pb-2 text-center text-[13px] font-medium sm:text-[17px]">
+                        {tabLabel}
+                      </span>
+                      <span
+                        className={`mb-0 h-1 w-[38%] max-w-[96px] rounded-full ${
+                          mainTab === tab ? 'bg-[#315efb]' : 'bg-transparent'
+                        }`}
+                        aria-hidden
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
             {/* TAB PANELS */}
             <div
-              className={`flex flex-col border-t border-[#ececec] py-0 ${
-                mobileComposerFull ? 'min-h-0 flex-1 overflow-hidden' : ''
-              }`}
+              className={`flex flex-col py-0 ${
+                isCollaboration ? '' : 'border-t border-[#ececec]'
+              } ${mobileComposerFull ? 'min-h-0 flex-1 overflow-hidden' : ''}`}
             >
               {mainTab === 'home' && (
                 <div
                   className={
                     mobileComposerFull
-                      ? 'mx-auto mt-4 flex min-h-0 w-full flex-1 flex-col'
-                      : 'mx-auto flex w-full flex-col pt-2'
+                      ? `${isCollaboration ? collabTabPanel : 'mx-auto mt-4 flex min-h-0 w-full flex-1 flex-col'} ${isCollaboration ? 'mt-0 flex min-h-0 flex-1 flex-col' : ''}`
+                      : isCollaboration
+                        ? `${collabTabPanel} flex flex-col`
+                        : 'mx-auto flex w-full flex-col pt-2'
                   }
                 >
+                  <div
+                    className={
+                      isCollaboration
+                        ? `${collabSectionCard} ${mobileComposerFull ? 'flex min-h-0 flex-1 flex-col' : ''}`
+                        : ''
+                    }
+                  >
                   {canPost && (
                     <PostComposer
                       variant="community"
@@ -1932,6 +2256,8 @@ const CommunityPage: React.FC = () => {
                       onLinkAttachmentChange={setNewPostLink}
                       coinAttachment={newPostCoin}
                       onCoinAttachmentChange={setNewPostCoin}
+                      pollAttachment={newPostPoll}
+                      onPollAttachmentChange={setNewPostPoll}
                       onCancel={closeComposer}
                       onSubmit={() => void handleCreatePost()}
                       isPosting={isPosting}
@@ -1941,7 +2267,13 @@ const CommunityPage: React.FC = () => {
                     />
                   )}
                   {memberButCannotPost && !ownerOnlyPostNoticeDismissed && (
-                    <div className="my-6 flex items-start gap-3 rounded-xl border border-[#ececec] bg-[#fafafa] px-4 py-3 text-sm text-[#666]">
+                    <div
+                      className={`my-6 flex items-start gap-3 rounded-xl px-4 py-3 text-sm ${
+                        isCollaboration
+                          ? 'mx-3 border border-neutral-200 bg-neutral-50 text-neutral-700'
+                          : 'border border-[#ececec] bg-[#fafafa] text-[#666]'
+                      }`}
+                    >
                       <p className="min-w-0 flex-1 leading-snug">
                         {t('community.ownerOnlyNotice')}
                       </p>
@@ -1957,9 +2289,9 @@ const CommunityPage: React.FC = () => {
                   )}
 
                   <div
-                    className={`flex flex-1 flex-col border-t border-neutral-200 ${
-                      mobileComposerFull ? 'hidden' : 'min-h-0'
-                    }`}
+                    className={`flex flex-1 flex-col ${
+                      isCollaboration ? 'border-t border-neutral-200' : 'border-t border-neutral-200'
+                    } ${mobileComposerFull ? 'hidden' : 'min-h-0'}`}
                   >
                   {posts.length > 0 ? (
                     posts.map((post) => (
@@ -1990,7 +2322,7 @@ const CommunityPage: React.FC = () => {
                         expandedCommentsPostId={expandedCommentsPostId}
                         menuOpenPostId={menuOpenPostId}
                         onMenuToggle={(postId, e) => {
-                          e.stopPropagation();
+                          e?.stopPropagation();
                           setMenuOpenPostId(menuOpenPostId === postId ? null : postId);
                         }}
                         menuRef={menuRef}
@@ -2024,21 +2356,49 @@ const CommunityPage: React.FC = () => {
                               : { commentId: c._id, postId: pid, content: c.content, rect },
                           );
                         }}
+                        onPollChange={(poll) => {
+                          setPosts((prev) =>
+                            prev.map((p) =>
+                              String(p._id) === String(post._id) ? { ...p, poll } : p
+                            )
+                          );
+                        }}
                       />
                     ))
                   ) : (
-                    <div className="flex flex-1 min-h-[280px] items-center justify-center px-4 py-12 text-[17px] text-[#999]">
+                    <div
+                      className={`flex min-h-[280px] flex-1 items-center justify-center px-4 py-12 text-[17px] ${
+                        isCollaboration ? 'text-[#64748b]' : 'text-[#999]'
+                      }`}
+                    >
                       {canViewFeed
                         ? t('community.feedEmpty')
                         : t('community.joinToSeePosts')}
                     </div>
                   )}
                   </div>
+                  </div>
                 </div>
               )}
 
               {mainTab === 'apps' && handle && (
-                <div className="mx-auto flex w-full max-w-2xl flex-col px-4">
+                <div
+                  className={
+                    isCollaboration
+                      ? collabTabPanel
+                      : 'mx-auto flex w-full max-w-2xl flex-col px-4 py-4 sm:py-6'
+                  }
+                >
+                  <div className={isCollaboration ? `${collabSectionCard} p-4 sm:p-5` : ''}>
+                  {community.kind === 'collaboration' ? (
+                    <CollaborationAppsStrip
+                      instances={sidebarAppInstances}
+                      isOwner={isOwner}
+                      onOpen={openCollabApp}
+                      onAdd={() => navigate(communityStorePath(handle))}
+                    />
+                  ) : (
+                    <>
                   <div className="flex items-center justify-between border-b border-[#ececec] py-4">
                     <h2 className="text-xl font-bold text-neutral-900">{t('community.appsHeading')}</h2>
                     {isOwner && (
@@ -2111,19 +2471,41 @@ const CommunityPage: React.FC = () => {
                   {sidebarAppInstances.length === 0 && (
                     <p className="pb-10 text-center text-[17px] text-[#999]">{t('community.noAppsInstalled')}</p>
                   )}
+                    </>
+                  )}
+                  </div>
                 </div>
               )}
 
               {mainTab === 'products' && handle && (
-                <div className="mx-auto flex w-full max-w-2xl flex-col px-3 pb-6 sm:px-4">
-                  <div className="flex flex-col gap-3 border-b border-[#ececec] py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-0">
-                    <h2 className="text-lg font-bold text-neutral-900 sm:text-xl">{t('community.productsHeading')}</h2>
+                <div
+                  className={
+                    isCollaboration
+                      ? collabTabPanel
+                      : 'mx-auto flex w-full max-w-2xl flex-col px-3 pb-6 sm:px-4'
+                  }
+                >
+                  <div className={isCollaboration ? `${collabSectionCard} p-4 sm:p-5` : ''}>
+                  <div
+                    className={`flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-0 ${
+                      isCollaboration
+                        ? 'border-b border-neutral-200 pt-0'
+                        : 'border-b border-[#ececec]'
+                    }`}
+                  >
+                    <h2
+                      className={`text-lg font-bold sm:text-xl ${
+                        isCollaboration ? 'text-neutral-900' : 'text-neutral-900'
+                      }`}
+                    >
+                      {t('community.productsHeading')}
+                    </h2>
                     <div className="flex items-center gap-2">
                       {isOwner && (
                         <button
                           type="button"
                           onClick={() => navigate(communityStorePath(handle))}
-                          className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#eef2ff] text-[#315efb] transition-colors hover:bg-[#dfe7ff]"
+                          className="flex h-9 w-9 items-center justify-center rounded-lg bg-neutral-100 text-neutral-800 transition-colors hover:bg-neutral-200"
                           title={t('community.addFromStoreTitle')}
                         >
                           <Plus className="h-5 w-5" />
@@ -2132,14 +2514,28 @@ const CommunityPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="py-6">
-                    <div className="overflow-hidden rounded-2xl border border-[#e5e5e5] bg-white">
+                  <div className={isCollaboration ? 'py-4' : 'py-6'}>
+                    <div
+                      className={`overflow-hidden rounded-2xl border bg-white ${
+                        isCollaboration ? 'border-neutral-200' : 'border-[#e5e5e5]'
+                      }`}
+                    >
                       <button
                         type="button"
                         onClick={() => setProductsBundleOpen((v) => !v)}
-                        className="flex w-full items-center gap-3 border-b border-[#ececec] px-4 py-4 text-left transition-colors hover:bg-neutral-50"
+                        className={`flex w-full items-center gap-3 border-b px-4 py-4 text-left transition-colors ${
+                          isCollaboration
+                            ? 'border-neutral-200 hover:bg-neutral-50'
+                            : 'border-[#ececec] hover:bg-neutral-50'
+                        }`}
                       >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-600">
+                        <span
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
+                            isCollaboration
+                              ? 'border-neutral-200 bg-neutral-100 text-neutral-800'
+                              : 'border-emerald-200 bg-emerald-50 text-emerald-600'
+                          }`}
+                        >
                           <Package className="h-4 w-4" strokeWidth={2} />
                         </span>
                         <div className="min-w-0 flex-1">
@@ -2246,47 +2642,147 @@ const CommunityPage: React.FC = () => {
                       )}
                     </div>
 
-                    <div className="mt-5 flex items-center justify-center gap-3 rounded-2xl bg-neutral-100 px-5 py-5 text-center text-sm leading-relaxed text-neutral-600">
+                    <div
+                      className={`mt-5 flex items-center justify-center gap-3 rounded-2xl px-5 py-5 text-center text-sm leading-relaxed ${
+                        isCollaboration
+                          ? 'border border-neutral-200 bg-neutral-50 text-neutral-700'
+                          : 'bg-neutral-100 text-neutral-600'
+                      }`}
+                    >
                       <span className="text-lg" aria-hidden>
                         🍔
                       </span>
                       <span>{t('community.accessAllPurchasable')}</span>
                     </div>
                   </div>
+                  </div>
                 </div>
               )}
 
               {mainTab === 'about' && community.owner && (
-                <div className="mx-auto flex w-full max-w-2xl flex-col space-y-0 px-4 pb-8">
-                  <div className="border-b border-[#ececec] pb-8">
-                    {/* <h2 className="text-lg font-semibold text-neutral-800">Team</h2> */}
-                    <div className="mt-5 space-y-6">
+                <div
+                  className={
+                    isCollaboration
+                      ? collabTabPanel
+                      : 'mx-auto flex w-full max-w-2xl flex-col space-y-0 px-4 pb-8'
+                  }
+                >
+                  <div
+                    className={
+                      isCollaboration
+                        ? `${collabSectionCard} space-y-6 p-4 sm:p-5`
+                        : 'space-y-0 border-b border-[#ececec] pb-8'
+                    }
+                  >
+                    <div className={isCollaboration ? 'space-y-6' : 'mt-5 space-y-6'}>
                       <div>
-                        <p className="mb-3 text-xs font-medium uppercase tracking-[0.08em] text-[#999]">{t('community.aboutOwner')}</p>
-                        <Link
-                          to={`/@${community.owner.username}`}
-                          className="flex items-center justify-between rounded-2xl border border-[#e5e5e5] p-4 transition-colors hover:border-[#cfcfcf] hover:bg-neutral-50"
+                        <p
+                          className={`mb-3 text-xs font-medium uppercase tracking-[0.08em] ${
+                            isCollaboration ? 'text-neutral-500' : 'text-[#999]'
+                          }`}
                         >
-                          <div className="flex items-center gap-4">
-                            <div className="relative">
-                              <img
-                                src={
-                                  community.owner.avatar ||
-                                  `https://ui-avatars.com/api/?name=${encodeURIComponent(community.owner.fullName || community.owner.username)}&background=404040&color=fff&size=96&bold=true`
-                                }
-                                alt=""
-                                className="h-14 w-14 rounded-full object-cover"
-                              />
-                              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500" />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-neutral-900">{community.owner.fullName || community.owner.username}</p>
-                              <p className="text-sm text-neutral-500">@{community.owner.username}</p>
-                            </div>
-                          </div>
-                          <span className="rounded-full bg-[#f5f5f5] px-3 py-1 text-sm font-medium text-neutral-700">{t('community.ownerRole')}</span>
-                        </Link>
+                          {isCollaboration
+                            ? t('community.collab.creatorsHeading')
+                            : t('community.aboutOwner')}
+                        </p>
+                        {(() => {
+                          const faceRows: { face: CreatorFace; role: string }[] = [];
+                          if (isCollaboration) {
+                            const ownerFace = resolveCreatorFace(
+                              community.ownerFace,
+                              community.owner
+                            );
+                            const coFace = resolveCreatorFace(
+                              community.coOwnerFace,
+                              community.coOwner
+                            );
+                            if (ownerFace) {
+                              faceRows.push({
+                                face: ownerFace,
+                                role: t('community.collab.roleOwner'),
+                              });
+                            }
+                            if (coFace) {
+                              faceRows.push({
+                                face: coFace,
+                                role: t('community.collab.roleCoOwner'),
+                              });
+                            }
+                          } else if (community.owner?.username) {
+                            faceRows.push({
+                              face: {
+                                type: 'user',
+                                name: community.owner.fullName || community.owner.username,
+                                handle: community.owner.username,
+                                avatar: community.owner.avatar,
+                                username: community.owner.username,
+                                fullName: community.owner.fullName,
+                              },
+                              role: t('community.ownerRole'),
+                            });
+                          }
+
+                          return faceRows.map(({ face, role }, idx) => {
+                            const label = face.name || face.fullName || face.username || '';
+                            const href =
+                              face.type === 'community' && face.handle
+                                ? communityPath(face.handle)
+                                : `/@${face.username || face.handle}`;
+                            const avatarSrc =
+                              resolveMediaUrl(face.avatar || '') ||
+                              face.avatar ||
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(label)}&background=${
+                                isCollaboration ? '171717' : '404040'
+                              }&color=fff&size=96&bold=true`;
+                            return (
+                              <Link
+                                key={`${face.type}-${face.handle}-${role}`}
+                                to={href}
+                                className={`flex items-center justify-between rounded-2xl border p-4 transition-colors ${
+                                  idx > 0 ? 'mt-3' : ''
+                                } ${
+                                  isCollaboration
+                                    ? 'border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50'
+                                    : 'border-[#e5e5e5] hover:border-[#cfcfcf] hover:bg-neutral-50'
+                                }`}
+                              >
+                                <div className="flex items-center gap-4">
+                                  <div className="relative">
+                                    <img
+                                      src={avatarSrc}
+                                      alt=""
+                                      className={`h-14 w-14 rounded-full object-cover ${
+                                        isCollaboration ? 'ring-2 ring-neutral-200' : ''
+                                      }`}
+                                    />
+                                    {!isCollaboration ? (
+                                      <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-green-500" />
+                                    ) : null}
+                                  </div>
+                                  <div>
+                                    <p className="font-semibold text-neutral-900">{label}</p>
+                                    <p className="text-sm text-neutral-500">
+                                      {face.type === 'community'
+                                        ? `@${face.handle}`
+                                        : `@${face.username || face.handle}`}
+                                    </p>
+                                  </div>
+                                </div>
+                                <span
+                                  className={`rounded-full px-3 py-1 text-sm font-medium ${
+                                    isCollaboration
+                                      ? 'bg-neutral-100 text-neutral-700'
+                                      : 'bg-[#f5f5f5] text-neutral-700'
+                                  }`}
+                                >
+                                  {role}
+                                </span>
+                              </Link>
+                            );
+                          });
+                        })()}
                       </div>
+                      {!isCollaboration ? (
                       <div>
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <p className="text-xs font-medium uppercase tracking-[0.08em] text-[#999]">{t('community.aboutAdmins')}</p>
@@ -2352,8 +2848,10 @@ const CommunityPage: React.FC = () => {
                           </ul>
                         )}
                       </div>
+                      ) : null}
                     </div>
                   </div>
+                  {!isCollaboration ? (
                   <div className="pt-8">
                     <div className="flex items-center gap-2 text-neutral-700">
                       <Star className="h-4 w-4 text-amber-400" fill="currentColor" />
@@ -2364,6 +2862,7 @@ const CommunityPage: React.FC = () => {
                       <p className="text-[17px]">{t('community.noReviewsYet')}</p>
                     </div>
                   </div>
+                  ) : null}
                 </div>
               )}
             </div>
@@ -2372,12 +2871,35 @@ const CommunityPage: React.FC = () => {
           )}
         </div>
 
-        {!isAppNavActive && rightSidebarProps && (
+        {!isAppNavActive && !isCollaboration && rightSidebarProps && (
           <div className="hidden h-full min-h-0 overflow-y-auto lg:block">
             <CommunityRightSidebar {...rightSidebarProps} />
           </div>
         )}
       </div>
+
+      {isCollaboration && community.owner ? (
+        <MobileBottomSheet
+          open={collabRightOpen}
+          onClose={() => setCollabRightOpen(false)}
+          title={t('discover.collaborationBadge')}
+        >
+          <CollaborationRightPanel
+            handle={community.handle}
+            name={community.name}
+            owner={community.owner}
+            coOwner={community.coOwner}
+            ownerFace={community.ownerFace}
+            coOwnerFace={community.coOwnerFace}
+            instances={sidebarAppInstances}
+            isOwner={isOwner}
+            onCopyLink={copyCommunityLink}
+            onOpenApp={openCollabApp}
+            onNavigate={() => setCollabRightOpen(false)}
+            className="!p-0"
+          />
+        </MobileBottomSheet>
+      ) : null}
 
       {community && isOwner && (
         <CommunityBannerModal
@@ -2487,6 +3009,21 @@ const CommunityPage: React.FC = () => {
           if (!editPostSaving) setEditPostTarget(null);
         }}
         onSubmit={(value) => void submitEditPost(value)}
+      />
+
+      <EditTextModal
+        isOpen={renameAppTarget !== null}
+        title={t('community.renameAppTitle')}
+        description={t('community.renameAppDescription')}
+        initialValue={renameAppTarget?.title ?? ''}
+        placeholder={t('community.renameAppPlaceholder')}
+        maxLength={120}
+        submitLabel={t('community.renameAppSave')}
+        saving={renameAppSaving}
+        onClose={() => {
+          if (!renameAppSaving) setRenameAppTarget(null);
+        }}
+        onSubmit={(value) => void submitRenameApp(value)}
       />
 
       <EditTextModal

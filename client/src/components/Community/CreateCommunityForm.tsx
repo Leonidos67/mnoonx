@@ -4,6 +4,13 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { useTranslation } from '../../i18n/useTranslation';
 import { ArrowLeft, Upload } from 'lucide-react';
+import {
+  COMMUNITY_CATEGORY_LABEL_KEY,
+  COMMUNITY_CATEGORY_OPTIONS,
+  type CommunityCategory,
+} from '../../constants/communityCategories';
+import StyledSelect from '../Common/StyledSelect';
+import { communityPath } from '../../constants/communityRoutes';
 
 import { COMMUNITIES_API as API_URL } from '../../config/api';
 
@@ -13,17 +20,6 @@ export interface CreateCommunityFormProps {
   /** Back navigation target; omit to use browser history (-1) */
   backTo?: string;
 }
-
-const CREATE_CATEGORIES = [
-  { value: 'Memecoins', labelKey: 'createCommunity.catMemecoins' },
-  { value: 'Futures', labelKey: 'createCommunity.catFutures' },
-  { value: 'On-Chain', labelKey: 'createCommunity.catOnChain' },
-  { value: 'Airdrops', labelKey: 'createCommunity.catAirdrops' },
-  { value: 'Education', labelKey: 'createCommunity.catEducation' },
-  { value: 'DeFi', labelKey: 'createCommunity.catDeFi' },
-  { value: 'NFT', labelKey: 'createCommunity.catNFT' },
-  { value: 'Other', labelKey: 'createCommunity.catOther' },
-] as const;
 
 const CreateCommunityForm: React.FC<CreateCommunityFormProps> = ({ embedded = false, backTo }) => {
   const { token } = useAuth();
@@ -35,11 +31,16 @@ const CreateCommunityForm: React.FC<CreateCommunityFormProps> = ({ embedded = fa
     name: '',
     handle: '',
     description: '',
-    category: 'Other',
+    category: 'Other' as CommunityCategory,
     isPublic: true,
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const categoryOptions = COMMUNITY_CATEGORY_OPTIONS.map((value) => ({
+    value,
+    label: t(COMMUNITY_CATEGORY_LABEL_KEY[value]),
+  }));
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -86,7 +87,7 @@ const CreateCommunityForm: React.FC<CreateCommunityFormProps> = ({ embedded = fa
         throw new Error(data.message || t('createCommunity.toastCreateFailed'));
       }
 
-      navigate(`/community/${formData.handle}`);
+      navigate(communityPath(formData.handle));
     } catch (err: unknown) {
       showToast(err instanceof Error ? err.message : t('createCommunity.toastGenericError'), 'error');
     } finally {
@@ -172,18 +173,15 @@ const CreateCommunityForm: React.FC<CreateCommunityFormProps> = ({ embedded = fa
 
       <div>
         <label className="mb-1 block text-sm font-medium text-neutral-700">{t('createCommunity.categoryLabel')}</label>
-        <select
-          name="category"
+        <StyledSelect
           value={formData.category}
-          onChange={handleChange}
-          className="w-full rounded-xl border border-neutral-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black/10"
-        >
-          {CREATE_CATEGORIES.map((cat) => (
-            <option key={cat.value} value={cat.value}>
-              {t(cat.labelKey)}
-            </option>
-          ))}
-        </select>
+          options={categoryOptions}
+          aria-label={t('createCommunity.categoryLabel')}
+          placeholder={t('createCommunity.categoryPlaceholder')}
+          onChange={(value) =>
+            setFormData((prev) => ({ ...prev, category: value as CommunityCategory }))
+          }
+        />
       </div>
 
       <div>

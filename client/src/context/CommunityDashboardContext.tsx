@@ -16,6 +16,7 @@ export interface DashboardInstalledApp {
   title: string;
   visibleToMembers: boolean;
   note?: string;
+  archivedAt?: string | null;
 }
 
 export interface DashboardCommunity {
@@ -33,6 +34,7 @@ export interface DashboardCommunity {
   joinCode?: string;
   isPaid: boolean;
   price: number;
+  kind?: 'community' | 'collaboration';
   isOwner?: boolean;
   isAdmin?: boolean;
   adminPermissions?: CommunityAdminPermissions;

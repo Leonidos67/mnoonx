@@ -7,6 +7,7 @@ import { useConfirm } from '../context/ConfirmContext';
 import EditTextModal from '../components/Common/EditTextModal';
 import {
   Calendar,
+  Camera,
   MapPin,
   Link as LinkIcon,
   Search,
@@ -35,6 +36,7 @@ import ProfilePremiumStyleModal, {
   type ProfileCustomizationDraft,
 } from '../components/Profile/ProfilePremiumStyleModal';
 import { ProfileQrCodeModal, ProfileQrTrigger } from '../components/Profile/ProfileQrCodeModal';
+import AvatarPickerModal from '../components/Profile/AvatarPickerModal';
 import ProfileUserActionsMenu, {
   type ProfileUserActionId,
 } from '../components/Profile/ProfileUserActionsMenu';
@@ -43,7 +45,7 @@ import ExternalLink from '../components/Common/ExternalLink';
 import { profilePath } from '../constants/paths';
 import { hasProSubscription } from '../utils/userPlan';
 import MobileBottomSheet from '../components/Common/MobileBottomSheet';
-import FloatingMenu from '../components/Common/FloatingMenu';
+import FloatingMenu, { type FloatingMenuAnchor } from '../components/Common/FloatingMenu';
 import PostDetailPanel from '../components/Posts/PostDetailPanel';
 import { PostCommentsSection } from '../components/Posts/PostCommentsSection';
 import { usePostDetail } from '../hooks/usePostDetail';
@@ -56,6 +58,7 @@ import { isValidPollDraft, type PostPollDraft } from '../types/postPoll';
 import type { PostLinkAttachment } from '../types/postLink';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { buildPostLightboxMeta } from '../utils/buildPostLightboxMeta';
+import { followUserByUsername } from '../utils/followUser';
 import { getPostDisplayMeta } from '../utils/postDisplay';
 import { tryAwardActivity } from '../utils/awardActivity';
 import { resolveMediaUrl } from '../utils/mediaUrl';
@@ -157,7 +160,6 @@ const UserProfileComponent: React.FC = () => {
   const { confirm } = useConfirm();
   const navigate = useNavigate();
   const { t, locale } = useTranslation();
-  const menuRef = useRef<HTMLDivElement>(null);
   const profileScrollRef = useRef<HTMLDivElement>(null);
   const profileHeaderEndRef = useRef<HTMLDivElement>(null);
   const [compactProfileBar, setCompactProfileBar] = useState(false);
@@ -188,6 +190,7 @@ const UserProfileComponent: React.FC = () => {
   const [followingSheetOpen, setFollowingSheetOpen] = useState(false);
   const [premiumModalOpen, setPremiumModalOpen] = useState(false);
   const [qrModalOpen, setQrModalOpen] = useState(false);
+  const [avatarPickerOpen, setAvatarPickerOpen] = useState(false);
   const [styleSaving, setStyleSaving] = useState(false);
   const [hasProPlan, setHasProPlan] = useState(hasProSubscription);
   const [messagingId, setMessagingId] = useState<string | null>(null); // Добавлено для отслеживания загрузки сообщения
@@ -205,6 +208,7 @@ const UserProfileComponent: React.FC = () => {
   const [repostedPosts, setRepostedPosts] = useState<Set<string>>(new Set());
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Set<string>>(new Set());
   const [menuOpenPostId, setMenuOpenPostId] = useState<string | null>(null);
+  const [postMenuAnchor, setPostMenuAnchor] = useState<FloatingMenuAnchor | null>(null);
   const [editPostTarget, setEditPostTarget] = useState<{ postId: string; content: string } | null>(null);
   const [editPostSaving, setEditPostSaving] = useState(false);
   const [quoteTarget, setQuoteTarget] = useState<FeedPost | null>(null);
@@ -285,15 +289,13 @@ const UserProfileComponent: React.FC = () => {
     return false;
   };
 
-  // Закрытие меню при клике вне
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpenPostId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    if (!menuOpenPostId) setPostMenuAnchor(null);
+  }, [menuOpenPostId]);
+
+  const closePostMenu = useCallback(() => {
+    setMenuOpenPostId(null);
+    setPostMenuAnchor(null);
   }, []);
 
   useEffect(() => {
@@ -1270,6 +1272,16 @@ const UserProfileComponent: React.FC = () => {
     setProfileMenuOpen(true);
   };
 
+  const menuPost = useMemo(() => {
+    if (!menuOpenPostId) return null;
+    return (
+      posts.find((p) => String(p._id) === menuOpenPostId) ||
+      reposts.find((p) => String(p._id) === menuOpenPostId) ||
+      mediaPosts.find((p) => String(p._id) === menuOpenPostId) ||
+      null
+    );
+  }, [menuOpenPostId, posts, reposts, mediaPosts]);
+
   const copyProfileLink = useCallback(async () => {
     if (!profile) return;
     const url = `${window.location.origin}${profilePath(profile.username)}`;
@@ -1392,49 +1404,27 @@ const UserProfileComponent: React.FC = () => {
                 </span>
               )}
 
-              <div className="ml-auto relative" ref={menuOpenPostId === postId ? menuRef : null}>
+              <div className="relative ml-auto">
                 <button
-                  onClick={(e) => { e.stopPropagation(); setMenuOpenPostId(menuOpenPostId === postId ? null : postId); }}
+                  type="button"
+                  data-floating-menu-trigger
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    if (menuOpenPostId === postId) {
+                      closePostMenu();
+                      return;
+                    }
+                    setPostMenuAnchor({ rect });
+                    setMenuOpenPostId(postId);
+                  }}
                   className={`post-feed-card-menu flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all ${menuOpenPostId === postId ? 'bg-black/10 text-black opacity-100' : 'text-neutral-500 opacity-60 hover:bg-black/5 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/article:opacity-100'}`}
+                  aria-expanded={menuOpenPostId === postId}
+                  aria-haspopup="menu"
                 >
                   <AnimatedPostMenuIcon kind="ellipsis" size={16} />
                 </button>
-                {menuOpenPostId === postId && (
-                  <div
-                    className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg border border-neutral-200 p-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <button
-                      onClick={() => {
-                        copyPostLink(postId);
-                        setMenuOpenPostId(null);
-                      }}
-                      className="w-full text-left py-1 px-3 text-[14px] rounded hover:bg-black/5 transition-colors flex items-center gap-2"
-                    >
-                      <AnimatedPostMenuIcon kind="link" size={12} />
-                      {t('home.copyLink')}
-                    </button>
-                    {isPostOwner(post) && (
-                      <>
-                        <button
-                          onClick={() => openEditPost(postId, post.content)}
-                          className="w-full text-left py-1 px-3 text-[14px] rounded hover:bg-black/5 transition-colors flex items-center gap-2"
-                        >
-                          <AnimatedPostMenuIcon kind="edit" size={12} />
-                          {t('common.edit')}
-                        </button>
-                        <div className="h-px bg-neutral-100 my-1" />
-                        <button
-                          onClick={() => handleDeletePost(postId)}
-                          className="w-full text-left px-3 py-1 text-[14px] rounded hover:bg-red-50 transition-colors flex items-center gap-2 text-red-600"
-                        >
-                          <AnimatedPostMenuIcon kind="trash" size={12} color="#dc2626" />
-                          {t('common.delete')}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
             <div className="mt-1">
@@ -1641,6 +1631,7 @@ const UserProfileComponent: React.FC = () => {
                   </button>
                   <button
                     type="button"
+                    data-floating-menu-trigger
                     onClick={openProfileMenu}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-neutral-300 transition-colors hover:bg-neutral-100"
                     aria-label={t('userProfile.menu.title')}
@@ -1685,6 +1676,7 @@ const UserProfileComponent: React.FC = () => {
                   </button>
                   <button
                     type="button"
+                    data-floating-menu-trigger
                     onClick={openProfileMenu}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-neutral-300 transition-colors hover:bg-neutral-100"
                     aria-label={t('userProfile.menu.title')}
@@ -1707,12 +1699,43 @@ const UserProfileComponent: React.FC = () => {
           <div className="relative z-10">
           <div className="flex justify-between items-start">
             <div className="relative">
-              <img 
-                src={profile.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=000&color=fff&size=140&bold=true`}
-                alt={displayName}
-                className="w-[80px] h-[80px] rounded-full border-4 border-white bg-white"
-                onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=000&color=fff&size=140&bold=true`; }}
-              />
+              {isOwnProfile ? (
+                <button
+                  type="button"
+                  onClick={() => setAvatarPickerOpen(true)}
+                  className="group relative block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#315efb]/40"
+                  aria-label={t('settings.avatarPickerTitle')}
+                >
+                  <img
+                    src={
+                      profile.avatar
+                        ? resolveMediaUrl(profile.avatar)
+                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=000&color=fff&size=140&bold=true`
+                    }
+                    alt={displayName}
+                    className="h-[80px] w-[80px] rounded-full border-4 border-white bg-white object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=000&color=fff&size=140&bold=true`;
+                    }}
+                  />
+                  <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 transition-colors group-hover:bg-black/35">
+                    <Camera className="h-5 w-5 text-white opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+                  </span>
+                </button>
+              ) : (
+                <img
+                  src={
+                    profile.avatar
+                      ? resolveMediaUrl(profile.avatar)
+                      : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=000&color=fff&size=140&bold=true`
+                  }
+                  alt={displayName}
+                  className="h-[80px] w-[80px] rounded-full border-4 border-white bg-white object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=000&color=fff&size=140&bold=true`;
+                  }}
+                />
+              )}
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-center">
@@ -1755,6 +1778,7 @@ const UserProfileComponent: React.FC = () => {
                 </button>
                 <button
                   type="button"
+                  data-floating-menu-trigger
                   onClick={openProfileMenu}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-300 transition-colors hover:bg-neutral-100"
                   aria-label={t('userProfile.menu.title')}
@@ -1792,6 +1816,7 @@ const UserProfileComponent: React.FC = () => {
                 </button>
                 <button
                   type="button"
+                  data-floating-menu-trigger
                   onClick={openProfileMenu}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-neutral-300 transition-colors hover:bg-neutral-100"
                   aria-label={t('userProfile.menu.title')}
@@ -1853,18 +1878,34 @@ const UserProfileComponent: React.FC = () => {
           )}
           
           <div className="my-2 flex gap-4 text-md">
-            <div
-              className="cursor-default"
+            <button
+              type="button"
+              onClick={() => {
+                setSearchFollower('');
+                setConnectionsTab('following');
+                if (isLgUp) return;
+                void fetchFollowing(profile.username);
+                setFollowingSheetOpen(true);
+              }}
+              className="rounded-md text-left transition-colors hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-black/10 lg:cursor-default lg:hover:bg-transparent"
             >
               <span className="font-bold text-neutral-900">{formatCount(profile.followingCount || 0)}</span>
               <span className="ml-1 text-neutral-500">{t('userProfile.following')}</span>
-            </div>
-            <div
-              className="cursor-default"
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchFollower('');
+                setConnectionsTab('followers');
+                if (isLgUp) return;
+                void fetchFollowers(profile.username);
+                setFollowersSheetOpen(true);
+              }}
+              className="rounded-md text-left transition-colors hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-black/10 lg:cursor-default lg:hover:bg-transparent"
             >
               <span className="font-bold text-neutral-900">{formatCount(profile.followersCount || 0)}</span>
               <span className="ml-1 text-neutral-500">{t('userProfile.followers')}</span>
-            </div>
+            </button>
           </div>
 
           <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-neutral-600">
@@ -2282,6 +2323,85 @@ const UserProfileComponent: React.FC = () => {
       </MobileBottomSheet>
 
       <FloatingMenu
+        open={Boolean(menuPost && postMenuAnchor)}
+        anchor={postMenuAnchor}
+        onClose={closePostMenu}
+        width={224}
+      >
+        {menuPost && (
+          <>
+            {!isPostOwner(menuPost) && menuPost.author?.username && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={async () => {
+                  if (!token) {
+                    window.dispatchEvent(new CustomEvent('openLogin'));
+                    return;
+                  }
+                  const username = String(menuPost.author.username).replace(/^@/, '');
+                  const result = await followUserByUsername(username, token);
+                  if (!result.ok) {
+                    showToast(t('common.followFailed'), 'error');
+                    return;
+                  }
+                  showToast(t('home.followUserSuccess', { username }));
+                  closePostMenu();
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
+              >
+                <AnimatedPostMenuIcon kind="follow" size={14} />
+                {t('home.followUser', {
+                  username: String(menuPost.author.username).replace(/^@/, ''),
+                })}
+              </button>
+            )}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                copyPostLink(String(menuPost._id));
+                closePostMenu();
+              }}
+              className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
+            >
+              <AnimatedPostMenuIcon kind="link" size={14} />
+              {t('home.copyLink')}
+            </button>
+            {isPostOwner(menuPost) && (
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    openEditPost(String(menuPost._id), menuPost.content);
+                    closePostMenu();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-neutral-50"
+                >
+                  <AnimatedPostMenuIcon kind="edit" size={14} />
+                  {t('common.edit')}
+                </button>
+                <div className="my-1 h-px bg-neutral-100" />
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    void handleDeletePost(String(menuPost._id));
+                    closePostMenu();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition-colors hover:bg-red-50"
+                >
+                  <AnimatedPostMenuIcon kind="trash" size={14} color="#dc2626" />
+                  {t('common.delete')}
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </FloatingMenu>
+
+      <FloatingMenu
         open={!!openCommentMenu}
         anchor={openCommentMenu ? { rect: openCommentMenu.rect } : null}
         onClose={() => setOpenCommentMenu(null)}
@@ -2339,6 +2459,18 @@ const UserProfileComponent: React.FC = () => {
         username={profile.username}
         fullName={displayName}
       />
+
+      {isOwnProfile ? (
+        <AvatarPickerModal
+          open={avatarPickerOpen}
+          onClose={() => setAvatarPickerOpen(false)}
+          currentAvatar={profile.avatar}
+          displayName={displayName}
+          onSaved={(avatarUrl) => {
+            setProfile((prev) => (prev ? { ...prev, avatar: avatarUrl } : prev));
+          }}
+        />
+      ) : null}
 
       <ProfileUserActionsMenu
         open={profileMenuOpen}

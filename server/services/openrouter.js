@@ -41,7 +41,7 @@ async function chatCompletion({ messages, maxTokens = 1200, temperature = 0.65, 
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
       'HTTP-Referer': process.env.OPENROUTER_REFERER || 'http://localhost:3000',
-      'X-Title': process.env.OPENROUTER_APP_NAME || 'MNOONX Alpha Space',
+      'X-Title': process.env.OPENROUTER_APP_NAME || 'MNOONX',
     },
     body: JSON.stringify({
       model: model || getModel(),

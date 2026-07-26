@@ -27,6 +27,23 @@ const CollaborationRequestSchema = new mongoose.Schema(
       ref: 'Community',
       default: null,
     },
+    /** Who should be primary owner when accepted: inviter (fromUser) or partner (toUser) */
+    primaryCreator: {
+      type: String,
+      enum: ['inviter', 'partner'],
+      default: 'inviter',
+    },
+    /** Optional face communities (owned by fromUser / toUser respectively) */
+    fromDisplayCommunity: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Community',
+      default: null,
+    },
+    toDisplayCommunity: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Community',
+      default: null,
+    },
   },
   { timestamps: true }
 );

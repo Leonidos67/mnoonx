@@ -2,6 +2,11 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const path = require('path');
+const fs = require('fs').promises;
+const fssync = require('fs');
+const crypto = require('crypto');
+const multer = require('multer');
 const User = require('../models/User');
 const Follow = require('../models/Follow');
 const Post = require('../models/Post');
@@ -21,6 +26,43 @@ const {
   createCollaborationCommunity,
 } = require('../services/collaboration');
 
+const UPLOADS_ROOT = path.join(__dirname, '../uploads');
+const USER_AVATAR_TMP = path.join(UPLOADS_ROOT, 'user-avatars', '_tmp');
+try {
+  fssync.mkdirSync(USER_AVATAR_TMP, { recursive: true });
+} catch (_) {
+  /* ignore */
+}
+
+const userAvatarUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, USER_AVATAR_TMP),
+    filename: (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || '';
+      cb(null, `${crypto.randomBytes(12).toString('hex')}${ext}`);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ok = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+    if (ok.has(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPEG, PNG, WebP or GIF images are allowed'));
+  },
+});
+
+function isAllowedAvatarValue(value) {
+  if (typeof value !== 'string') return false;
+  const v = value.trim();
+  if (!v || v.length > 12000) return false;
+  if (v.startsWith('data:image/svg+xml')) return true;
+  if (v.startsWith('data:image/png') || v.startsWith('data:image/jpeg') || v.startsWith('data:image/webp')) {
+    return v.length <= 12000;
+  }
+  if (/^https?:\/\//i.test(v)) return true;
+  if (v.startsWith('/uploads/')) return true;
+  return false;
+}
+
 async function serializePostWithAuthor(post, viewerUserId) {
   return serializeFeedPost(post, viewerUserId);
 }
@@ -39,12 +81,14 @@ router.get('/list', auth, async (req, res) => {
       ];
     }
     const sort =
-      sortBy === 'followers' || sortBy === 'popular'
-        ? { followersCount: -1, createdAt: -1 }
-        : { username: 1 };
+      sortBy === 'activity' || sortBy === 'active'
+        ? { 'activityState.balance': -1, postsCount: -1, followersCount: -1 }
+        : sortBy === 'followers' || sortBy === 'popular'
+          ? { followersCount: -1, createdAt: -1 }
+          : { username: 1 };
     const viewerId = req.userId ? req.userId.toString() : null;
     const users = await User.find(filter)
-      .select('username fullName avatar bio followersCount createdAt')
+      .select('username fullName avatar bio followersCount postsCount activityState createdAt')
       .sort(sort)
       .limit(limit)
       .lean();
@@ -56,6 +100,9 @@ router.get('/list', auth, async (req, res) => {
         avatar: u.avatar || '',
         bio: (u.bio || '').toString().slice(0, 160),
         followersCount: u.followersCount || 0,
+        postsCount: u.postsCount || 0,
+        activityPoints: Number(u.activityState?.balance) || 0,
+        activityStreak: Number(u.activityState?.streak) || 0,
         isSelf: Boolean(viewerId && u._id.toString() === viewerId),
       }))
     );
@@ -212,11 +259,23 @@ router.post('/me/collaboration-requests/:id/accept', auth, async (req, res) => {
       return res.status(403).json({ message: 'Only the recipient can accept this request' });
     }
 
+    const primary = request.primaryCreator === 'partner' ? 'partner' : 'inviter';
+    const ownerId = primary === 'partner' ? request.toUser : request.fromUser;
+    const coOwnerId = primary === 'partner' ? request.fromUser : request.toUser;
+    const fromFace = request.fromDisplayCommunity || null;
+    const toFace = request.toDisplayCommunity || null;
+    const ownerDisplayCommunityId =
+      String(ownerId) === String(request.fromUser) ? fromFace : toFace;
+    const coOwnerDisplayCommunityId =
+      String(coOwnerId) === String(request.fromUser) ? fromFace : toFace;
+
     const community = await createCollaborationCommunity({
-      ownerId: request.fromUser,
-      coOwnerId: request.toUser,
+      ownerId,
+      coOwnerId,
       name: request.name,
       description: request.description,
+      ownerDisplayCommunityId,
+      coOwnerDisplayCommunityId,
     });
 
     request.status = 'accepted';
@@ -483,6 +542,66 @@ router.patch('/me/profile', auth, async (req, res) => {
     res.json(profilePayload(user));
   } catch (error) {
     console.error('Update profile error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// POST /api/users/me/avatar — upload image file or set preset/data URL
+router.post('/me/avatar', auth, (req, res, next) => {
+  if (!req.userId) {
+    return res.status(401).json({ message: 'Unauthorized' });
+  }
+  const contentType = String(req.headers['content-type'] || '');
+  if (contentType.includes('multipart/form-data')) {
+    userAvatarUpload.single('avatar')(req, res, (err) => {
+      if (err) {
+        const msg =
+          err.code === 'LIMIT_FILE_SIZE' ? 'File too large (max 5MB)' : err.message || 'Upload failed';
+        return res.status(400).json({ message: msg });
+      }
+      next();
+    });
+    return;
+  }
+  next();
+}, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (req.file) {
+      const finalDir = path.join(UPLOADS_ROOT, 'user-avatars', String(req.userId));
+      await fs.mkdir(finalDir, { recursive: true });
+      const ext =
+        path.extname(req.file.originalname) ||
+        ({ 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif' }[
+          req.file.mimetype
+        ] || '.img');
+      const safeBase = `avatar-${Date.now()}${ext}`;
+      const destAbs = path.join(finalDir, safeBase);
+      await fs.rename(req.file.path, destAbs);
+      const hostBase = `${req.protocol}://${req.get('host')}`;
+      const relPosix = `user-avatars/${req.userId}/${safeBase}`.split(path.sep).join('/');
+      user.avatar = `${hostBase}/uploads/${relPosix}`;
+    } else {
+      const raw = req.body?.avatar;
+      if (!isAllowedAvatarValue(raw)) {
+        return res.status(400).json({
+          message: 'Send multipart field "avatar" or JSON { avatar: dataUrl|https url }',
+        });
+      }
+      user.avatar = String(raw).trim();
+    }
+
+    await user.save();
+    res.json({
+      ...profilePayload(user),
+      avatar: user.avatar || '',
+    });
+  } catch (error) {
+    console.error('Update avatar error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

@@ -1,5 +1,4 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import {
   Rocket,
   Map,
@@ -12,73 +11,64 @@ import {
   Compass,
 } from 'lucide-react';
 import type { DocsArticleProps } from '../components/Docs/DocsArticle';
-import { COMMUNITY_APP_IDS } from '../constants/communityApps';
-import {
-  communityDashboardAnalyticsPath,
-  communityDashboardPath,
-  communityDashboardUsersPath,
-  communityPath,
-  communitySettingsPath,
-  communityStorePath,
-} from '../constants/communityRoutes';
 import { docsPagePath } from './docsNav';
-import { DocsCode as C, DocsLink as L, DocsUl as Ul, type DocsPageKey } from './docsPagesShared';
+import { DocsLink as L, DocsUl as Ul, type DocsPageKey } from './docsPagesShared';
 
 export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next'>> = {
   'start/overview': {
-    title: 'Документация MNOONX',
+    title: 'MNOONX Documentation',
     lead:
-      'Добро пожаловать. Здесь собраны пошаговые руководства: как зарегистрироваться, запустить сообщество, установить приложения из магазина и развивать аудиторию. Начните с карточек ниже или выберите раздел в меню слева.',
+      'Step-by-step guides for founders and community managers: sign up, launch a community, install apps, and grow your audience. Start with the cards below or pick a section in the left menu.',
     showHero: true,
     sections: [
       {
-        heading: 'Для кого эта документация',
+        heading: 'Who this is for',
         body: (
           <>
             <p>
-              Руководство подойдёт создателям сообществ, модераторам и участникам, которые хотят
-              быстро разобраться в интерфейсе без лишней технической терминологии. Мы описываем
-              действия в интерфейсе: какие кнопки нажать, что проверить перед запуском и как
-              подключить чат, курсы или объявления.
+              This guide is for community creators, moderators, and active members who need to learn
+              the platform quickly without technical jargon. We focus on concrete actions: what to
+              click, what to verify before launch, and how to add chat, courses, or announcements.
             </p>
             <p className="mt-3">
-              Если вы только знакомитесь с платформой, пройдите блок «Начало работы», затем раздел
-              «Сообщества» и «Приложения» — в таком порядке большинство команд запускают первый
-              проект за один–два дня.
+              If you are new to MNOONX, read Getting Started, then Communities and Apps — most teams
+              launch their first project in one to two days following that order.
             </p>
           </>
         ),
       },
       {
-        heading: 'Из чего состоит платформа',
+        heading: 'What the platform includes',
         body: (
           <>
             <p className="mb-3">
-              MNOONX — это социальная платформа с акцентом на обучение, инвестиции, закрытые группы, команды проектов.
+              MNOONX is a social platform for communities: learning, private clubs, professional
+              groups, and team spaces.
             </p>
             <Ul
               items={[
                 <>
-                  <strong>Глобальная лента</strong> — <L to="/">главная страница</L> с постами
-                  пользователей и публичными материалами из сообществ.
+                  <strong>Home feed</strong> — <L to="/">posts</L> from people you follow and public
+                  community content.
                 </>,
                 <>
-                  <strong>Профили</strong> — персональная страница с подписками, постами и кнопкой
-                  личного сообщения.
+                  <strong>Profiles</strong> — personal pages with subscriptions, posts, and direct
+                  messaging.
                 </>,
                 <>
-                  <strong>Сообщества</strong> — отдельное пространство с лентой, оформлением и
-                  встроенными приложениями.
+                  <strong>Communities</strong> — dedicated spaces with a feed, branding, and
+                  built-in apps.
                 </>,
                 <>
-                  <strong>Магазин приложений</strong> — чат, курсы, файлы, объявления, события.
+                  <strong>App store</strong> — chat, courses, files, announcements, events.
                 </>,
                 <>
-                  <strong>Панель владельца</strong> — статистика, список участников и управление
-                  продуктами.
+                  <strong>Owner dashboard</strong> — analytics, members, and app management.
                 </>,
                 <>
-                  <strong>Мессенджер и уведомления</strong> — личная переписка и лента событий.
+                  <strong>Messages and notifications</strong> — conversations on the{' '}
+                  <L to="/messenger">messages page</L> and updates on the{' '}
+                  <L to="/notifications">notifications page</L>.
                 </>,
               ]}
             />
@@ -88,65 +78,65 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
     ],
     cardGrids: [
       {
-        title: 'Начните здесь',
+        title: 'Start here',
         cards: [
           {
             icon: Rocket,
-            title: 'Быстрый старт',
-            description: 'От регистрации до первого поста и знакомства с навигацией платформы.',
+            title: 'Quick start',
+            description: 'From registration to your first post and platform navigation.',
             to: docsPagePath('start', 'account'),
           },
           {
             icon: Map,
-            title: 'План запуска сообщества',
-            description: 'Пошаговая дорожная карта: идея, оформление, приложения, первые участники.',
+            title: 'Community launch plan',
+            description: 'Roadmap: concept, branding, apps, first members.',
             to: docsPagePath('community', 'roadmap'),
           },
           {
             icon: Sparkles,
-            title: 'Чеклист перед запуском',
-            description: 'Финальная проверка: доступ, брендинг, приложения и контент.',
+            title: 'Pre-launch checklist',
+            description: 'Final check: access, branding, apps, and content.',
             to: docsPagePath('growth', 'checklist'),
           },
         ],
       },
       {
-        title: 'Что можно делать в MNOONX',
+        title: 'What you can do on MNOONX',
         cards: [
           {
             icon: UserPlus,
-            title: 'Создать сообщество',
-            description: 'Запустить своё пространство с уникальным адресом и настройками доступа.',
+            title: 'Create a community',
+            description: 'Launch a space with a unique address and access settings.',
             to: docsPagePath('community', 'create'),
           },
           {
             icon: Store,
-            title: 'Магазин приложений',
-            description: 'Установить чат, курсы, файлы и другие модули в одно нажатие.',
+            title: 'App store',
+            description: 'Install chat, courses, files, and other modules.',
             to: docsPagePath('apps', 'store'),
           },
           {
             icon: Users,
-            title: 'Участники и роли',
-            description: 'Приглашать людей, настраивать приватность и права на публикации.',
+            title: 'Members and roles',
+            description: 'Invite people, set privacy, and posting permissions.',
             to: docsPagePath('community', 'members'),
           },
           {
             icon: BarChart3,
-            title: 'Аналитика',
-            description: 'Смотреть рост участников, активность ленты и вовлечённость в чат.',
+            title: 'Analytics',
+            description: 'Track member growth, feed activity, and chat engagement.',
             to: docsPagePath('dashboard', 'analytics'),
           },
           {
             icon: MessageCircle,
-            title: 'Мессенджер',
-            description: 'Писать участникам лично и вести диалог поддержки.',
+            title: 'Direct messages',
+            description: 'Message members privately and handle support conversations.',
             to: docsPagePath('social', 'messenger'),
           },
           {
             icon: Compass,
-            title: 'Discover',
-            description: 'Находить новые сообщества и вступать в интересные клубы.',
+            title: 'Community catalog',
+            description: 'Browse communities and join clubs that fit your interests.',
             to: docsPagePath('social', 'discover'),
           },
         ],
@@ -155,136 +145,132 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'start/account': {
-    title: 'Аккаунт и вход',
+    title: 'Account and sign-in',
     lead:
-      'Аккаунт открывает публикацию постов, вступление в сообщества, личные сообщения и настройки профиля. Без входа можно просматривать часть публичных страниц, но основные действия требуют регистрации.',
+      'An account unlocks posting, joining communities, direct messages, and profile settings. Some public pages are visible without signing in; most actions require registration.',
     steps: [
       {
-        title: 'Регистрация',
+        title: 'Registration',
         body: (
           <>
             <p>
-              На главной странице или в шапке сайта нажмите «Войти» или «Регистрация». Заполните
-              форму:
+              On the <L to="/">home feed</L> or in the site header, click Sign in or Register. Fill
+              in the form:
             </p>
             <Ul
               items={[
                 <>
-                  <strong>Имя пользователя (username)</strong> — от 3 до 30 символов, латиница; по
-                  нему строится адрес вашего профиля.
+                  <strong>Username</strong> — 3 to 30 Latin characters; used for your profile page
+                  address.
                 </>,
                 <>
-                  <strong>Email</strong> — для входа и восстановления доступа.
+                  <strong>Email</strong> — for sign-in and account recovery.
                 </>,
                 <>
-                  <strong>Пароль</strong> — не короче 6 символов; храните его в надёжном месте.
+                  <strong>Password</strong> — at least 6 characters; store it securely.
                 </>,
               ]}
             />
             <p className="mt-3">
-              После успешной регистрации вы сразу попадаете в аккаунт: откроется главная лента, в
-              меню появятся ваши сообщества и профиль. Адрес профиля будет вида{' '}
-              <strong>@ваш_username</strong> — его можно отправить друзьям как ссылку.
+              After registration you are signed in immediately: the home feed opens, your
+              communities appear in the menu, and your profile link is ready to share with members
+              and colleagues.
             </p>
           </>
         ),
       },
       {
-        title: 'Вход и выход',
+        title: 'Sign in and sign out',
         body: (
           <>
             <p>
-              При следующем визите нажмите «Войти» и введите тот же email (или username) и пароль.
-              Платформа запомнит сессию в браузере, поэтому повторный вход обычно не нужен, пока вы
-              не выйдете вручную.
+              On your next visit, click Sign in and enter your email or username and password. The
+              platform keeps your session until you sign out manually.
             </p>
             <p className="mt-3">
-              Кнопка «Выйти» находится в меню профиля. После выхода для публикации постов,
-              редактирования профиля и сообщений снова потребуется войти — это нормальная защита
-              вашего аккаунта.
+              Sign out is in the profile menu. After signing out, posting, editing your profile, and
+              messaging require signing in again.
             </p>
           </>
         ),
       },
       {
-        title: 'Настройки аккаунта',
+        title: 'Account settings',
         body: (
           <>
             <p>
-              Откройте раздел <L to="/settings">Настройки</L>. Здесь меняют отображаемое имя,
-              описание (bio), аватар, баннер профиля, город и ссылку на сайт.
+              Open <L to="/settings">profile settings</L>. Here you update display name, bio, avatar,
+              banner, city, and website link.
             </p>
             <p className="mt-3">
-              Нажмите «Сохранить» после правок — обновления сразу видны в профиле и в карточках
-              ваших постов в ленте. Рекомендуем заполнить аватар и короткое описание до приглашения
-              первых участников в сообщество: так вы выглядите доверительнее.
+              Click Save after changes — updates appear on your profile and post cards right away.
+              Fill in your avatar and a short bio before inviting your first members.
             </p>
           </>
         ),
       },
     ],
     tips: [
-      'Выберите короткий запоминающийся username — он же станет частью адреса сообщества.',
-      'Не используйте служебные слова вроде discover, settings, messenger, admin, docs — они зарезервированы системой.',
-      'Один человек — один аккаунт; для теста лучше создать отдельный username, а не делиться паролем.',
+      'Choose a short, memorable username — it becomes part of your community address.',
+      'Avoid usernames that match the names of main platform sections.',
+      'One person, one account; for testing, create a separate username instead of sharing passwords.',
     ],
   },
 
   'start/navigation': {
-    title: 'Навигация по платформе',
+    title: 'Platform navigation',
     lead:
-      'Интерфейс устроен просто: слева (на компьютере) или внизу (на телефоне) — основные разделы. В центре — контент выбранной страницы. Ниже — куда чаще всего заходят новые пользователи.',
+      'On desktop, main sections are in the left sidebar; on mobile, in the bottom bar. The center shows the content of the page you selected.',
     steps: [
       {
-        title: 'Главная лента',
+        title: 'Home feed',
         body: (
           <>
             <p>
-              <L to="/">Главная</L> показывает посты людей, на которых вы подписаны, и публичные
-              материалы из сообществ. Под каждым постом — лайк, комментарии и репост. Троеточие у
-              поста открывает меню: скопировать ссылку, изменить или удалить (для своих публикаций).
+              The <L to="/">home feed</L> shows posts from people you follow and public community
+              content. Each post has like, comment, and repost actions. The post menu lets you copy a
+              link or edit and delete your own posts.
             </p>
             <p className="mt-3">
-              Нажмите на карточку поста, чтобы открыть обсуждение с комментариями в боковой панели
-              (на широком экране) или в нижнем окне (на телефоне).
+              Click a post card to open the discussion with comments in a side panel on desktop or a
+              bottom sheet on mobile.
             </p>
           </>
         ),
       },
       {
-        title: 'Discover',
+        title: 'Community catalog',
         body: (
           <p>
-            В <L to="/discover">Discover</L> собран каталог сообществ — публичных и закрытых.
-            Закрытые отмечены отдельно: чтобы вступить, нужен код приглашения от владельца или
-            одобрение после запроса.
+            The <L to="/discover">community catalog</L> lists public and private communities.
+            Private ones are marked separately; joining requires an invite code from the owner.
           </p>
         ),
       },
       {
-        title: 'Мессенджер и уведомления',
+        title: 'Messages and notifications',
         body: (
           <Ul
             items={[
               <>
-                <L to="/messenger">Мессенджер</L> — личные диалоги и служебные чаты платформы.
-                Откройте чат из списка слева; переписка сохраняется между визитами.
+                <L to="/messenger">Direct messages</L> — conversations with members and platform
+                service channels. History is saved between visits.
               </>,
               <>
-                <L to="/notifications">Уведомления</L> — лайки, упоминания, события в сообществах
-                и системные сообщения. Значок в шапке подсказывает, есть ли непрочитанное.
+                <L to="/notifications">Notifications</L> — likes, mentions, community events, and
+                system messages. The header badge shows unread items.
               </>,
             ]}
           />
         ),
       },
       {
-        title: 'Создание сообщества',
+        title: 'Creating a community',
         body: (
           <p>
-            Чтобы создать своё пространство, используйте <L to="/create-community">создание
-            сообщества</L> или мастер <L to="/new">«Создать»</L> (варианты personal / business —
-            разные подсказки в форме, итог один: новое сообщество с вашим handle).
+            To launch your space, go to <L to="/create-community">create a community</L> or open the{' '}
+            <L to="/new">Create wizard</L> — Personal and Business paths use different prompts in
+            the form, but both create a new community with your chosen address.
           </p>
         ),
       },
@@ -292,37 +278,37 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'profile/basics': {
-    title: 'Профиль и лента',
+    title: 'Profile and feed',
     lead:
-      'Профиль — ваша визитка на платформе: здесь видят, кто вы, читают посты, подписываются и пишут в личные сообщения. Чем аккуратнее оформлен профиль, тем выше доверие к вам и к сообществам, которые вы ведёте.',
+      'Your profile is your platform presence: people read your posts, follow you, and start direct messages here. A polished profile builds trust in you and the communities you lead.',
     steps: [
       {
-        title: 'Открыть профиль',
+        title: 'Open a profile',
         body: (
           <p>
-            Формат URL: <C>/@username</C>. Свой профиль доступен после входа; чужие профили видны
-            всем (кнопки Follow / Message — при авторизации).
+            Your own profile is available after sign-in from the account menu. Other profiles are
+            public; follow and message actions require authorization.
           </p>
         ),
       },
       {
-        title: 'Публикация постов',
+        title: 'Publishing posts',
         body: (
           <p>
-            На своём профиле во вкладке «Посты» откройте композер: текст, медиа (загрузка или URL),
-            ссылка-превью. Посты попадают в вашу ленту и на главную (если не привязаны только к
-            приватному сообществу).
+            On your profile, open the composer under the Posts tab: text, media, and link previews.
+            Posts appear on your profile and the home feed unless they belong only to a private
+            community.
           </p>
         ),
       },
       {
-        title: 'Вкладки профиля',
+        title: 'Profile tabs',
         body: (
           <Ul
             items={[
-              'Посты — ваши публикации.',
-              'Репосты — что вы репостнули.',
-              'Replies / Media — зарезервированы под будущий контент.',
+              'Posts — your publications.',
+              'Reposts — content you shared.',
+              'Replies and media — additional profile sections.',
             ]}
           />
         ),
@@ -331,34 +317,33 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'profile/connections': {
-    title: 'Подписки и связи',
-    lead: 'Follow связывает ленты и уведомления; из профиля можно написать в мессенджер.',
+    title: 'Follows and connections',
+    lead: 'Follows shape your feed and notifications; you can start a direct conversation from a profile.',
     steps: [
       {
-        title: 'Подписаться и отписаться',
+        title: 'Follow and unfollow',
         body: (
           <p>
-            Кнопка <strong>Follow</strong> на чужом профиле создаёт связь follower → following.
-            Повторное нажатие (Following) отписывает. Счётчики обновляются с сервера.
+            Click Follow on someone’s profile to add them to your feed. Click again to unfollow.
+            Follower and following counts update automatically.
           </p>
         ),
       },
       {
-        title: 'Список подписчиков (мобильный)',
+        title: 'Follower lists',
         body: (
           <p>
-            На мобильном нажатие на «Followers» / «Following» открывает нижнюю панель со списком и
-            поиском. На десктопе списки — в правой колонке профиля.
+            On mobile, tapping Followers or Following opens a searchable list. On desktop, lists
+            appear in the right column of the profile.
           </p>
         ),
       },
       {
-        title: 'Написать сообщение',
+        title: 'Send a message',
         body: (
           <p>
-            Нажмите иконку чата — откроется мессенджер с личным диалогом с этим человеком. Меню
-            «⋯»: скопировать ссылку на профиль, написать сообщение, пожаловаться или заблокировать
-            (действия сопровождаются подсказкой на экране).
+            Click the message icon to open a <L to="/messenger">direct conversation</L>. The profile
+            menu also offers copy link, send message, report, and block.
           </p>
         ),
       },
@@ -366,117 +351,123 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'community/roadmap': {
-    title: 'План запуска сообщества',
+    title: 'Community launch plan',
     lead:
-      'Пошаговая дорожная карта: от идеи до работающего сообщества с приложениями и аналитикой.',
+      'A step-by-step roadmap from concept to a running community with apps and analytics.',
     steps: [
       {
-        title: 'Фаза 0 — Концепция (1–2 дня)',
+        title: 'Phase 0 — Concept (1–2 days)',
         body: (
           <Ul
             items={[
-              'Ниша и целевая аудитория: обучение, инвестиции, закрытые группы, команды проектов?',
-              'Handle сообщества (латиница, без пробелов): будет в URL /community/handle.',
-              'Публичное или приватное; нужен ли код входа.',
-              'Список приложений на старте (обычно Chat + Announcements).',
+              'Niche and audience: learning, private club, professional group, or project team.',
+              'Short community address in Latin characters, no spaces — this goes in every link you share.',
+              'Public or private community; whether you need an invite code.',
+              'Starter apps: usually chat and announcements.',
             ]}
           />
         ),
       },
       {
-        title: 'Фаза 1 — Создание и брендинг',
+        title: 'Phase 1 — Creation and branding',
         body: (
           <p>
-            Следуйте <L to={docsPagePath('community', 'create')}>Создание сообщества</L> и{' '}
-            <L to={docsPagePath('community', 'branding')}>Оформление</L>. Заполните название,
-            описание, аватар и баннер до приглашения первых участников.
+            Follow the guides on{' '}
+            <L to={docsPagePath('community', 'create')}>creating a community</L> and{' '}
+            <L to={docsPagePath('community', 'branding')}>branding</L>. Set name, description,
+            avatar, and banner before inviting the first members.
           </p>
         ),
       },
       {
-        title: 'Фаза 2 — Приложения из магазина',
+        title: 'Phase 2 — Apps from the store',
         body: (
           <p>
-            <L to={docsPagePath('apps', 'install')}>Установите приложения</L> по приоритету: чат для
-            живого общения, объявления для правил, курсы/файлы для контента.
+            <L to={docsPagePath('apps', 'install')}>Install apps</L> by priority: chat for
+            conversation, announcements for rules, courses and files for content.
           </p>
         ),
       },
       {
-        title: 'Фаза 3 — Первый контент и участники',
+        title: 'Phase 3 — First content and members',
         body: (
           <p>
-            Закрепите правила постом в ленте, пригласите 5–10 человек, проверьте{' '}
-            кто может публиковать посты и роли админов. См.{' '}
-            <L to={docsPagePath('community', 'members')}>Участники</L>.
+            Publish rules in the feed, invite 5–10 people, confirm who can post, and assign admins.
+            See <L to={docsPagePath('community', 'members')}>community members</L> for details.
           </p>
         ),
       },
       {
-        title: 'Фаза 4 — Dashboard и рост',
+        title: 'Phase 4 — Dashboard and growth',
         body: (
           <p>
-            Подключите <L to={docsPagePath('dashboard', 'analytics')}>аналитику</L>, настройте
-            инвайты и план из <L to={docsPagePath('growth', 'strategy')}>стратегии роста</L>.
+            Enable <L to={docsPagePath('dashboard', 'analytics')}>analytics</L>, set up invites,
+            and follow the <L to={docsPagePath('growth', 'strategy')}>growth strategy</L>.
           </p>
         ),
       },
     ],
     tips: [
-      'Не устанавливайте все приложения сразу — начните с 2–3, остальное добавите по запросу аудитории.',
-      'Приватное сообщество без join code не пустит новых участников — проверьте настройки заранее.',
+      'Do not install every app on day one — start with two or three and add more when members ask.',
+      'A private community without an invite code will block new members — verify settings early.',
     ],
   },
 
   'community/create': {
-    title: 'Создание сообщества',
-    lead: 'Сообщество создаётся через форму; вы автоматически становитесь владельцем (owner) и первым участником.',
+    title: 'Creating a community',
+    lead:
+      'Communities are created through a form; you automatically become the owner and first member.',
     steps: [
       {
-        title: 'Открыть мастер создания',
+        title: 'Open the creation flow',
         body: (
           <Ul
             items={[
-              <><L to="/create-community">/create-community</L> — основная форма.</>,
-              <><L to="/new">/new</L> — выбор типа (personal / business).</>,
-              'В сайдбаре после входа — список «Мои сообщества» и кнопка создания.',
+              <>
+                <L to="/create-community">Create a community</L> — main form.
+              </>,
+              <>
+                <L to="/new">Create wizard</L> — Personal or Business path.
+              </>,
+              'After sign-in, the sidebar shows My communities and a create button.',
             ]}
           />
         ),
       },
       {
-        title: 'Заполнить обязательные поля',
+        title: 'Required fields',
         body: (
           <Ul
             items={[
               <>
-                <strong>Name</strong> — отображаемое название.
+                <strong>Name</strong> — displayed community name.
               </>,
               <>
-                <strong>Handle</strong> — уникальный идентификатор в URL:{' '}
-                <C>/community/your-handle</C>.
+                <strong>Address</strong> — short unique identifier for links; Latin characters, no
+                spaces.
               </>,
-              'Описание и категория — для Discover и доверия.',
-              'Visibility: публичное (видно в ленте Discover) или приватное.',
+              'Description and category — for the community catalog and member trust.',
+              'Visibility: public (listed in the catalog) or private (invite only).',
             ]}
           />
         ),
       },
       {
-        title: 'Сохранить и открыть страницу',
+        title: 'Save and open the page',
         body: (
           <p>
-            После сохранения вы попадёте на страницу своего сообщества. Как владелец вы увидите
-            кнопки настроек, магазина приложений и панели управления.
+            After saving you land on your community page. As owner you see settings, the app store,
+            and the owner dashboard.
           </p>
         ),
       },
       {
-        title: 'Проверить права',
+        title: 'Confirm permissions',
         body: (
           <p>
-            Только owner может удалить сообщество, менять критичные настройки и устанавливать apps.
-            Админам можно выдать права через dashboard (см. раздел Dashboard).
+            Only the owner can delete the community, change critical settings, and install apps.
+            Admins can be granted rights through the{' '}
+            <L to={docsPagePath('dashboard', 'overview')}>owner dashboard</L>.
           </p>
         ),
       },
@@ -484,89 +475,89 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'community/access': {
-    title: 'Доступ и приватность',
-    lead: 'Настройки определяют, кто видит сообщество, кто вступает и кто может публиковать посты.',
+    title: 'Access and privacy',
+    lead:
+      'Settings define who sees the community, who can join, and who can publish posts.',
     steps: [
       {
-        title: 'Открыть настройки',
+        title: 'Open settings',
         body: (
           <p>
-            Как владелец откройте «Настройки» на странице сообщества или из панели управления
-            (Settings).
+            As owner, open Settings on the community page or from the owner dashboard.
           </p>
         ),
       },
       {
-        title: 'Публичное vs приватное',
+        title: 'Public and private',
         body: (
           <Ul
             items={[
               <>
-                <strong>Публичное</strong> — страницу и ленту видят все; вступить можно без кода
-                (если вы не включили дополнительные ограничения).
+                <strong>Public</strong> — everyone sees the page and feed; members can join without
+                a code unless you add extra restrictions.
               </>,
               <>
-                <strong>Приватное</strong> — без вступления видно только краткое превью; нужен код
-                приглашения или членство.
+                <strong>Private</strong> — non-members see only a short preview; an invite code or
+                membership is required.
               </>,
             ]}
           />
         ),
       },
       {
-        title: 'Код входа',
+        title: 'Invite code',
         body: (
           <p>
-            В настройках задайте код приглашения (пароль клуба). При вступлении участник вводит его
-            в окне Join. Без правильного кода в закрытое сообщество не попасть — так вы контролируете,
-            кто внутри.
+            Set an invite code in settings. When joining, members enter it in the Join dialog. Without
+            the correct code, no one enters a private community — you control membership.
           </p>
         ),
       },
       {
-        title: 'Кто может постить',
+        title: 'Who can publish',
         body: (
           <p>
-            Опция «Участники могут публиковать»: если выключена — посты создаёт только владелец и
-            назначенные админы. Если включена — любой участник может писать в ленту сообщества.
+            The Members can post option: when off, only the owner and assigned admins create posts.
+            When on, any member can publish to the community feed.
           </p>
         ),
       },
     ],
     tips: [
-      'Для платных клубов сочетайте приватность + join code + платный доступ (см. монетизацию).',
+      'For paid clubs, combine private access, invite codes, and paid membership — see monetization.',
     ],
   },
 
   'community/branding': {
-    title: 'Оформление сообщества',
-    lead: 'Аватар и баннер формируют узнаваемость; их можно загрузить файлом или указать URL.',
+    title: 'Community branding',
+    lead:
+      'Avatar and banner build recognition; upload a file or paste an image URL.',
     steps: [
       {
-        title: 'Аватар сообщества',
+        title: 'Community avatar',
         body: (
           <p>
-            На странице сообщества owner открывает редактирование аватара: загрузка в{' '}
-            файл с компьютера или вставьте ссылку на картинку. Аватар виден в шапке сообщества и в
-            ленте, когда пост выходит от имени сообщества.
+            On the community page, the owner opens avatar editing: upload from your computer or paste
+            an image link. The avatar appears in the community header and on feed posts published as
+            the community.
           </p>
         ),
       },
       {
-        title: 'Баннер',
+        title: 'Banner',
         body: (
           <p>
-            Баннер — широкое изображение в шапке. Поддерживаются файл, URL и удаление. На мобильном
-            используется нижняя панель (как у других модалок).
+            The banner is a wide header image. You can upload, link, or remove it. On mobile,
+            editing opens in a bottom panel.
           </p>
         ),
       },
       {
-        title: 'Название и описание',
+        title: 'Name and description',
         body: (
           <p>
-            Редактируются в Settings. Handle после создания менять осторожно — все ссылки завязаны
-            на URL.
+            Edit these in community settings. Change the community address carefully after launch —
+            all shared links depend on it.
           </p>
         ),
       },
@@ -574,46 +565,46 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'community/members': {
-    title: 'Участники сообщества',
+    title: 'Community members',
     lead:
-      'Участники — люди, вступившие в ваш клуб. Владелец видит полный список и может управлять доступом; участники общаются в ленте и приложениях.',
+      'Members are people who joined your club. The owner sees the full list and manages access; members interact in the feed and apps.',
     steps: [
       {
-        title: 'Вступление',
+        title: 'Joining',
         body: (
           <Ul
             items={[
-              'В публичном сообществе на странице клуба нажмите Join — вы сразу станете участником.',
-              'В закрытом сообществе после Join появится поле для кода приглашения — введите код от владельца.',
-              'После вступления сообщество появится в вашем меню и в списке «Мои сообщества».',
+              'In a public community, click Join on the community page — you become a member immediately.',
+              'In a private community, Join opens a field for the invite code.',
+              'After joining, the community appears in your menu and under My communities.',
             ]}
           />
         ),
       },
       {
-        title: 'Выход',
+        title: 'Leaving',
         body: (
           <p>
-            Участник может покинуть сообщество кнопкой Leave — он перестанет видеть закрытый контент
-            и исчезнет из списка участников. Владелец остаётся всегда.
+            A member can leave the community — they lose access to private content and disappear from
+            the member list. The owner always remains.
           </p>
         ),
       },
       {
-        title: 'Просмотр списка (owner)',
+        title: 'Member list',
         body: (
           <p>
-            В dashboard → Users отображаются участники с email, датой вступления, last seen (для
-            аналитики удержания).
+            The <L to={docsPagePath('dashboard', 'members')}>members section</L> of the owner
+            dashboard shows email, join date, and last activity — useful for retention.
           </p>
         ),
       },
       {
-        title: 'Админы сообщества',
+        title: 'Administrators',
         body: (
           <p>
-            Owner может назначать админов с гранулярными правами (участники, аналитика, контент) через
-            права администраторов — в настройках панели владельца.
+            The owner assigns admins with rights for members, analytics, and content — in dashboard
+            settings.
           </p>
         ),
       },
@@ -621,35 +612,33 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'community/feed': {
-    title: 'Лента сообщества',
-    lead: 'Лента сообщества похожа на главную: посты, лайки, репосты, комментарии, меню карточки.',
+    title: 'Community feed',
+    lead:
+      'The community feed works like the home feed: posts, likes, reposts, comments, and post menus.',
     steps: [
       {
-        title: 'Создать пост в сообществе',
+        title: 'Create a community post',
         body: (
           <p>
-            На <C>/community/:handle</C> при наличии прав откройте композер. Пост привязывается к
-            community; публичные посты могут отображаться от имени сообщества (имя + аватар
-            community).
+            On the community page, open the post composer if you have permission. The post belongs to
+            the club; public posts can appear under the community name and avatar.
           </p>
         ),
       },
       {
-        title: 'Медиа и ссылки',
+        title: 'Media and links',
         body: (
           <p>
-            Поддерживаются загрузка файлов и вставка URL картинок/видео (разрешённые домены и
-            /uploads/). Ссылка-превью добавляется отдельно.
+            Upload files, paste image and video links, and add link previews for articles.
           </p>
         ),
       },
       {
-        title: 'Взаимодействия',
+        title: 'Engagement',
         body: (
           <p>
-            Лайки и репосты сохраняются сразу — при обновлении страницы счётчики остаются верными.
-            В меню «⋯» у поста: ссылка на публикацию, правка текста и удаление (для автора и
-            владельца сообщества).
+            Likes and reposts save immediately. The post menu offers a link to the post, edit, and
+            delete — for the author and community owner.
           </p>
         ),
       },
@@ -657,32 +646,44 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'apps/overview': {
-    title: 'Что такое приложения сообщества',
+    title: 'Community apps',
     lead:
-      'Приложения — дополнительные разделы внутри вашего сообщества: чат, курсы, файлы и другие. Каждое ставится из магазина отдельно; можно установить несколько раз с разными названиями.',
+      'Apps are extra sections inside your community: chat, courses, files, and more. Each is installed from the store separately; you can add multiple instances with different names.',
     sections: [
       {
-        heading: 'Доступные приложения',
+        heading: 'Available apps',
         body: (
           <Ul
             items={[
-              <><strong>Чат</strong> — общение участников в реальном времени.</>,
-              <><strong>Курсы</strong> — уроки и программы обучения.</>,
-              <><strong>Контент</strong> — статьи и длинные материалы.</>,
-              <><strong>Файлы</strong> — документы и загрузки.</>,
-              <><strong>Объявления</strong> — важные новости и правила.</>,
-              <><strong>События</strong> — календарь встреч и AMA.</>,
+              <>
+                <strong>Chat</strong> — real-time member conversation.
+              </>,
+              <>
+                <strong>Courses</strong> — lessons and learning programs.
+              </>,
+              <>
+                <strong>Content</strong> — articles and long-form materials.
+              </>,
+              <>
+                <strong>Files</strong> — documents and downloads.
+              </>,
+              <>
+                <strong>Announcements</strong> — important news and rules.
+              </>,
+              <>
+                <strong>Events</strong> — calendar of calls and meetups.
+              </>,
             ]}
           />
         ),
       },
       {
-        heading: 'Как это выглядит для участника',
+        heading: 'What members see',
         body: (
           <p>
-            После установки на странице сообщества появляются новые вкладки. Участник переключается
-            между лентой, чатом, курсами и т.д. — как между разделами в одном приложении на телефоне.
-            Можно скрыть вкладку, пока готовите материал, и открыть её в день запуска.
+            After installation, new tabs appear on the community page. Members switch between feed,
+            chat, courses, and other sections. Hide a tab while preparing content and reveal it on
+            launch day.
           </p>
         ),
       },
@@ -690,36 +691,37 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'apps/store': {
-    title: 'Магазин приложений',
-    lead: 'Магазин доступен только владельцу сообщества по URL /community/:handle/store.',
+    title: 'App store',
+    lead:
+      'The app store is available only to the community owner — open it from your community page.',
     steps: [
       {
-        title: 'Как попасть в магазин',
+        title: 'How to open the store',
         body: (
           <p>
-            Откройте своё сообщество → Store (или напрямую{' '}
-            <C>/community/my-handle/store</C>). Без прав owner увидите отказ.
+            Open your community page and go to App store. Members do not see the store — only
+            installed tabs on the community page.
           </p>
         ),
       },
       {
-        title: 'Интерфейс магазина',
+        title: 'Store interface',
         body: (
           <Ul
             items={[
-              'Категории: Community, Education, AI, Trading и др.',
-              'Поиск по названию приложения.',
-              'Карточка: описание, цена (часто Free), кнопка Install.',
+              'Categories: community, education, themed modules.',
+              'Search by app name.',
+              'Each card shows description, price (often free), and Install.',
             ]}
           />
         ),
       },
       {
-        title: 'Уже установленные',
+        title: 'Already installed',
         body: (
           <p>
-            Установленные apps отмечены в магазине. Управление экземплярами — в Products dashboard
-            или на странице сообщества (вкладки приложений).
+            Installed apps are marked in the store. Manage instances in the Products section of the
+            owner dashboard or on community page tabs.
           </p>
         ),
       },
@@ -727,79 +729,81 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'apps/install': {
-    title: 'Установка приложения',
-    lead: 'Установка добавляет запись в installedAppInstances и вкладку на странице сообщества.',
+    title: 'Installing an app',
+    lead:
+      'Installation adds a new tab on the community page — the process takes about a minute.',
     steps: [
       {
-        title: 'Выбрать приложение в Store',
+        title: 'Choose an app in the store',
         body: (
           <p>
-            В <C>community/:handle/store</C> найдите нужный модуль (например Chat). Нажмите{' '}
-            <strong>Install</strong> / установить.
+            In the <L to={docsPagePath('apps', 'store')}>app store</L>, find the module you need,
+            for example Chat. Click Install.
           </p>
         ),
       },
       {
-        title: 'Подтвердить установку',
+        title: 'Confirm installation',
         body: (
           <p>
-            Откроется окно с названием модуля (можно оставить предложенное). После подтверждения
-            приложение появится в списке установленных и на странице сообщества.
+            A dialog asks for the tab name — keep the suggestion or set your own. After confirmation
+            the app appears on the community page.
           </p>
         ),
       },
       {
-        title: 'Проверить на странице сообщества',
+        title: 'Verify on the community page',
         body: (
           <p>
-            Вернитесь на <C>/community/:handle</C> — появится вкладка/панель приложения. Если вкладка
-            скрыта — в панели владельца включите «Видно участникам» для этого приложения.
+            Return to the community page — the app tab should appear. If it is hidden, enable Visible
+            to members in product settings on the owner dashboard.
           </p>
         ),
       },
       {
-        title: 'Повторная установка',
+        title: 'Install again',
         body: (
           <p>
-            Один и тот же <C>appId</C> можно установить несколько раз (например два чата: «General» и
-            «VIP») — у каждого свой <C>id</C> instance.
+            You can install the same app multiple times — for example two chats, General and VIP.
+            Each instance has its own name and message history.
           </p>
         ),
       },
     ],
     tips: [
-      'После установки Chat создайте приветственное сообщение от owner, чтобы задать тон.',
+      'After installing chat, post a welcome message from the owner to set the tone.',
     ],
   },
 
   'apps/configure': {
-    title: 'Настройка экземпляров',
-    lead: 'Каждый instance настраивается отдельно: заголовок, видимость, заметка для себя.',
+    title: 'Configuring app instances',
+    lead:
+      'Each app instance is configured separately: title, visibility, and internal notes.',
     steps: [
       {
-        title: 'Products в Dashboard',
+        title: 'Products section',
         body: (
           <p>
-            <C>/dashboard/:handle/products</C> — список установленных приложений: переименование,
-            скрытие от участников, порядок (если поддерживается UI).
+            On the owner dashboard, open Products — a list of installed apps: rename, hide from
+            members, and reorder tabs.
           </p>
         ),
       },
       {
-        title: 'visibleToMembers',
+        title: 'Visibility for members',
         body: (
           <p>
-            Если выключить видимость — участники не увидят вкладку (удобно для черновиков курсов).
-            На главной панели владельца появится напоминание о скрытых приложениях.
+            When visibility is off, members do not see the tab — useful for draft courses. The
+            dashboard home shows a reminder about hidden apps.
           </p>
         ),
       },
       {
-        title: 'Удаление экземпляра',
+        title: 'Remove an instance',
         body: (
           <p>
-            Удаление через dashboard/products или store — снимает instance и связанный UI. Данные
-            чата/курсов могут остаться в БД — уточняйте перед удалением production-данных.
+            Remove via Products or the store to drop the tab from the community page. Save important
+            materials first — some data may remain archived.
           </p>
         ),
       },
@@ -807,28 +811,33 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'apps/chat': {
-    title: 'Приложение «Чат»',
-    lead: 'Community Chat — сообщения внутри сообщества с read state и непрочитанными.',
+    title: 'Chat app',
+    lead: 'Community chat — member conversation inside the club with read indicators.',
     steps: [
       {
-        title: 'Установить Chat из Store',
-        body: <p>См. <L to={docsPagePath('apps', 'install')}>Установка</L>. Выберите appId chat.</p>,
-      },
-      {
-        title: 'Открыть панель чата',
+        title: 'Install chat',
         body: (
           <p>
-            На странице сообщества переключитесь на вкладку чата. Участники пишут сообщения; owner
-            модерирует как автор с правами сообщества.
+            See <L to={docsPagePath('apps', 'install')}>installing apps</L>. Choose Chat in the
+            store.
           </p>
         ),
       },
       {
-        title: 'Непрочитанные',
+        title: 'Open chat',
         body: (
           <p>
-            Непрочитанные сообщения подсвечиваются в чате и учитываются в аналитике панели владельца
-            — так видно, где нужно ответить участникам.
+            On the community page, switch to the chat tab. Members send messages; the owner sets tone
+            and moderates discussion.
+          </p>
+        ),
+      },
+      {
+        title: 'Unread messages',
+        body: (
+          <p>
+            Unread messages are highlighted in chat and reflected in owner dashboard analytics — so
+            you know where to respond.
           </p>
         ),
       },
@@ -836,28 +845,28 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'apps/courses': {
-    title: 'Приложение «Курсы»',
-    lead: 'Структура курсов и уроков для обучения внутри сообщества.',
+    title: 'Courses app',
+    lead: 'Course and lesson structure for learning inside the community.',
     steps: [
       {
-        title: 'Установить Courses',
-        body: <p>Store → Courses (appId courses) → Install.</p>,
+        title: 'Install courses',
+        body: <p>In the app store, choose Courses and click Install.</p>,
       },
       {
-        title: 'Создать курс',
+        title: 'Create a course',
         body: (
           <p>
-            В панели courses owner добавляет курс: название, описание, уроки. Участники видят список
-            после публикации (visibleToMembers).
+            In the courses section, the owner adds a program: title, description, lessons. Members
+            see the list after publish and when visibility is on.
           </p>
         ),
       },
       {
-        title: 'Развитие',
+        title: 'Expand over time',
         body: (
           <p>
-            Комбинируйте с Content и Files: курсы для программы, content для статей, files для
-            материалов.
+            Combine with Content and Files: courses for programs, content for articles, files for
+            downloads.
           </p>
         ),
       },
@@ -865,27 +874,39 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'apps/content': {
-    title: 'Приложение «Контент»',
-    lead: 'Документы и long-read материалы внутри сообщества.',
+    title: 'Content app',
+    lead: 'Documents and long-form materials inside the community.',
     steps: [
-      { title: 'Установка', body: <p>Store → Content (appId content).</p> },
       {
-        title: 'Публикация',
-        body: <p>Owner создаёт документы; участники читают в панели content.</p>,
+        title: 'Install',
+        body: <p>In the app store, choose Content and install the module.</p>,
+      },
+      {
+        title: 'Publish',
+        body: (
+          <p>
+            The owner creates documents; members read them in the content section on the community
+            page.
+          </p>
+        ),
       },
     ],
   },
 
   'apps/files': {
-    title: 'Приложение «Файлы»',
-    lead: 'Загрузка и раздача файлов участникам.',
+    title: 'Files app',
+    lead: 'Upload and share files with members.',
     steps: [
-      { title: 'Установка', body: <p>Store → Files (appId files).</p> },
       {
-        title: 'Загрузка',
+        title: 'Install',
+        body: <p>In the app store, choose Files and install the module.</p>,
+      },
+      {
+        title: 'Upload',
         body: (
           <p>
-            Файлы сохраняются на сервере в uploads; участники с доступом скачивают из панели files.
+            Uploaded files are available to members with community access — download from the Files
+            section.
           </p>
         ),
       },
@@ -893,16 +914,19 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'apps/announcements': {
-    title: 'Приложение «Объявления»',
-    lead: 'Важные новости и правила сообщества.',
+    title: 'Announcements app',
+    lead: 'Important news and community rules.',
     steps: [
-      { title: 'Установка', body: <p>Store → Announcements.</p> },
       {
-        title: 'Первое объявление',
+        title: 'Install',
+        body: <p>In the app store, choose Announcements and install the module.</p>,
+      },
+      {
+        title: 'First announcement',
         body: (
           <p>
-            Создайте закреплённое объявление с правилами и ссылками. Рекомендуется на этапе запуска
-            (см. чеклист).
+            Create a pinned announcement with rules and links. Recommended at launch — see the{' '}
+            <L to={docsPagePath('growth', 'checklist')}>pre-launch checklist</L>.
           </p>
         ),
       },
@@ -910,54 +934,60 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'apps/events': {
-    title: 'Приложение «События»',
-    lead: 'Календарь звонков, AMA и офлайн-встреч.',
+    title: 'Events app',
+    lead: 'Calendar for calls, AMAs, and offline meetups.',
     steps: [
-      { title: 'Установка', body: <p>Store → Events (appId events).</p> },
       {
-        title: 'Создание события',
-        body: <p>Укажите название, дату, описание. Участники видят список в панели events.</p>,
+        title: 'Install',
+        body: <p>In the app store, choose Events and install the module.</p>,
+      },
+      {
+        title: 'Create an event',
+        body: (
+          <p>
+            Set title, date, and description. Members see the list in Events on the community page.
+          </p>
+        ),
       },
     ],
   },
 
   'dashboard/overview': {
-    title: 'Dashboard владельца',
-    lead: 'Панель управления сообществом на английском UI: /dashboard/:handle.',
+    title: 'Owner dashboard',
+    lead:
+      'The owner dashboard is your control center: settings, members, apps, and analytics in one place.',
     steps: [
       {
-        title: 'Доступ',
+        title: 'Access',
         body: (
           <p>
-            Только owner (и админы с правами) видят dashboard. Ссылка из меню сообщества или{' '}
-            <C>/dashboard/your-handle</C>.
+            The owner and admins with the right permissions can open the dashboard from the menu on
+            your community page.
           </p>
         ),
       },
       {
-        title: 'Разделы',
+        title: 'Sections',
         body: (
           <Ul
             items={[
-              <>Home — сводка, предупреждения (скрытые apps, непрочитанный чат).</>,
-              <>Settings — настройки сообщества.</>,
-              <>Users — таблица участников.</>,
-              <>Products — установленные приложения.</>,
-              <>Content — управление контентом.</>,
-              <>Analytics — графики роста.</>,
-              <>Invites — приглашения.</>,
+              <>Home — summary and alerts about hidden apps and unread chat.</>,
+              <>Settings — name, access, payments.</>,
+              <>Members — member table.</>,
+              <>Products — installed apps.</>,
+              <>Content — material management.</>,
+              <>Analytics — growth charts.</>,
+              <>Invites — links and codes for new members.</>,
             ]}
           />
         ),
       },
       {
-        title: 'Быстрые ссылки',
+        title: 'Quick navigation',
         body: (
           <p>
-            Пример для handle <C>myclub</C>: страница{' '}
-            <C>{communityDashboardPath('myclub')}</C>, магазин{' '}
-            <C>{communityStorePath('myclub')}</C>, настройки{' '}
-            <C>{communitySettingsPath('myclub')}</C>.
+            From the community page you reach settings, the app store, and the dashboard without
+            hunting across the platform.
           </p>
         ),
       },
@@ -965,32 +995,37 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'dashboard/analytics': {
-    title: 'Аналитика',
-    lead: 'Графики за 30 дней: рост участников, посты, накопительная кривая.',
+    title: 'Analytics',
+    lead:
+      '30-day charts: member growth, feed activity, and chat engagement.',
     steps: [
       {
-        title: 'Открыть Analytics',
-        body: <p><C>/dashboard/:handle/analytics</C></p>,
+        title: 'Open analytics',
+        body: (
+          <p>
+            On the owner dashboard, open Analytics — charts and key metrics for recent weeks.
+          </p>
+        ),
       },
       {
-        title: 'Метрики',
+        title: 'Key metrics',
         body: (
           <Ul
             items={[
-              'memberCount, newMembers7d',
-              'postCount, newPosts7d',
-              'totalChatUnread по чатам',
-              'estimatedRevenue для платных сообществ',
+              'Total members and new members in the last 7 days.',
+              'Post count and new posts in the last 7 days.',
+              'Unread chat messages.',
+              'Estimated revenue for paid communities.',
             ]}
           />
         ),
       },
       {
-        title: 'Как использовать',
+        title: 'How to use the data',
         body: (
           <p>
-            Сравнивайте newMembers7d и newPosts7d еженедельно. Падение постов при росте участников —
-            сигнал сделать активность или объявление.
+            Compare new members and posts weekly. Member growth without posts signals it is time to
+            schedule activity or post an announcement.
           </p>
         ),
       },
@@ -998,43 +1033,58 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'dashboard/members': {
-    title: 'Участники в Dashboard',
-    lead: 'В панели владельца есть таблица всех участников с датой вступления и активностью — удобно для модерации и рассылок.',
+    title: 'Members in the dashboard',
+    lead:
+      'A table of all members with join date and activity — useful for moderation and outreach.',
     steps: [
       {
-        title: 'Открыть Users',
-        body: <p><C>/dashboard/:handle/users</C> — колонки User, Email, Status, Joined at и др.</p>,
+        title: 'Open members',
+        body: (
+          <p>
+            On the owner dashboard, open Members — a table with name, email, status, and join date.
+          </p>
+        ),
       },
       {
-        title: 'Экспорт',
-        body: <p>Кнопка Export CSV выгружает текущую страницу таблицы для CRM или рассылки.</p>,
+        title: 'Export',
+        body: (
+          <p>
+            Export CSV downloads the current table page for CRM or email — only with member consent
+            for personal data use.
+          </p>
+        ),
       },
     ],
   },
 
   'social/posts': {
-    title: 'Посты и взаимодействия',
-    lead: 'Единая модель постов на главной, в профиле и в сообществах.',
+    title: 'Posts and engagement',
+    lead: 'One post model on the home feed, profiles, and communities.',
     steps: [
       {
-        title: 'Лайк',
+        title: 'Like',
         body: (
           <p>
-            Нажмите сердечко под постом — лайк сохранится. Повторное нажатие снимает лайк. Счётчик
-            обновляется сразу у всех, кто смотрит тот же пост.
+            Click the heart under a post to like it. Click again to remove the like. The count
+            updates immediately.
           </p>
         ),
       },
       {
-        title: 'Репост',
-        body: <p>Repost создаёт связь в reposts; на профиле вкладка Reposts.</p>,
-      },
-      {
-        title: 'Комментарии',
+        title: 'Repost',
         body: (
           <p>
-            Раскрытие комментариев в ленте или в боковой панели (десктоп). Редактирование/удаление
-            своих комментариев через меню.
+            Reposting shares the post with your followers. Reposts appear under the Reposts tab on
+            your profile.
+          </p>
+        ),
+      },
+      {
+        title: 'Comments',
+        body: (
+          <p>
+            Open comments under the post or in the side panel. Edit and delete your own comments from
+            the menu.
           </p>
         ),
       },
@@ -1042,24 +1092,24 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'social/messenger': {
-    title: 'Мессенджер',
-    lead: 'Личные и системные диалоги; DM создаётся парой Conversation на каждого участника.',
+    title: 'Direct messages',
+    lead: 'Private conversations and platform service channels on one page.',
     steps: [
       {
-        title: 'Системные чаты',
+        title: 'Service chats',
         body: (
           <p>
-            При первом входе создаются system_mnoonx и system_support. Support — для обращений в
-            поддержку.
+            On first sign-in, platform and support conversations appear — use them for product
+            questions.
           </p>
         ),
       },
       {
-        title: 'Личный DM',
+        title: 'Private chat',
         body: (
           <p>
-            Из профиля нажмите иконку сообщения — откроется личный чат с этим пользователем в
-            мессенджере.
+            From a profile, click the message icon to open a <L to="/messenger">direct chat</L> with
+            that person.
           </p>
         ),
       },
@@ -1067,18 +1117,24 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'social/discover': {
-    title: 'Discover',
-    lead: 'Каталог сообществ для поиска и вступления.',
+    title: 'Community catalog',
+    lead: 'Browse communities and join clubs that match your interests.',
     steps: [
       {
-        title: 'Просмотр',
-        body: <p><L to="/discover">/discover</L> — список всех сообществ, в т.ч. private (с бейджем).</p>,
-      },
-      {
-        title: 'Вступление',
+        title: 'Browse',
         body: (
           <p>
-            Переход на страницу community → Join. Для private — код из настроек owner.
+            The <L to="/discover">community catalog</L> lists public and private communities —
+            private ones have a distinct badge.
+          </p>
+        ),
+      },
+      {
+        title: 'Join',
+        body: (
+          <p>
+            Open the community page and click Join. Private communities require an invite code from
+            the owner.
           </p>
         ),
       },
@@ -1086,39 +1142,40 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'growth/strategy': {
-    title: 'Стратегия роста',
-    lead: 'После технического запуска фокус на удержании и контенте.',
+    title: 'Growth strategy',
+    lead: 'After launch, focus on retention and consistent content.',
     steps: [
       {
-        title: 'Неделя 1 — Ядро',
+        title: 'Week 1 — Core',
         body: (
           <Ul
             items={[
-              '10–20 активных участников (личные инвайты).',
-              'Ежедневный чат или объявление от owner.',
-              '1–2 поста в ленте сообщества в день.',
+              '10–20 active members through personal invites.',
+              'Daily chat message or announcement from the owner.',
+              '1–2 posts in the community feed per day.',
             ]}
           />
         ),
       },
       {
-        title: 'Неделя 2–4 — Ритм',
+        title: 'Weeks 2–4 — Rhythm',
         body: (
           <Ul
             items={[
-              'Еженедельное событие (Events app).',
-              'Серия уроков (Courses) или файлов (Files).',
-              'Кросс-пост в глобальную ленту с ссылкой на community.',
+              'Weekly event in the Events app.',
+              'Lesson series or file drops for members.',
+              'Post on the home feed with a link to your community.',
             ]}
           />
         ),
       },
       {
-        title: 'Метрики',
+        title: 'Metrics',
         body: (
           <p>
-            Следите в Analytics: newMembers7d, postsActivity, chat unread. Цель — рост активных, не
-            только подписчиков.
+            Track new members, posts, and unread chat in{' '}
+            <L to={docsPagePath('dashboard', 'analytics')}>analytics</L>. Aim for active members, not
+            just sign-ups.
           </p>
         ),
       },
@@ -1126,79 +1183,82 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
   },
 
   'growth/monetization': {
-    title: 'Монетизация',
-    lead: 'Сообщества могут быть платными (isPaid, price) — revenue отображается в analytics.',
+    title: 'Monetization',
+    lead:
+      'Paid community access is configured in community settings; revenue appears in analytics.',
     steps: [
       {
-        title: 'Платный доступ',
+        title: 'Paid access',
         body: (
           <p>
-            В настройках сообщества включите paid mode и цену. Участники платят за access (логика
-            оплаты зависит от интеграции; в analytics — estimatedRevenue).
+            In community settings, enable paid mode and set a price. Members get access after
+            payment; analytics shows estimated revenue.
           </p>
         ),
       },
       {
-        title: 'Memberships в dashboard',
+        title: 'Memberships and tiers',
         body: (
           <p>
-            Вкладка Memberships в Users dashboard показывает продукты доступа и active users (для
-            планирования тарифов).
+            The members section of the owner dashboard shows access products and active subscribers
+            — useful for planning tiers.
           </p>
         ),
       },
     ],
-    tips: ['Начните с бесплатного сообщества, платный уровень добавьте после доказанной ценности.'],
+    tips: [
+      'Start free; add a paid tier after you have proven value.',
+    ],
   },
 
   'growth/checklist': {
-    title: 'Чеклист перед публичным запуском',
-    lead: 'Пройдите пункты за день до анонса.',
+    title: 'Pre-launch checklist',
+    lead: 'Complete these items the day before your public announcement.',
     steps: [
       {
-        title: 'Брендинг',
+        title: 'Branding',
         body: (
           <Ul
             items={[
-              'Аватар и баннер загружены.',
-              'Bio и описание без опечаток.',
-              'Handle совпадает с брендом в соцсетях.',
+              'Avatar and banner uploaded.',
+              'Description proofread.',
+              'Community address matches your brand on social media.',
             ]}
           />
         ),
       },
       {
-        title: 'Доступ',
+        title: 'Access',
         body: (
           <Ul
             items={[
-              'Публичное/приватное выбрано осознанно.',
-              'Join code записан и протестирован (для private).',
-              'Настройка «кто может постить» соответствует вашей модели (только вы или все участники).',
+              'Public or private — chosen deliberately.',
+              'Invite code saved and tested for private clubs.',
+              'Who can publish matches your operating model.',
             ]}
           />
         ),
       },
       {
-        title: 'Приложения',
+        title: 'Apps',
         body: (
           <Ul
             items={[
-              'Chat + Announcements установлены.',
-              'visibleToMembers=true для всех нужных вкладок.',
-              'Тестовое сообщение в чате удалено или оформлено как welcome.',
+              'Chat and announcements installed.',
+              'All needed tabs visible to members.',
+              'Test chat message removed or turned into a welcome note.',
             ]}
           />
         ),
       },
       {
-        title: 'Контент',
+        title: 'Content',
         body: (
           <Ul
             items={[
-              'Пост с правилами в ленте.',
-              'Первое объявление в Announcements.',
-              'Ссылка на community в профиле owner.',
+              'Rules post in the feed.',
+              'First announcement published.',
+              'Community link added to the owner profile.',
             ]}
           />
         ),
@@ -1208,8 +1268,8 @@ export const PAGES_EN: Record<DocsPageKey, Omit<DocsArticleProps, 'prev' | 'next
         body: (
           <Ul
             items={[
-              'Analytics открывается без ошибок.',
-              'Users показывает тестового участника после пробного Join.',
+              'Analytics opens without errors.',
+              'Members section shows a test member after a trial join.',
             ]}
           />
         ),

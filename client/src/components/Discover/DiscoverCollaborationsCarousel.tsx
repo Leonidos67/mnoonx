@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { ChevronLeft, ChevronRight, Users, Users2 } from 'lucide-react';
 import { useTranslation } from '../../i18n/useTranslation';
+import { resolveMediaUrl } from '../../utils/mediaUrl';
 
 export interface CollabOwner {
   _id?: string;
@@ -22,10 +23,10 @@ export interface CollaborationItem {
 }
 
 function avatarUrl(name: string, src?: string, size = 40): string {
-  return (
+  const raw =
     src ||
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=315efb&color=fff&size=${size}&bold=true`
-  );
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=315efb&color=fff&size=${size}&bold=true`;
+  return resolveMediaUrl(raw) || raw;
 }
 
 interface DiscoverCollaborationsCarouselProps {
@@ -46,7 +47,7 @@ const DiscoverCollaborationsCarousel: React.FC<DiscoverCollaborationsCarouselPro
   const scrollBy = (dir: -1 | 1) => {
     const el = scrollerRef.current;
     if (!el) return;
-    el.scrollBy({ left: dir * Math.min(360, el.clientWidth * 0.8), behavior: 'smooth' });
+    el.scrollBy({ left: dir * Math.min(320, el.clientWidth * 0.75), behavior: 'smooth' });
   };
 
   return (
@@ -82,60 +83,72 @@ const DiscoverCollaborationsCarousel: React.FC<DiscoverCollaborationsCarouselPro
 
       <div
         ref={scrollerRef}
-        className="flex gap-3 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-2.5 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:gap-3 [&::-webkit-scrollbar]:hidden"
       >
         {items.map((item) => {
           const a = item.owner;
           const b = item.coOwner;
-          const cover =
-            item.banner ||
-            item.avatar ||
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(item.name)}&background=111827&color=fff&size=400&bold=true`;
+          const bannerRaw = String(item.banner || '').trim();
+          const bannerUrl = bannerRaw ? resolveMediaUrl(bannerRaw) || bannerRaw : null;
 
           return (
             <button
               key={item._id}
               type="button"
               onClick={() => onOpen(item)}
-              className="w-[280px] shrink-0 overflow-hidden rounded-3xl border border-gray-200 bg-white text-left transition-shadow hover:shadow-md sm:w-[300px]"
+              className="w-[min(78vw,16.5rem)] shrink-0 overflow-hidden rounded-2xl border border-neutral-200/90 bg-white text-left shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-[border-color,box-shadow] hover:border-neutral-300 hover:shadow-md sm:w-[15.5rem] sm:rounded-[1.25rem]"
             >
-              <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100">
-                <img src={cover} alt="" className="h-full w-full object-cover" />
-                <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-white backdrop-blur-sm">
+              <div className="relative z-10 h-20 bg-neutral-100 sm:h-[5.5rem]">
+                <div className="absolute inset-0 overflow-hidden bg-neutral-100">
+                  {bannerUrl ? (
+                    <>
+                      <img src={bannerUrl} alt="" className="h-full w-full object-cover" />
+                      <div
+                        aria-hidden
+                        className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"
+                      />
+                    </>
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center px-3">
+                      <p className="line-clamp-2 text-center text-sm font-medium text-neutral-400">
+                        {item.name}
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <span className="absolute left-2.5 top-2 z-10 inline-flex items-center gap-1 rounded-full bg-black/65 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white backdrop-blur-sm sm:left-3 sm:top-2.5 sm:px-2.5 sm:text-[10px]">
                   <Users2 className="h-3 w-3" />
                   {t('discover.collaborationBadge')}
                 </span>
-              </div>
-              <div className="p-4">
-                <p className="line-clamp-1 text-[15px] font-semibold text-gray-900">{item.name}</p>
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="flex -space-x-2">
+                <div className="absolute bottom-0 left-3 z-20 flex translate-y-1/2 -space-x-2">
+                  <img
+                    src={avatarUrl(a.fullName || a.username, a.avatar)}
+                    alt=""
+                    className="h-8 w-8 rounded-full border-2 border-white object-cover shadow-sm"
+                  />
+                  {b ? (
                     <img
-                      src={avatarUrl(a.fullName || a.username, a.avatar)}
+                      src={avatarUrl(b.fullName || b.username, b.avatar)}
                       alt=""
-                      className="h-7 w-7 rounded-full border-2 border-white object-cover"
+                      className="h-8 w-8 rounded-full border-2 border-white object-cover shadow-sm"
                     />
-                    {b ? (
-                      <img
-                        src={avatarUrl(b.fullName || b.username, b.avatar)}
-                        alt=""
-                        className="h-7 w-7 rounded-full border-2 border-white object-cover"
-                      />
-                    ) : null}
-                  </div>
-                  <p className="min-w-0 truncate text-xs text-gray-500">
-                    {b
-                      ? t('discover.collaborationByTwo', {
-                          a: a.fullName || a.username,
-                          b: b.fullName || b.username,
-                        })
-                      : t('discover.collaborationByOne', { a: a.fullName || a.username })}
-                  </p>
+                  ) : null}
                 </div>
+              </div>
+              <div className="relative z-0 px-3.5 pb-3.5 pt-6">
+                <p className="line-clamp-1 text-sm font-semibold text-neutral-900">{item.name}</p>
+                <p className="mt-1 line-clamp-1 text-[11px] text-neutral-500">
+                  {b
+                    ? t('discover.collaborationByTwo', {
+                        a: a.fullName || a.username,
+                        b: b.fullName || b.username,
+                      })
+                    : t('discover.collaborationByOne', { a: a.fullName || a.username })}
+                </p>
                 {item.description ? (
-                  <p className="mt-2 line-clamp-2 text-sm text-gray-600">{item.description}</p>
+                  <p className="mt-1.5 line-clamp-2 text-xs text-neutral-600">{item.description}</p>
                 ) : null}
-                <p className="mt-3 inline-flex items-center gap-1 text-xs text-gray-400">
+                <p className="mt-2.5 inline-flex items-center gap-1 text-[11px] text-neutral-400">
                   <Users className="h-3 w-3" />
                   {t('discover.membersCount', { count: (item.memberCount || 0).toLocaleString() })}
                 </p>

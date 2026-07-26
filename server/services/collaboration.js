@@ -67,6 +67,88 @@ async function evaluateCollaborationInvite(fromUserId, toUser) {
   return { ok: true, action: 'request', mode };
 }
 
+/**
+ * Resolve a community the user owns (non-collaboration) by id or handle.
+ * Returns ObjectId or null. Throws on invalid ownership.
+ */
+async function resolveOwnedDisplayCommunity(userId, communityIdOrHandle) {
+  if (communityIdOrHandle == null || communityIdOrHandle === '' || communityIdOrHandle === 'user') {
+    return null;
+  }
+  const raw = String(communityIdOrHandle).trim();
+  const filter = {
+    kind: { $ne: 'collaboration' },
+    owner: userId,
+  };
+  if (/^[a-f\d]{24}$/i.test(raw)) {
+    filter._id = raw;
+  } else {
+    filter.handle = raw.toLowerCase().replace(/^@/, '');
+  }
+  const doc = await Community.findOne(filter).select('_id').lean();
+  if (!doc) {
+    const err = new Error('Display community must be owned by that creator and not be a collaboration');
+    err.code = 'invalid_display_community';
+    throw err;
+  }
+  return doc._id;
+}
+
+function serializeCreatorFace(userDoc, communityDoc) {
+  if (!userDoc) return null;
+  const userId = userDoc._id ? String(userDoc._id) : String(userDoc);
+  const username = userDoc.username || '';
+  if (communityDoc && communityDoc.handle) {
+    return {
+      type: 'community',
+      name: communityDoc.name,
+      handle: communityDoc.handle,
+      avatar: communityDoc.avatar || '',
+      userId,
+      username,
+      fullName: userDoc.fullName || username,
+    };
+  }
+  return {
+    type: 'user',
+    name: userDoc.fullName || username,
+    handle: username,
+    avatar: userDoc.avatar || '',
+    userId,
+    username,
+    fullName: userDoc.fullName || username,
+  };
+}
+
+function attachCollaborationFaces(obj, community) {
+  if (!obj || community.kind !== 'collaboration') return obj;
+  const ownerUser = community.owner;
+  const coUser = community.coOwner;
+  const ownerComm = community.ownerDisplayCommunity;
+  const coComm = community.coOwnerDisplayCommunity;
+  obj.ownerFace = serializeCreatorFace(
+    ownerUser && typeof ownerUser === 'object' ? ownerUser : null,
+    ownerComm && typeof ownerComm === 'object' && ownerComm.handle ? ownerComm : null
+  );
+  obj.coOwnerFace = serializeCreatorFace(
+    coUser && typeof coUser === 'object' ? coUser : null,
+    coComm && typeof coComm === 'object' && coComm.handle ? coComm : null
+  );
+  return obj;
+}
+
+const COLLAB_POPULATE = [
+  { path: 'owner', select: 'username fullName avatar' },
+  { path: 'coOwner', select: 'username fullName avatar' },
+  { path: 'ownerDisplayCommunity', select: 'name handle avatar kind' },
+  { path: 'coOwnerDisplayCommunity', select: 'name handle avatar kind' },
+];
+
+async function populateCollaboration(docOrId) {
+  const id = docOrId._id || docOrId;
+  return Community.findById(id).populate(COLLAB_POPULATE);
+}
+
 async function createCollaborationCommunity({
   ownerId,
   coOwnerId,
@@ -74,6 +156,8 @@ async function createCollaborationCommunity({
   description,
   category = 'Other',
   isPublic = true,
+  ownerDisplayCommunityId = null,
+  coOwnerDisplayCommunityId = null,
 }) {
   const base = String(name || 'collab')
     .toLowerCase()
@@ -98,6 +182,8 @@ async function createCollaborationCommunity({
     owner: ownerId,
     kind: 'collaboration',
     coOwner: coOwnerId,
+    ownerDisplayCommunity: ownerDisplayCommunityId || null,
+    coOwnerDisplayCommunity: coOwnerDisplayCommunityId || null,
     members: memberIds,
     memberJoins: memberIds.map((userId) => ({ userId, joinedAt: createdAt })),
     memberCount: 2,
@@ -114,9 +200,66 @@ async function createCollaborationCommunity({
     $addToSet: { ownedCommunities: doc._id, joinedCommunities: doc._id },
   });
 
-  return Community.findById(doc._id)
-    .populate('owner', 'username fullName avatar')
-    .populate('coOwner', 'username fullName avatar');
+  return populateCollaboration(doc._id);
+}
+
+/** Swap primary owner ↔ coOwner (and their display communities). */
+async function swapCollaborationCreators(community) {
+  if (!community || community.kind !== 'collaboration') {
+    const err = new Error('Not a collaboration');
+    err.code = 'not_collaboration';
+    throw err;
+  }
+  const coId = community.coOwner;
+  if (!coId) {
+    const err = new Error('Collaboration has no co-owner');
+    err.code = 'no_coowner';
+    throw err;
+  }
+  const prevOwner = community.owner;
+  const prevOwnerFace = community.ownerDisplayCommunity;
+  community.owner = coId;
+  community.coOwner = prevOwner;
+  community.ownerDisplayCommunity = community.coOwnerDisplayCommunity;
+  community.coOwnerDisplayCommunity = prevOwnerFace;
+  await community.save();
+  return populateCollaboration(community._id);
+}
+
+async function setCollaborationCreatorFaces(community, { ownerDisplayCommunityId, coOwnerDisplayCommunityId }) {
+  if (!community || community.kind !== 'collaboration') {
+    const err = new Error('Not a collaboration');
+    err.code = 'not_collaboration';
+    throw err;
+  }
+  if (ownerDisplayCommunityId !== undefined) {
+    community.ownerDisplayCommunity = ownerDisplayCommunityId
+      ? await resolveOwnedDisplayCommunity(community.owner, ownerDisplayCommunityId)
+      : null;
+  }
+  if (coOwnerDisplayCommunityId !== undefined) {
+    if (!community.coOwner) {
+      const err = new Error('Collaboration has no co-owner');
+      err.code = 'no_coowner';
+      throw err;
+    }
+    community.coOwnerDisplayCommunity = coOwnerDisplayCommunityId
+      ? await resolveOwnedDisplayCommunity(community.coOwner, coOwnerDisplayCommunityId)
+      : null;
+  }
+  await community.save();
+  return populateCollaboration(community._id);
+}
+
+async function listOwnedCommunitiesForUser(userId) {
+  return Community.find({
+    owner: userId,
+    kind: { $ne: 'collaboration' },
+  })
+    .sort({ memberCount: -1, createdAt: -1 })
+    .select('name handle avatar memberCount')
+    .limit(40)
+    .lean();
 }
 
 async function getInviteStatusForViewer(viewerId, profileUser) {
@@ -148,5 +291,12 @@ module.exports = {
   areFriends,
   evaluateCollaborationInvite,
   createCollaborationCommunity,
+  swapCollaborationCreators,
+  setCollaborationCreatorFaces,
+  resolveOwnedDisplayCommunity,
+  attachCollaborationFaces,
+  populateCollaboration,
+  listOwnedCommunitiesForUser,
+  COLLAB_POPULATE,
   getInviteStatusForViewer,
 };

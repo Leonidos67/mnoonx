@@ -40,7 +40,7 @@ const AdminLogin: React.FC = () => {
           </span>
           <div>
             <h1 className="text-xl font-bold text-white">Вход в админку</h1>
-            <p className="text-sm text-neutral-500">MNOONX Alpha Space</p>
+            <p className="text-sm text-neutral-500">MNOONX</p>
           </div>
         </div> */}
 

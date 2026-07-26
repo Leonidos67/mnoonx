@@ -10,30 +10,14 @@ import {
 } from '../../constants/communityAdminPermissions';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useTranslation } from '../../i18n/useTranslation';
+import {
+  COMMUNITY_CATEGORY_LABEL_KEY,
+  COMMUNITY_CATEGORY_OPTIONS,
+  isCommunityCategory,
+} from '../../constants/communityCategories';
+import StyledSelect from '../../components/Common/StyledSelect';
 
 import { COMMUNITIES_API as API_URL } from '../../config/api';
-
-const CATEGORIES = [
-  'Memecoins',
-  'Futures',
-  'On-Chain',
-  'Airdrops',
-  'Education',
-  'DeFi',
-  'NFT',
-  'Other',
-] as const;
-
-const SETTINGS_CATEGORY_TKEY: Record<(typeof CATEGORIES)[number], string> = {
-  Memecoins: 'communitySettings.categoryMemecoins',
-  Futures: 'communitySettings.categoryFutures',
-  'On-Chain': 'communitySettings.categoryOnChain',
-  Airdrops: 'communitySettings.categoryAirdrops',
-  Education: 'communitySettings.categoryEducation',
-  DeFi: 'communitySettings.categoryDeFi',
-  NFT: 'communitySettings.categoryNFT',
-  Other: 'communitySettings.categoryOther',
-};
 
 const CommunityDashboardSettings: React.FC = () => {
   const navigate = useNavigate();
@@ -271,17 +255,15 @@ const CommunityDashboardSettings: React.FC = () => {
           </div>
           <div>
             <label className="mb-2 block text-sm font-medium text-neutral-700">{t('communitySettings.category')}</label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-xl border border-neutral-200 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-black/10"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {t(SETTINGS_CATEGORY_TKEY[c])}
-                </option>
-              ))}
-            </select>
+            <StyledSelect
+              value={isCommunityCategory(category) ? category : 'Other'}
+              aria-label={t('communitySettings.category')}
+              options={COMMUNITY_CATEGORY_OPTIONS.map((c) => ({
+                value: c,
+                label: t(COMMUNITY_CATEGORY_LABEL_KEY[c]),
+              }))}
+              onChange={setCategory}
+            />
           </div>
         </section>
 

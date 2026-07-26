@@ -4,11 +4,12 @@ import {
   LinkIcon,
   TrashIcon,
   UserPenIcon,
+  UserPlusIcon,
   type IconHandle,
 } from '@animateicons/react/lucide';
 import { useAnimateOnParentHover } from '../../hooks/useAnimateOnParentHover';
 
-type Kind = 'ellipsis' | 'link' | 'edit' | 'trash';
+type Kind = 'ellipsis' | 'link' | 'edit' | 'trash' | 'follow';
 
 type AnimatedPostMenuIconProps = {
   kind: Kind;
@@ -49,6 +50,8 @@ export const AnimatedPostMenuIcon: React.FC<AnimatedPostMenuIconProps> = ({
         <LinkIcon {...shared} />
       ) : kind === 'edit' ? (
         <UserPenIcon {...shared} />
+      ) : kind === 'follow' ? (
+        <UserPlusIcon {...shared} />
       ) : (
         <TrashIcon {...shared} />
       )}
